@@ -58,6 +58,19 @@ Last updated: 2026-11-19
 
 See [Task Manager contract](TASK_MANAGER.md).
 
+## Production Orchestrator
+
+- Initial code-defined workflow registry added with `creative.preproduction` v1 (research intake → story development → character/world bible → visual development → storyboard → production handoff).
+- Production runs and ordered steps are persisted in `production_runs` and `production_steps`; migration 0008 added.
+- Run creation writes the run, all task records, dependency edges, task events, and step mappings in one transaction.
+- Idempotency protects run creation and detects key/request conflicts.
+- Human approval checkpoints are represented by tasks in `waiting_approval`; approval releases the task to the Task Manager queue, while rejection cancels it.
+- API routes expose workflow registry, run creation/list/detail, and task approval/rejection.
+- Workflow handlers, worker process, run-level pause/resume/cancellation, database-managed workflow templates, and authenticated approvals are not implemented.
+- Migration 0008 and orchestrator tests are implemented but await CI verification.
+
+See [Production Orchestrator contract](PRODUCTION_ORCHESTRATOR.md).
+
 ## AI Gateway API routes
 
 All routes are under `/api/v1`:
