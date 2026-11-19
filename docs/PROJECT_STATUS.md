@@ -88,3 +88,5 @@ Never infer one status from another.
 - Settlement replay is accepted only for an exact match of the previously recorded final status and actual cost. Conflicting updates are rejected and do not mutate the ledger.
 - Added regression tests for repeated start, repeated settlement, conflicting settlement, and avoiding duplicate start audit events.
 - This does not add lease expiry, hard process termination, or automatic reconciliation for abandoned reservations.
+
+- Duplicate Runtime callers that encounter an active Gateway idempotency lease now leave the reservation running for safe retry instead of prematurely settling it as failed; a regression test covers this case.

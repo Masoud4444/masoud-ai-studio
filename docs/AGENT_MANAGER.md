@@ -95,3 +95,6 @@ execution remain unconfigured until the owner explicitly configures them.
 - Retrying a reservation already in `running` returns the existing reservation instead of starting a second ledger execution. The caller must reuse the same idempotency key; the AI Gateway then deduplicates/replays the corresponding model request.
 - Repeated settlement is accepted only when both final status and actual cost exactly match the first settlement. Conflicting settlement attempts are rejected, and audit events are not duplicated.
 - This supports recovery after a caller/process interruption and concurrent duplicate submissions. It does not replace a durable runtime execution record, lease expiry policy, or operator reconciliation for genuinely abandoned reservations.
+
+
+- If the Gateway reports `request_in_progress` for a duplicate caller while the original idempotent request is still within its lease, the Runtime leaves the budget reservation in `running`. It does not prematurely mark the execution failed; retrying with the same key can receive the stored Gateway result after completion.

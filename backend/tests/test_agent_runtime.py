@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from backend.app.database import Base
-from backend.app.models import AIModelPricing, AIProvider
+from backend.app.models import AIModelPricing, AIProvider, AgentBudgetReservation
 from backend.app.agent_manager import create_agent, enable_agent
 from backend.app.agent_schemas import AgentCreate
 from backend.app.agent_runtime import run_agent
@@ -103,3 +103,32 @@ def test_runtime_reserves_budget_and_replays_stored_gateway_result(db_session, m
     assert second["replayed"] is True
     assert len(calls) == 2
     assert calls[0] == calls[1]
+
+
+
+def test_runtime_keeps_reservation_running_when_gateway_reports_in_progress(db_session, monkeypatch):
+    agent_id = configured_agent(db_session)
+
+    async def gateway_in_progress(_db, _payload, _key):
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "request_in_progress"},
+        )
+
+    monkeypatch.setattr(
+        "backend.app.agent_runtime.generate_chat_completion",
+        gateway_in_progress,
+    )
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(
+            run_agent(
+                db_session,
+                agent_id,
+                "Retry the same request safely.",
+                "runtime-key-in-progress-01",
+            )
+        )
+    assert exc.value.detail["code"] == "request_in_progress"
+    reservation = db_session.query(AgentBudgetReservation).one()
+    assert reservation.status == "running"
+    assert reservation.actual_cost_usd is None

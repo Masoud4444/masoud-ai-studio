@@ -142,7 +142,17 @@ async def run_agent(db: Session, agent_id: str, user_message: str, idempotency_k
             "reservation": settled,
             "replayed": bool(result.get("replayed", False)),
         }
-    except Exception:
+    except Exception as exc:
+        # Another request with the same key may currently own the Gateway lease.
+        # Keep this reservation running so the caller can retry and receive the
+        # encrypted Gateway replay; do not prematurely settle a live execution.
+        if (
+            started
+            and isinstance(exc, HTTPException)
+            and isinstance(exc.detail, dict)
+            and exc.detail.get("code") == "request_in_progress"
+        ):
+            raise
         if started:
             # On ambiguous provider failures, charge the full reserved upper bound
             # in the ledger rather than assuming that no billable work occurred.
