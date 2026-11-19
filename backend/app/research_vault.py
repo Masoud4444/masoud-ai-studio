@@ -171,6 +171,7 @@ def link_source_to_project(db: Session, source_id: str, project_id: str, notes: 
     if link:
         if notes is not None and link.notes != notes:
             link.notes = notes
+            _event(db, "source", source_id, "source_project_notes_updated", {"project_id": project_id})
             db.commit()
             db.refresh(link)
         return {"source_id": source_id, "project_id": project_id,
@@ -195,6 +196,18 @@ def detach_source_from_project(db: Session, source_id: str, project_id: str):
     ))
     if link is None:
         raise HTTPException(status_code=404, detail={"code": "research_source_link_not_found"})
+    referenced = db.scalar(
+        select(ResearchClaimEvidence.id)
+        .join(ResearchEvidence, ResearchEvidence.id == ResearchClaimEvidence.evidence_id)
+        .join(ResearchClaim, ResearchClaim.id == ResearchClaimEvidence.claim_id)
+        .where(
+            ResearchClaim.project_id == project_id,
+            ResearchEvidence.source_id == source_id,
+        )
+        .limit(1)
+    )
+    if referenced is not None:
+        raise HTTPException(status_code=409, detail={"code": "research_source_has_claim_evidence"})
     db.delete(link)
     _event(db, "source", source_id, "source_detached_from_project", {"project_id": project_id})
     db.commit()
@@ -312,6 +325,22 @@ def link_evidence_to_claim(db: Session, claim_id: str, evidence_id: str,
         if existing.relationship == relationship and existing.note == note:
             return {"claim_id": claim_id, "evidence_id": evidence_id,
                     "relationship": relationship, "note": note, "replayed": True}
+        if claim.status == "accepted" and existing.relationship == "supports" and relationship != "supports":
+            other_support = db.scalar(select(ResearchClaimEvidence.id).where(
+                ResearchClaimEvidence.claim_id == claim_id,
+                ResearchClaimEvidence.relationship == "supports",
+                ResearchClaimEvidence.id != existing.id,
+            ).limit(1))
+            if other_support is None:
+                raise HTTPException(status_code=409, detail={"code": "accepted_claim_requires_supporting_evidence"})
+        if claim.status == "rejected" and existing.relationship == "contradicts" and relationship != "contradicts":
+            other_contradiction = db.scalar(select(ResearchClaimEvidence.id).where(
+                ResearchClaimEvidence.claim_id == claim_id,
+                ResearchClaimEvidence.relationship == "contradicts",
+                ResearchClaimEvidence.id != existing.id,
+            ).limit(1))
+            if other_contradiction is None:
+                raise HTTPException(status_code=409, detail={"code": "rejected_claim_requires_contradicting_evidence"})
         existing.relationship = relationship
         existing.note = note
         _event(db, "claim", claim_id, "claim_evidence_relation_updated", {

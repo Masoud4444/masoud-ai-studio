@@ -134,3 +134,41 @@ def test_claim_rejection_requires_contradicting_evidence_and_events(db_session):
     result = update_claim(db_session, claim["id"], ResearchClaimUpdate(status="rejected"))
     assert result["status"] == "rejected"
     assert len(db_session.scalars(select(ResearchEvent)).all()) >= 4
+
+
+
+def test_source_cannot_be_detached_while_claim_uses_its_evidence(db_session):
+    p = project(db_session, "research-linked-claim")
+    source = create_source(db_session, ResearchSourceCreate(
+        source_type="note", title="Claim source", project_id=p.id
+    ))
+    evidence = create_evidence(db_session, source["id"], ResearchEvidenceCreate(
+        excerpt="A preserved supporting passage."
+    ))
+    claim = create_claim(db_session, ResearchClaimCreate(
+        project_id=p.id, statement="A claim backed by the source."
+    ))
+    link_evidence_to_claim(db_session, claim["id"], evidence["id"], "supports")
+    with pytest.raises(HTTPException) as exc:
+        detach_source_from_project(db_session, source["id"], p.id)
+    assert exc.value.detail["code"] == "research_source_has_claim_evidence"
+    assert get_source(db_session, source["id"])["project_ids"] == [p.id]
+
+
+def test_accepted_claim_cannot_lose_its_last_supporting_relation(db_session):
+    p = project(db_session, "research-accepted-claim")
+    source = create_source(db_session, ResearchSourceCreate(
+        source_type="note", title="Support source", project_id=p.id
+    ))
+    evidence = create_evidence(db_session, source["id"], ResearchEvidenceCreate(
+        excerpt="The supporting observation."
+    ))
+    claim = create_claim(db_session, ResearchClaimCreate(
+        project_id=p.id, statement="A supported claim."
+    ))
+    link_evidence_to_claim(db_session, claim["id"], evidence["id"], "supports")
+    update_claim(db_session, claim["id"], ResearchClaimUpdate(status="accepted"))
+    with pytest.raises(HTTPException) as exc:
+        link_evidence_to_claim(db_session, claim["id"], evidence["id"], "contextualizes")
+    assert exc.value.detail["code"] == "accepted_claim_requires_supporting_evidence"
+    assert get_claim(db_session, claim["id"])["evidence"][0]["relationship"] == "supports"
