@@ -12,26 +12,43 @@ A private, local-first AI creative production studio for research, story develop
 - Preserve provenance, version history, continuity, privacy, recoverability, and cost visibility.
 - The product is a private owner-operated studio, not a multi-tenant SaaS.
 
-## Planned technology baseline
+## Technology baseline
 
-- Frontend: React, TypeScript, Tailwind CSS
+- Frontend: React, TypeScript, Tailwind CSS (not implemented yet)
 - Backend: Python, FastAPI, SQLAlchemy 2, Pydantic, Alembic
 - Initial database: SQLite
-- Desktop shell: Tauri
-- Companion clients: Android and Web/PWA
+- Desktop shell: Tauri (not implemented yet)
+- Companion clients: Android and Web/PWA (not implemented yet)
 
-Technology choices remain subject to the architecture decisions and compatibility checks documented in this repository.
+## Repository and branch
 
-## Repository status
+- Private repository: `Masoud4444/masoud-ai-studio`.
+- Current implementation branch: `implementation/bootstrap-001`.
+- This branch is intentionally separate from `main`; no merge has been performed.
+- The implementation below is a fresh code path. Foundation 002 has not been imported or inspected in this branch.
 
-This repository was initially created empty. The first commit establishes project documentation and repository conventions only.
+## Implemented backend slices
 
-The previously produced **Foundation 002** archive is retained in the project's file library and is the intended implementation baseline. Its reported Linux test result was 8/8 tests passed; this result has not yet been independently re-run from this repository. The archive has not yet been imported into this repository, so no claim is made that its source code is present here.
+- Project lifecycle API with optimistic version checks.
+- Content-addressed storage and project asset linking.
+- AI Provider registry with encrypted credentials and SSRF-aware URL validation.
+- OpenAI-compatible non-streaming chat completion gateway with pinned DNS resolution, response encryption and idempotency.
+- Model capability declarations and provider model-ID verification.
+- Token usage ledger, manually configured model pricing, estimated cost tracking, and immutable pricing history.
+- Alembic schema migration baseline and follow-up migrations.
 
-**Next milestone:** safely inspect and import Foundation 002, then implement Package 003 — Projects & Storage Foundation — without overwriting or duplicating existing work.
+See [Project Status](docs/PROJECT_STATUS.md), [Architecture](docs/ARCHITECTURE.md), and [AI Gateway Guide](docs/AI_GATEWAY.md).
 
-See [Project Status](docs/PROJECT_STATUS.md) and [Architecture](docs/ARCHITECTURE.md).
+## Development setup
 
+```bash
+python -m pip install -r requirements.txt
+mkdir -p data
+alembic upgrade head
+uvicorn backend.app.main:app --reload
+```
+
+Set `MASOUD_STUDIO_DATABASE_URL` if using a different database. Managed application startup expects migrations to have been applied. `MASOUD_STUDIO_SCHEMA_MODE=create` enables development-only metadata bootstrap.
 
 ## Project asset endpoints
 
@@ -40,3 +57,7 @@ See [Project Status](docs/PROJECT_STATUS.md) and [Architecture](docs/ARCHITECTUR
 - `DELETE /api/v1/projects/{project_id}/assets/{link_id}` (detaches the project link; it does not delete shared blob bytes)
 
 Blobs are stored locally under `data/storage/blobs/<sha256-prefix>/<sha256>` by default. Configure with `MASOUD_STUDIO_STORAGE_ROOT`; configure the upload limit with `MASOUD_STUDIO_MAX_UPLOAD_BYTES`.
+
+## Important security boundary
+
+The backend does not yet implement user authentication/authorization. Keep it bound to localhost or a trusted private environment. Do not expose it to the public internet. Windows deployment and recovery behavior still require verification.
