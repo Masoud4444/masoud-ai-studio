@@ -92,6 +92,7 @@ Build frontend with npm run build.
 
 ## Project documentation
 
+- Local Windows installation: docs/INSTALLATION.md
 - Project status and roadmap: docs/PROJECT_STATUS.md
 - Architecture: docs/ARCHITECTURE.md
 - Frontend and Windows setup: docs/FRONTEND.md

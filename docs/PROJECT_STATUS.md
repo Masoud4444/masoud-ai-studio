@@ -167,3 +167,13 @@ Never infer one status from another.
 - Added transition explanations and evidence/production notes; fact records can be versioned and soft-deactivated through the API.
 - Added one-click deterministic analysis and a review queue to confirm, dismiss as false positive, or mark findings resolved.
 - The interface distinguishes high/medium/low severity and displays the source scenes and fact history.
+
+
+## Local Windows launch increment — 2026-11-19
+
+- Added a production-style local serving path: when frontend/dist/index.html exists, FastAPI serves the compiled React application from the same process after registering API and health routes.
+- Added scripts/start-studio-windows.bat. It checks the local virtual environment and frontend build, applies pending Alembic migrations, refuses to start when port 8000 is already occupied, starts Uvicorn bound to 127.0.0.1, waits for the expected health response and opens the browser.
+- Updated the Windows guide and README to describe the one-command local browser launch workflow and distinguish it from development mode.
+- This increment has been committed to implementation/bootstrap-001 as 459ffff41b09e905c2fa5f7fafe613a5b638957f.
+- Verification for this increment: repository files and branch head were inspected after commit. No tests or builds were rerun. The launcher has not yet been executed on a Windows machine.
+- This is not yet a native desktop installer. Tauri packaging, a bundled Python runtime/backend, Windows code signing, DPAPI-backed credential protection, update delivery, backup/restore and hands-on Windows acceptance remain outstanding.
