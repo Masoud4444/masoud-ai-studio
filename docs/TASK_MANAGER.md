@@ -51,13 +51,13 @@ The internal service functions in `backend/app/task_manager.py` are the worker c
 
 Workers must only store sanitized error messages. Raw provider responses, prompts, credentials, and secrets must not be placed in task error fields or event details.
 
-**Worker supervisor foundation:** `backend/app/worker.py` now provides a sequential, single-process supervisor, a validated handler registry, per-operation database sessions, lease recovery, handler-type allowlisting, bounded result serialization, graceful stop signalling, and sanitized failure persistence. The API lifespan starts it only when `MASOUD_STUDIO_WORKER_ENABLED=true`; the default is disabled. The only built-in handler is the non-billable `system.healthcheck` smoke-test handler. Creative workflow task types remain queued until their owning modules register real handlers.
+**Worker supervisor foundation:** `backend/app/worker.py` now provides a sequential, single-process supervisor, a validated handler registry, per-operation database sessions, lease recovery, handler-type allowlisting, active lease heartbeats/renewal, bounded result serialization, graceful stop signalling, and sanitized failure persistence. The API lifespan starts it only when `MASOUD_STUDIO_WORKER_ENABLED=true`; the default is disabled. The only built-in handler is the non-billable `system.healthcheck` smoke-test handler. Creative workflow task types remain queued until their owning modules register real handlers.
 
 No public claim/complete endpoints exist. Keep the API and opt-in worker on localhost or a trusted private environment; the API still has no authentication/authorization. Run a single worker process with SQLite; multi-worker claim coordination and production-grade locking still require verification and hardening.
 
 ## Not yet implemented
 
-- Windows service/desktop process management, worker health telemetry, bounded execution timeouts, and multi-worker-safe claim coordination.
+- Windows service/desktop process management, hard execution timeouts/process isolation, worker health telemetry, and multi-worker-safe claim coordination.
 - Dead-letter queue UI and operator dashboard.
 - Cancellation signalling for already-running work.
 - Per-task resource quotas, global concurrency limits, and rate limiting.
