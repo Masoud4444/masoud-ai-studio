@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, m
 class ProviderCreate(BaseModel):
     name: str = Field(min_length=2, max_length=100, pattern=r"^[A-Za-z0-9][A-Za-z0-9 _.-]*$")
     base_url: str = Field(min_length=10, max_length=500)
+    connection_type: Literal["remote", "local"] = "remote"
     api_key: SecretStr | None = None
     models: list[str] = Field(default_factory=list, max_length=100)
     priority: int = Field(default=100, ge=1, le=1000)
