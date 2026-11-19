@@ -26,8 +26,8 @@ KEY_ENV = "MASOUD_STUDIO_CREDENTIAL_KEY"
 KEY_VERSION = int(os.getenv("MASOUD_STUDIO_CREDENTIAL_KEY_VERSION", "1"))
 
 
-def _master_key() -> bytes:
-    encoded = os.getenv(KEY_ENV, "")
+def _master_key(version: int = KEY_VERSION) -> bytes:
+    encoded = os.getenv(f"{KEY_ENV}_V{version}", "") or (os.getenv(KEY_ENV, "") if version == 1 else "")
     if not encoded:
         raise HTTPException(status_code=503, detail={"code": "credential_encryption_not_configured"})
     try:
@@ -45,9 +45,10 @@ def encrypt_secret(secret: str) -> str:
     return base64.urlsafe_b64encode(nonce + ciphertext).decode("ascii")
 
 
-def decrypt_secret(ciphertext: str) -> str:
+def decrypt_secret(ciphertext: str, key_version: int = KEY_VERSION) -> str:
     raw = base64.urlsafe_b64decode(ciphertext.encode("ascii"))
-    return AESGCM(_master_key()).decrypt(raw[:12], raw[12:], b"masoud-ai-studio:provider:v1").decode("utf-8")
+    aad = f"masoud-ai-studio:provider:v{key_version}".encode("ascii")
+    return AESGCM(_master_key(key_version)).decrypt(raw[:12], raw[12:], aad).decode("utf-8")
 
 
 def validate_provider_url(value: str) -> str:
