@@ -5,9 +5,7 @@ execute tools, access project files, or perform external write actions.
 """
 import hashlib
 import json
-import math
 from decimal import Decimal
-from uuid import uuid4
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -81,12 +79,33 @@ async def run_agent(db: Session, agent_id: str, user_message: str, idempotency_k
         db, agent.id, runtime_key, request_hash,
         _upper_bound_cost(agent, pricing, user_message),
     )
-    if reservation["status"] in {"succeeded", "failed"}:
+    gateway_key = hashlib.sha256(runtime_key.encode("utf-8")).hexdigest()
+    payload = ChatCompletionRequest(
+        model=agent.model_id,
+        provider_id=agent.provider_id,
+        temperature=float(agent.temperature),
+        max_tokens=agent.max_output_tokens,
+        messages=[
+            ChatMessage(role="system", content=agent.system_prompt),
+            ChatMessage(role="user", content=user_message),
+        ],
+    )
+    if reservation["status"] == "succeeded":
+        result = await generate_chat_completion(db, payload, gateway_key)
         return {
             "agent_id": agent.id,
+            "content": result["content"],
+            "model": result["model"],
+            "usage": {
+                "prompt_tokens": result["prompt_tokens"],
+                "completion_tokens": result["completion_tokens"],
+                "total_tokens": result["total_tokens"],
+            },
             "reservation": reservation,
             "replayed": True,
         }
+    if reservation["status"] == "failed":
+        raise HTTPException(status_code=409, detail={"code": "agent_previous_run_failed_use_new_idempotency_key"})
     if reservation["status"] == "released":
         raise HTTPException(status_code=409, detail={"code": "agent_budget_reservation_released"})
 
@@ -94,17 +113,6 @@ async def run_agent(db: Session, agent_id: str, user_message: str, idempotency_k
     try:
         reservation = start_agent_budget_reservation(db, reservation["id"])
         started = True
-        gateway_key = hashlib.sha256(runtime_key.encode("utf-8")).hexdigest()
-        payload = ChatCompletionRequest(
-            model=agent.model_id,
-            provider_id=agent.provider_id,
-            temperature=float(agent.temperature),
-            max_tokens=agent.max_output_tokens,
-            messages=[
-                ChatMessage(role="system", content=agent.system_prompt),
-                ChatMessage(role="user", content=user_message),
-            ],
-        )
         result = await generate_chat_completion(db, payload, gateway_key)
         gateway_idem_hash = hashlib.sha256(gateway_key.encode("utf-8")).hexdigest()
         usage = db.scalar(
