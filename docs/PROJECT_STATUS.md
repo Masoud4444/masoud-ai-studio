@@ -34,8 +34,10 @@ Last updated: 2026-11-19
 ## Testing and verification
 
 - Pytest coverage exists for project and storage behavior, and new tests cover AI Gateway credential encryption and provider URL rejection.
-- Tests have **not** been executed in this environment. No claim is made that the branch currently passes.
-- GitHub Actions must be checked after the latest commit; absence of reported status is not a passing result.
+- GitHub Actions run `44444397076` for commit `2410ee783f2a844a55112c9591efcac92fe5aff8` completed successfully on 2026-11-19.
+- Result: **14 passed, 1 warning** (Python 3.11, Ubuntu GitHub Actions runner).
+- Earlier CI attempts exposed dependency-line and escaped-newline errors; these were corrected before the successful run.
+- This is Linux CI verification only. Windows behavior remains unverified.
 - Schema creation still uses SQLAlchemy `create_all` during app startup. Alembic migrations are required before production use.
 - Windows-specific behavior has not been verified.
 
