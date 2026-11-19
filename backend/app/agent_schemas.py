@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Literal
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class AgentCreate(BaseModel):
@@ -44,6 +44,30 @@ class AgentUpdate(BaseModel):
     max_cost_per_run_usd: float | None = Field(default=None, gt=0, le=1000)
     monthly_budget_usd: float | None = Field(default=None, gt=0, le=100000)
     permissions: list[str] | None = Field(default=None, max_length=50)
+
+    @model_validator(mode="after")
+    def reject_null_for_required_fields(self):
+        nullable = {"description", "provider_id", "model_id"}
+        for field_name in self.model_fields_set - nullable:
+            if getattr(self, field_name) is None:
+                raise ValueError(f"{field_name} cannot be null")
+        return self
+
+    @field_validator("permissions")
+    @classmethod
+    def clean_updated_permissions(cls, values):
+        if values is None:
+            return values
+        allowed = {"research.read", "project.read", "asset.read", "content.create",
+                   "content.edit", "asset.create", "task.create", "ai.generate"}
+        result = []
+        for value in values:
+            item = value.strip()
+            if item not in allowed:
+                raise ValueError("Unsupported agent permission")
+            if item not in result:
+                result.append(item)
+        return result
 
 
 class AgentToolGrantInput(BaseModel):
