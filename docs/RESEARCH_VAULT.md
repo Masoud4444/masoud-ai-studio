@@ -8,7 +8,7 @@ The Research Vault is the studio's provenance-aware knowledge workspace. It sepa
 
 - Register URL, document, note, transcript, dataset and other source records.
 - Link one source to multiple projects without duplicating its identity.
-- Associate an existing content-addressed Asset with a source.
+- Associate an existing content-addressed Asset with a source. When the source is project-linked, the asset must already be attached to that same project.
 - Preserve author, publisher, publication date, retrieval date, language, summary, URL and flexible metadata.
 - Capture evidence excerpts with locators such as page, section, timestamp or dataset row.
 - Deduplicate identical evidence for the same source using SHA-256 content identity.
@@ -65,4 +65,5 @@ All routes are under /api/v1:
 
 - Service-level tests cover URL validation/canonicalization, project association, source-link idempotency, evidence deduplication, claim review requirements and provenance events.
 - HTTP integration tests cover the source → evidence → claim → review flow and verify that a source cannot be detached while a project claim still cites its evidence.
-- The complete backend suite and Alembic migration to revision 0012 passed in GitHub Actions run 44510354753 (85 tests, one non-failing warning).
+- Asset-link validation tests ensure a source cannot attach a file from a different project.
+- The complete backend suite and Alembic migration to revision 0012 passed in GitHub Actions run 44510598517 (86 tests, one non-failing warning).

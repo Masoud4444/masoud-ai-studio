@@ -8,7 +8,7 @@ The current frontend is a React + TypeScript + Vite application designed to run 
 - Production room: list workflows and runs, create a preproduction run, pause/resume/cancel run controls, approval-gate visibility.
 - AI agents: create draft agent profiles, list registry, enable/disable where provider configuration permits.
 - Assets: select a project, upload an asset, list attached assets, detach an asset without deleting the underlying content-addressed blob.
-- Research Vault: register source metadata, scope sources to projects, capture exact excerpts and locators, create project claims, link evidence as support/contradiction/context and review claims with evidence gates. The UI respects the backend's claim-evidence integrity rules.
+- Research Vault: register source metadata, scope sources to projects, capture exact excerpts and locators, create project claims, link evidence as support/contradiction/context and review claims with evidence gates. The UI respects the backend's claim-evidence integrity rules. It can attach an existing project asset to a source; upload the file first in the Assets workspace.
 - Characters & Worlds, Video & Audio, Compliance and Settings show explicit staged-module states; they are not represented as completed features.
 
 ## Development
