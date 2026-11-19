@@ -147,3 +147,47 @@ def test_model_capabilities_are_marked_as_declared_not_verified():
         assert result["context_window"] == 64000
         assert list_model_capabilities(db)[0]["capabilities"] == ["chat", "vision"]
     engine.dispose()
+
+
+def test_provider_connection_marks_only_matching_declared_models_verified(monkeypatch):
+    from backend.app.ai_gateway import test_provider_connection
+    engine, Session = gateway_db()
+    async def fake_models(provider):
+        return ["declared-model", "remote-only-model"]
+    monkeypatch.setattr("backend.app.ai_gateway._fetch_provider_model_list", fake_models)
+    with Session() as db:
+        provider = AIProvider(name="Probe Provider", base_url="https://api.example/v1", models_json='["declared-model", "missing-model"]')
+        db.add(provider)
+        db.commit()
+        result = asyncio.run(test_provider_connection(db, provider.id))
+        assert result["status"] == "verified"
+        assert result["verified_models"] == ["declared-model"]
+        assert result["unmatched_declared_models"] == ["missing-model"]
+    engine.dispose()
+
+
+def test_expired_idempotency_lease_can_be_recovered(monkeypatch):
+    import hashlib
+    from backend.app.ai_gateway import _request_hash
+    engine, Session = gateway_db()
+    monkeypatch.setenv("MASOUD_STUDIO_CREDENTIAL_KEY", base64.urlsafe_b64encode(b"r" * 32).decode("ascii"))
+    calls = {"count": 0}
+    async def fake_send(provider, payload):
+        calls["count"] += 1
+        return {"id": "recovered", "model": payload.model, "content": "recovered", "prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
+    monkeypatch.setattr("backend.app.ai_gateway._send_chat_completion", fake_send)
+    request = ChatCompletionRequest(model="m1", messages=[{"role":"user","content":"recover"}])
+    with Session() as db:
+        provider = AIProvider(name="Lease Provider", base_url="https://api.example/v1", models_json='["m1"]')
+        db.add(provider)
+        db.commit()
+        db.add(AIRequest(
+            id="expired-request", idempotency_hash=hashlib.sha256(b"lease-key-001").hexdigest(),
+            request_hash=_request_hash(request), provider_id=provider.id, model="m1",
+            status="pending", lease_expires_at=1,
+        ))
+        db.commit()
+        result = asyncio.run(generate_chat_completion(db, request, "lease-key-001"))
+        assert result["content"] == "recovered"
+        assert calls["count"] == 1
+    engine.dispose()
