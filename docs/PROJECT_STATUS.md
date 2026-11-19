@@ -129,7 +129,7 @@ See [AI Gateway implementation guide](AI_GATEWAY.md) for setup, environment conf
 1. Add integration tests for the outbound HTTP transport, DNS pinning, response sanitization, credential-key rotation, and concurrent idempotency.
 2. Complete AI Gateway operational controls: provider priority/routing, safe failure policy, budget controls, concurrency limits, circuit breaker, and optional streaming.
 3. Add Windows DPAPI-backed secret custody and Windows CI / packaging verification.
-4. Verify migrations 0007–0008 and Task Manager/Orchestrator/Worker tests; add lease renewal, bounded execution and multi-worker-safe claims before enabling creative handlers.
+4. Verify migrations 0007–0008 and Task Manager/Orchestrator/Worker tests; add hard execution timeouts/process isolation and multi-worker-safe claims before enabling creative handlers.
 5. Add run-level controls, versioned workflow registry, worker heartbeat/timeout supervision, and operator recovery tooling.
 6. Implement task handlers and proceed with Research/Intake, Story, Character/Universe, Visual, Video, Audio, QA/Compliance, Export, Analytics, and companion clients.
 
@@ -151,7 +151,7 @@ Never infer one status from another.
 - Results are JSON-serialized and bounded by a configurable in-process limit (default 4 MiB).
 - Worker starts only when `MASOUD_STUDIO_WORKER_ENABLED=true`; default is disabled. Graceful shutdown waits for the current synchronous handler to finish.
 - Only `system.healthcheck` is built in. Creative workflow task types intentionally remain queued until their actual modules register handlers.
-- Known limits: synchronous handlers cannot be forcibly interrupted; lease heartbeat/renewal, per-handler execution timeout, process isolation, multi-worker SQLite coordination, and operator telemetry remain future work.
+- Known limits: synchronous handlers cannot be forcibly interrupted; per-handler hard timeouts, process isolation, multi-worker SQLite coordination, and operator telemetry remain future work.
 
 
 ## Latest implementation checkpoint
