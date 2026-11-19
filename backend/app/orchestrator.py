@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -74,10 +74,8 @@ def _run_payload(run: ProductionRun, db: Session, replayed: bool = False) -> dic
         status = "blocked"
     else:
         status = "queued"
-    if run.status != status:
-        run.status = status
-        run.updated_at = _now()
-        db.commit()
+    # Status is a read-time projection of task states. GET/list operations must
+    # not mutate persisted state or commit unrelated caller transactions.
     return {
         "id": run.id, "project_id": run.project_id,
         "workflow_key": run.workflow_key, "workflow_version": run.workflow_version,
@@ -184,7 +182,10 @@ def list_production_runs(db: Session, limit: int = 50, offset: int = 0,
     query = select(ProductionRun)
     if project_id:
         query = query.where(ProductionRun.project_id == project_id)
-    total = len(db.scalars(query).all())
+    count_query = select(func.count()).select_from(ProductionRun)
+    if project_id:
+        count_query = count_query.where(ProductionRun.project_id == project_id)
+    total = db.scalar(count_query) or 0
     rows = db.scalars(query.order_by(ProductionRun.created_at.desc())
                       .offset(offset).limit(limit)).all()
     return {"items": [_run_payload(row, db) for row in rows],
