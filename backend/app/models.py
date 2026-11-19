@@ -1,6 +1,6 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from uuid import uuid4
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, Boolean, Numeric
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, Boolean, Numeric, Date
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
 
@@ -236,3 +236,18 @@ class AgentEvent(Base):
     event_type: Mapped[str] = mapped_column(String(40), nullable=False)
     detail_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+
+class AgentBudgetReservation(Base):
+    __tablename__ = "agent_budget_reservations"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    agent_id: Mapped[str] = mapped_column(ForeignKey("studio_agents.id", ondelete="RESTRICT"), index=True, nullable=False)
+    idempotency_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    period_start: Mapped[date] = mapped_column(Date, index=True, nullable=False)
+    reserved_usd: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
+    actual_cost_usd: Mapped[float | None] = mapped_column(Numeric(18, 8), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="reserved", index=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
