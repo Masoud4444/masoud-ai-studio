@@ -33,6 +33,7 @@ def upgrade():
                     "supports_streaming, supports_tools, supports_vision) "
                     "VALUES (:id, :provider_id, :model_id, '[]', 'declared', 0, 0, 0)"
                 ), {"id": str(uuid4()), "provider_id": provider_id, "model_id": model_id})
+                existing.add((provider_id, model_id))
 
 def downgrade():
     # Do not erase user-defined capability declarations.
