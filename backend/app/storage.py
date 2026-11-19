@@ -13,16 +13,16 @@ MAX_UPLOAD_BYTES = int(os.getenv("MASOUD_STUDIO_MAX_UPLOAD_BYTES", str(100 * 102
 STORAGE_ROOT = Path(os.getenv("MASOUD_STUDIO_STORAGE_ROOT", "./data/storage")).expanduser()
 
 def safe_filename(value: str) -> str:
-    name = Path(value.replace("\\\\", "/")).name
+    name = Path(value.replace("\\", "/")).name
     name = re.sub(r"[^A-Za-z0-9._ -]", "_", name).strip(" .")
     return (name or "upload.bin")[:255]
 
 def detect_mime(header: bytes) -> str:
     signatures = [
-        (b"\\x89PNG\\r\\n\\x1a\\n", "image/png"), (b"\\xff\\xd8\\xff", "image/jpeg"),
+        (b"\x89PNG\r\n\x1a\n", "image/png"), (b"\xff\xd8\xff", "image/jpeg"),
         (b"GIF87a", "image/gif"), (b"GIF89a", "image/gif"), (b"%PDF-", "application/pdf"),
-        (b"PK\\x03\\x04", "application/zip"), (b"OggS", "application/ogg"),
-        (b"fLaC", "audio/flac"), (b"ID3", "audio/mpeg"), (b"\\x1a\\x45\\xdf\\xa3", "video/webm"),
+        (b"PK\x03\x04", "application/zip"), (b"OggS", "application/ogg"),
+        (b"fLaC", "audio/flac"), (b"ID3", "audio/mpeg"), (b"\x1a\x45\xdf\xa3", "video/webm"),
     ]
     for signature, mime in signatures:
         if header.startswith(signature): return mime
