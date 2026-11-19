@@ -94,3 +94,26 @@ def test_queued_task_can_be_cancelled_but_running_task_cannot(db_session):
     with pytest.raises(HTTPException) as exc:
         cancel_task(db_session, running["id"])
     assert exc.value.status_code == 409
+
+
+
+def test_naive_sqlite_lease_timestamp_is_accepted_for_completion(db_session):
+    task = create(db_session, "task-naive-complete")
+    claimed = claim_task(db_session, "worker-naive")
+    assert claimed["id"] == task["id"]
+    row = db_session.get(StudioTask, task["id"])
+    row.lease_expires_at = (datetime.now(timezone.utc) + timedelta(minutes=1)).replace(tzinfo=None)
+    db_session.commit()
+    completed = complete_task(db_session, task["id"], "worker-naive", {"ok": True})
+    assert completed["status"] == "succeeded"
+
+
+def test_naive_sqlite_lease_timestamp_is_accepted_for_failure(db_session):
+    task = create(db_session, "task-naive-fail", max_attempts=1)
+    claimed = claim_task(db_session, "worker-naive-fail")
+    assert claimed["id"] == task["id"]
+    row = db_session.get(StudioTask, task["id"])
+    row.lease_expires_at = (datetime.now(timezone.utc) + timedelta(minutes=1)).replace(tzinfo=None)
+    db_session.commit()
+    failed = fail_task(db_session, task["id"], "worker-naive-fail", "test_error", "expected", 0)
+    assert failed["status"] == "failed"
