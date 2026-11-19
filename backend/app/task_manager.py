@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -126,14 +126,14 @@ def get_task(db: Session, task_id: str) -> dict:
 def list_tasks(db: Session, limit: int = 50, offset: int = 0,
                status: str | None = None, project_id: str | None = None) -> dict:
     query = select(StudioTask)
-    count_query = select(StudioTask.id)
+    count_query = select(func.count()).select_from(StudioTask)
     if status:
         query = query.where(StudioTask.status == status)
         count_query = count_query.where(StudioTask.status == status)
     if project_id:
         query = query.where(StudioTask.project_id == project_id)
         count_query = count_query.where(StudioTask.project_id == project_id)
-    total = len(db.scalars(count_query).all())
+    total = db.scalar(count_query) or 0
     rows = db.scalars(query.order_by(StudioTask.priority.asc(), StudioTask.created_at.desc())
                       .offset(offset).limit(limit)).all()
     return {"items": [serialize_task(row) for row in rows], "total": total,
