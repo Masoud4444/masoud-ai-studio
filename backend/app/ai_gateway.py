@@ -19,7 +19,7 @@ from sqlalchemy import select, update, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .models import AIProvider, AIRequest, AIUsage, AIModelCapability, AIModelPricing
+from .models import AIProvider, AIRequest, AIUsage, AIModelCapability, AIModelPricing, AIModelPricingHistory
 from .gateway_schemas import ProviderCreate, ChatCompletionRequest, ModelCapabilityUpdate, ModelPricingUpdate
 
 KEY_ENV = "MASOUD_STUDIO_CREDENTIAL_KEY"
@@ -469,7 +469,7 @@ async def test_provider_connection(db: Session, provider_id: str) -> dict:
         if row is None:
             row = AIModelCapability(id=str(uuid4()), provider_id=provider.id, model_id=model_id)
             db.add(row)
-        row.verification_status = "verified"
+        row.verification_status = "model_id_verified"
     db.commit()
     return {
         "provider_id": provider.id,
@@ -498,11 +498,19 @@ def set_model_pricing(db: Session, provider_id: str, model_id: str, payload: Mod
             version=1, source_note=payload.source_note,
         )
         db.add(row)
+        next_version = 1
     else:
         row.input_usd_per_million = payload.input_usd_per_million
         row.output_usd_per_million = payload.output_usd_per_million
         row.source_note = payload.source_note
         row.version += 1
+        next_version = row.version
+    db.add(AIModelPricingHistory(
+        id=str(uuid4()), provider_id=provider_id, model_id=model_id,
+        input_usd_per_million=payload.input_usd_per_million,
+        output_usd_per_million=payload.output_usd_per_million,
+        version=next_version, source_note=payload.source_note,
+    ))
     db.commit()
     db.refresh(row)
     return {
@@ -551,3 +559,17 @@ def get_usage_summary(db: Session) -> dict:
             **entry, "estimated_cost_usd": str(entry["estimated_cost_usd"].quantize(Decimal("0.00000001")))
         } for entry in by_model.values()],
     }
+
+
+def list_model_pricing_history(db: Session, provider_id: str, model_id: str) -> list[dict]:
+    rows = db.scalars(select(AIModelPricingHistory).where(
+        AIModelPricingHistory.provider_id == provider_id,
+        AIModelPricingHistory.model_id == model_id,
+    ).order_by(AIModelPricingHistory.version.desc())).all()
+    return [{
+        "version": row.version,
+        "input_usd_per_million": float(row.input_usd_per_million),
+        "output_usd_per_million": float(row.output_usd_per_million),
+        "source_note": row.source_note,
+        "created_at": row.created_at,
+    } for row in rows]
