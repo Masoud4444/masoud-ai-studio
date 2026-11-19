@@ -7,6 +7,7 @@ import json
 import os
 import socket
 import time
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timezone
 from urllib.parse import urlsplit, urlunsplit
 from uuid import uuid4
@@ -14,12 +15,12 @@ from uuid import uuid4
 import aiohttp
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from fastapi import HTTPException
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .models import AIProvider, AIRequest, AIUsage, AIModelCapability
-from .gateway_schemas import ProviderCreate, ChatCompletionRequest, ModelCapabilityUpdate
+from .models import AIProvider, AIRequest, AIUsage, AIModelCapability, AIModelPricing
+from .gateway_schemas import ProviderCreate, ChatCompletionRequest, ModelCapabilityUpdate, ModelPricingUpdate
 
 KEY_ENV = "MASOUD_STUDIO_CREDENTIAL_KEY"
 KEY_VERSION = int(os.getenv("MASOUD_STUDIO_CREDENTIAL_KEY_VERSION", "1"))
@@ -323,10 +324,22 @@ async def generate_chat_completion(db: Session, payload: ChatCompletionRequest, 
         request_row.lease_expires_at = None
         request_row.encrypted_response = _encrypt_response(result)
         request_row.response_key_version = KEY_VERSION
+        pricing = db.scalar(select(AIModelPricing).where(
+            AIModelPricing.provider_id == provider.id,
+            AIModelPricing.model_id == payload.model,
+        ))
+        estimated_cost = None
+        pricing_version = None
+        if pricing is not None:
+            input_cost = Decimal(result["prompt_tokens"]) * Decimal(str(pricing.input_usd_per_million)) / Decimal(1_000_000)
+            output_cost = Decimal(result["completion_tokens"]) * Decimal(str(pricing.output_usd_per_million)) / Decimal(1_000_000)
+            estimated_cost = (input_cost + output_cost).quantize(Decimal("0.00000001"), rounding=ROUND_HALF_UP)
+            pricing_version = pricing.version
         db.add(AIUsage(
             id=str(uuid4()), request_id=request_row.id, provider_id=provider.id,
             model=payload.model, prompt_tokens=result["prompt_tokens"],
             completion_tokens=result["completion_tokens"], total_tokens=result["total_tokens"],
+            estimated_cost_usd=estimated_cost, pricing_version=pricing_version,
         ))
         db.commit()
         result["replayed"] = False
@@ -464,4 +477,77 @@ async def test_provider_connection(db: Session, provider_id: str) -> dict:
         "verified_models": verified,
         "unmatched_declared_models": sorted(declared_models - set(remote_models)),
         "remote_model_count": len(remote_models),
+    }
+
+
+def set_model_pricing(db: Session, provider_id: str, model_id: str, payload: ModelPricingUpdate) -> dict:
+    provider = db.get(AIProvider, provider_id)
+    if provider is None:
+        raise HTTPException(status_code=404, detail={"code": "provider_not_found"})
+    if model_id not in json.loads(provider.models_json):
+        raise HTTPException(status_code=404, detail={"code": "provider_model_not_found"})
+    row = db.scalar(select(AIModelPricing).where(
+        AIModelPricing.provider_id == provider_id,
+        AIModelPricing.model_id == model_id,
+    ))
+    if row is None:
+        row = AIModelPricing(
+            id=str(uuid4()), provider_id=provider_id, model_id=model_id,
+            input_usd_per_million=payload.input_usd_per_million,
+            output_usd_per_million=payload.output_usd_per_million,
+            version=1, source_note=payload.source_note,
+        )
+        db.add(row)
+    else:
+        row.input_usd_per_million = payload.input_usd_per_million
+        row.output_usd_per_million = payload.output_usd_per_million
+        row.source_note = payload.source_note
+        row.version += 1
+    db.commit()
+    db.refresh(row)
+    return {
+        "provider_id": provider.id, "provider_name": provider.name, "model_id": row.model_id,
+        "input_usd_per_million": float(row.input_usd_per_million),
+        "output_usd_per_million": float(row.output_usd_per_million),
+        "version": row.version, "source_note": row.source_note,
+    }
+
+
+def get_usage_summary(db: Session) -> dict:
+    now = datetime.now(timezone.utc)
+    month_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+    rows = db.execute(
+        select(AIUsage, AIProvider.name)
+        .join(AIProvider, AIProvider.id == AIUsage.provider_id)
+        .where(AIUsage.created_at >= month_start)
+        .order_by(AIUsage.created_at.desc())
+    ).all()
+    total_prompt = sum(row.prompt_tokens for row, _ in rows)
+    total_completion = sum(row.completion_tokens for row, _ in rows)
+    known_costs = [Decimal(str(row.estimated_cost_usd)) for row, _ in rows if row.estimated_cost_usd is not None]
+    by_model = {}
+    for row, provider_name in rows:
+        key = f"{provider_name}:{row.model}"
+        entry = by_model.setdefault(key, {
+            "provider": provider_name, "model": row.model, "requests": 0,
+            "prompt_tokens": 0, "completion_tokens": 0, "estimated_cost_usd": Decimal("0"),
+            "priced_requests": 0,
+        })
+        entry["requests"] += 1
+        entry["prompt_tokens"] += row.prompt_tokens
+        entry["completion_tokens"] += row.completion_tokens
+        if row.estimated_cost_usd is not None:
+            entry["estimated_cost_usd"] += Decimal(str(row.estimated_cost_usd))
+            entry["priced_requests"] += 1
+    return {
+        "period": "current_utc_month",
+        "requests": len(rows),
+        "prompt_tokens": total_prompt,
+        "completion_tokens": total_completion,
+        "total_tokens": total_prompt + total_completion,
+        "estimated_cost_usd": str(sum(known_costs, Decimal("0")).quantize(Decimal("0.00000001"))),
+        "unpriced_requests": sum(1 for row, _ in rows if row.estimated_cost_usd is None),
+        "by_model": [{
+            **entry, "estimated_cost_usd": str(entry["estimated_cost_usd"].quantize(Decimal("0.00000001")))
+        } for entry in by_model.values()],
     }
