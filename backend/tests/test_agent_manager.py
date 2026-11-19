@@ -113,3 +113,16 @@ def test_agent_tool_grants_cannot_be_changed_while_enabled(db_session):
     with pytest.raises(HTTPException) as exc:
         replace_agent_tools(db_session, created["id"], AgentToolsUpdate(grants=[]))
     assert exc.value.detail["code"] == "disable_agent_before_editing_tools"
+
+
+
+def test_agent_patch_rejects_null_for_non_nullable_configuration():
+    with pytest.raises(ValidationError):
+        AgentUpdate(name=None)
+    with pytest.raises(ValidationError):
+        AgentUpdate(system_prompt=None)
+
+
+def test_agent_patch_rejects_unknown_permissions():
+    with pytest.raises(ValidationError):
+        AgentUpdate(permissions=["admin.root"])
