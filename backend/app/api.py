@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, File, Header, Query, UploadFile, HTTPException
+from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 from .database import get_db, engine
 from .storage import STORAGE_ROOT
@@ -23,6 +24,9 @@ from .research_vault import (
     create_claim, list_claims, get_claim, link_evidence_to_claim, update_claim,
 )
 from .story_engine import create_story, list_stories, get_story, update_story, create_scene, update_scene, delete_scene, reorder_scenes
+from .story_export import render_fountain
+from .models import Story, StoryScene
+from sqlalchemy import select
 from .story_schemas import StoryCreate, StoryUpdate, StorySceneCreate, StorySceneUpdate, StorySceneReorder
 from .research_schemas import (
     ResearchSourceCreate, ResearchEvidenceCreate, ResearchClaimCreate,
@@ -589,6 +593,23 @@ def post_story(payload: StoryCreate, db: Session = Depends(get_db)):
 @router.get("/stories")
 def get_stories(project_id: str | None = Query(None, min_length=36, max_length=36), limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0), db: Session = Depends(get_db)):
     return list_stories(db, project_id=project_id, limit=limit, offset=offset)
+
+@router.get("/stories/{story_id}/export/fountain")
+def export_story_fountain(story_id: str, db: Session = Depends(get_db)):
+    story = db.get(Story, story_id)
+    if story is None:
+        raise HTTPException(status_code=404, detail={"code": "story_not_found"})
+    scenes = db.scalars(select(StoryScene).where(StoryScene.story_id == story_id).order_by(StoryScene.position)).all()
+    story_data = {"title": story.title, "logline": story.logline, "format": story.format}
+    scene_data = [{
+        "position": scene.position, "title": scene.title, "slugline": scene.slugline,
+        "summary": scene.summary, "dramatic_purpose": scene.dramatic_purpose,
+        "beats": scene.beats_json, "body": scene.body,
+    } for scene in scenes]
+    content = render_fountain(story_data, scene_data)
+    return PlainTextResponse(content, media_type="text/plain; charset=utf-8", headers={
+        "Content-Disposition": f'attachment; filename="story-{story_id[:8]}.fountain"'
+    })
 
 @router.get("/stories/{story_id}")
 def get_story_route(story_id: str, db: Session = Depends(get_db)):

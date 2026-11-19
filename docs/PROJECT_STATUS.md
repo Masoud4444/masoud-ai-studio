@@ -276,3 +276,10 @@ Never infer one status from another.
 - The source directory is never deleted by migration. The DPAPI credential key remains in the original per-user application profile, while database, storage, backups and studio preferences move together.
 - The launcher and offline restore utility both honor the configured data directory. The system diagnostics endpoint reports the fixed DPAPI key location separately from the relocated data directory.
 - Migration is offline-only and currently requires the app to be stopped and the destination path not to exist. Do not remove the source copy until the new location is confirmed and backed up.
+
+
+## Screenplay export v0.1 — 2026-11-19
+
+- Added a read-only Fountain screenplay export for each story dossier. It preserves scene order, explicit sluglines, script body text and editorial metadata comments (scene title, summary, dramatic purpose and beats).
+- Export is generated from the current saved story state; it does not mutate the story or create a revision. The Story Engine exposes a direct download link for the .fountain file.
+- Export uses a deterministic UTF-8 text renderer and a story-scoped attachment filename. Focused regression coverage is isolated from previously passing suites.
