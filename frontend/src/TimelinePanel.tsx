@@ -109,7 +109,6 @@ export function TimelinePanel({ projects }: { projects: Project[] }) {
   }
 
   const eventName = (id: string) => events.find(item => item.id === id)?.title ?? "Unknown event";
-  const orderedNames = analysis?.ordered_event_ids.map(eventName) ?? [];
 
   return <section className="workspace-panel">
     <div className="panel-header"><div><span className="eyebrow">IN-WORLD CHRONOLOGY</span><h2>Timeline & Event Continuity</h2><p>Define what happened before what, independently from screenplay scene order. Unrelated events remain unordered until you connect them.</p></div><button className="secondary-button" onClick={() => void loadTimeline()}><RefreshCw size={14}/> Refresh</button></div>

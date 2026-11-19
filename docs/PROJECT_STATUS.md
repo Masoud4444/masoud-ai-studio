@@ -211,3 +211,9 @@ Never infer one status from another.
 - Character & Worlds now loads the story-scoped prop registry, creates canonical props, edits metadata/status/current holder and selects registered props when recording continuity facts.
 - Free-text prop identity is no longer used by the UI continuity form; facts reference stable prop IDs.
 - UI code is committed; latest frontend CI/browser verification is pending.
+
+
+### Timeline partial-order presentation — 2026-11-19
+
+- Timeline analysis now returns topological layers, not only a flattened topological ordering. Events in the same layer have no implied order relative to each other.
+- This preserves non-linear story structure and avoids displaying unrelated events as if one necessarily happened first.

@@ -139,7 +139,7 @@ def _path_exists(edges: list[tuple[str, str]], start: str, target: str) -> bool:
     return False
 
 
-def _topological_order(event_ids: list[str], edges: list[tuple[str, str]]) -> tuple[list[str], list[str]]:
+def _topological_layers(event_ids: list[str], edges: list[tuple[str, str]]) -> tuple[list[list[str]], list[str]]:
     adjacency = {event_id: [] for event_id in event_ids}
     indegree = {event_id: 0 for event_id in event_ids}
     for before, after in edges:
@@ -147,16 +147,20 @@ def _topological_order(event_ids: list[str], edges: list[tuple[str, str]]) -> tu
             adjacency[before].append(after)
             indegree[after] += 1
     ready = sorted(event_id for event_id, degree in indegree.items() if degree == 0)
-    order: list[str] = []
+    layers: list[list[str]] = []
+    ordered: set[str] = set()
     while ready:
-        current = ready.pop(0)
-        order.append(current)
-        for following in sorted(adjacency[current]):
-            indegree[following] -= 1
-            if indegree[following] == 0:
-                ready.append(following)
-                ready.sort()
-    return order, sorted(set(event_ids) - set(order))
+        layer = ready
+        layers.append(layer)
+        ordered.update(layer)
+        next_ready: list[str] = []
+        for current in layer:
+            for following in adjacency[current]:
+                indegree[following] -= 1
+                if indegree[following] == 0:
+                    next_ready.append(following)
+        ready = sorted(next_ready)
+    return layers, sorted(set(event_ids) - ordered)
 
 
 @router.get("/events")
@@ -262,12 +266,14 @@ def analyze_timeline(sid: str, db: Session = Depends(get_db)):
     ).all()
     event_ids = [event.id for event in events]
     edges = _active_edges(db, sid)
-    ordered, cyclic = _topological_order(event_ids, edges)
+    layers, cyclic = _topological_layers(event_ids, edges)
+    ordered = [event_id for layer in layers for event_id in layer]
     if cyclic:
         return {
             "story_id": sid,
             "is_consistent": False,
             "ordered_event_ids": ordered,
+            "ordered_layers": layers,
             "cycle_event_ids": cyclic,
             "relations_count": len(edges),
             "note": "Chronology is a partial order. Events without a path between them are intentionally unordered.",
@@ -276,6 +282,7 @@ def analyze_timeline(sid: str, db: Session = Depends(get_db)):
         "story_id": sid,
         "is_consistent": True,
         "ordered_event_ids": ordered,
+        "ordered_layers": layers,
         "cycle_event_ids": [],
         "relations_count": len(edges),
         "note": "Chronology is a partial order. Events without a path between them are intentionally unordered.",
