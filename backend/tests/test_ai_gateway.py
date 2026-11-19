@@ -166,7 +166,7 @@ def test_provider_connection_marks_only_matching_declared_models_verified(monkey
         db.add(provider)
         db.commit()
         result = asyncio.run(test_provider_connection(db, provider.id))
-        assert result["status"] == "verified"
+        assert result["status"] == "model_id_verified"
         assert result["verified_models"] == ["declared-model"]
         assert result["unmatched_declared_models"] == ["missing-model"]
     engine.dispose()
