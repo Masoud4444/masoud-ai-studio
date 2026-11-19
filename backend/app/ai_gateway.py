@@ -20,7 +20,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .models import AIProvider, AIRequest, AIUsage, AIModelCapability, AIModelPricing, AIModelPricingHistory
-from .gateway_schemas import ProviderCreate, ChatCompletionRequest, ModelCapabilityUpdate, ModelPricingUpdate
+from .gateway_schemas import ProviderCreate, ProviderUpdate, ChatCompletionRequest, ModelCapabilityUpdate, ModelPricingUpdate
 
 KEY_ENV = "MASOUD_STUDIO_CREDENTIAL_KEY"
 KEY_VERSION = int(os.getenv("MASOUD_STUDIO_CREDENTIAL_KEY_VERSION", "1"))
@@ -137,6 +137,7 @@ def _serialize(provider: AIProvider) -> dict:
         "base_url": provider.base_url,
         "models": json.loads(provider.models_json),
         "is_enabled": provider.is_enabled,
+        "priority": provider.priority,
         "created_at": provider.created_at,
         "updated_at": provider.updated_at,
     }
@@ -149,7 +150,7 @@ def create_provider(db: Session, payload: ProviderCreate) -> dict:
     provider = AIProvider(
         id=str(uuid4()), name=payload.name.strip(), provider_type="openai_compatible",
         base_url=base_url, encrypted_api_key=encrypted, key_version=KEY_VERSION,
-        models_json=json.dumps(payload.models), is_enabled=True,
+        models_json=json.dumps(payload.models), is_enabled=True, priority=payload.priority,
     )
     db.add(provider)
     for model_id in payload.models:
@@ -180,7 +181,7 @@ def _select_provider(db: Session, request: ChatCompletionRequest) -> AIProvider:
     query = select(AIProvider).where(AIProvider.is_enabled.is_(True))
     if request.provider_id:
         query = query.where(AIProvider.id == request.provider_id)
-    providers = db.scalars(query.order_by(AIProvider.created_at.asc())).all()
+    providers = db.scalars(query.order_by(AIProvider.priority.asc(), AIProvider.created_at.asc())).all()
     for provider in providers:
         if request.model in json.loads(provider.models_json):
             return provider
@@ -579,3 +580,16 @@ def list_model_pricing_history(db: Session, provider_id: str, model_id: str) -> 
         "source_note": row.source_note,
         "created_at": row.created_at,
     } for row in rows]
+
+
+def update_provider(db: Session, provider_id: str, payload: ProviderUpdate) -> dict:
+    provider = db.get(AIProvider, provider_id)
+    if provider is None:
+        raise HTTPException(status_code=404, detail={"code": "provider_not_found"})
+    if payload.priority is not None:
+        provider.priority = payload.priority
+    if payload.is_enabled is not None:
+        provider.is_enabled = payload.is_enabled
+    db.commit()
+    db.refresh(provider)
+    return _serialize(provider)
