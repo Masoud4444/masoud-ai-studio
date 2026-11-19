@@ -8,7 +8,7 @@ from .ai_gateway import create_provider, list_providers, delete_provider, update
 from .gateway_schemas import ProviderCreate, ProviderRead, ProviderUpdate, ChatCompletionRequest, ChatCompletionRead, ModelCapabilityUpdate, ModelPricingUpdate
 from .task_manager import create_task, get_task, list_tasks, cancel_task, retry_task, approve_task, reject_task_approval
 from .task_schemas import TaskCreate, TaskRead
-from .orchestrator import list_workflows, create_production_run, get_production_run, list_production_runs
+from .orchestrator import (list_workflows, create_production_run, get_production_run, list_production_runs, pause_production_run, resume_production_run, cancel_production_run)
 from .orchestrator_schemas import ProductionRunCreate
 
 router = APIRouter(prefix="/api/v1", tags=["studio"])
@@ -205,3 +205,19 @@ def get_production_runs(
 @router.get("/production/runs/{run_id}")
 def get_production_run_route(run_id: str, db: Session = Depends(get_db)):
     return get_production_run(db, run_id)
+
+
+
+@router.post("/production/runs/{run_id}/pause")
+def post_production_run_pause(run_id: str, db: Session = Depends(get_db)):
+    return pause_production_run(db, run_id)
+
+
+@router.post("/production/runs/{run_id}/resume")
+def post_production_run_resume(run_id: str, db: Session = Depends(get_db)):
+    return resume_production_run(db, run_id)
+
+
+@router.post("/production/runs/{run_id}/cancel")
+def post_production_run_cancel(run_id: str, db: Session = Depends(get_db)):
+    return cancel_production_run(db, run_id)
