@@ -4,7 +4,6 @@ This module configures agents only. It does not execute tools or call model prov
 """
 import json
 import hashlib
-import math
 import re
 from decimal import Decimal
 from datetime import date
@@ -210,7 +209,10 @@ def _money(value) -> Decimal:
         raise HTTPException(status_code=422, detail={"code": "invalid_budget_amount"})
     if not amount.is_finite() or amount < 0:
         raise HTTPException(status_code=422, detail={"code": "invalid_budget_amount"})
-    return amount.quantize(Decimal("0.00000001"))
+    try:
+        return amount.quantize(Decimal("0.00000001"))
+    except Exception:
+        raise HTTPException(status_code=422, detail={"code": "invalid_budget_amount"})
 
 
 def _reservation_payload(row: AgentBudgetReservation, replayed: bool = False) -> dict:
