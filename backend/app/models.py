@@ -106,3 +106,15 @@ class AIModelPricing(Base):
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     source_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+class AIModelPricingHistory(Base):
+    __tablename__ = "ai_model_pricing_history"
+    __table_args__ = (UniqueConstraint("provider_id", "model_id", "version", name="uq_provider_model_price_version"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    provider_id: Mapped[str] = mapped_column(ForeignKey("ai_providers.id", ondelete="RESTRICT"), index=True, nullable=False)
+    model_id: Mapped[str] = mapped_column(String(160), nullable=False)
+    input_usd_per_million: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
+    output_usd_per_million: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
