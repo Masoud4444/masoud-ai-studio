@@ -31,6 +31,9 @@ class StoryUpdate(BaseModel):
     def non_empty_update(self):
         if not (self.model_fields_set - {"expected_version", "change_note"}):
             raise ValueError("At least one story field must be updated")
+        for field_name in self.model_fields_set - {"expected_version", "change_note", "genre", "target_audience", "premise", "logline", "synopsis", "creative_intent"}:
+            if getattr(self, field_name) is None:
+                raise ValueError(f"{field_name} cannot be null")
         return self
 
 class StorySceneCreate(BaseModel):
@@ -58,4 +61,6 @@ class StorySceneUpdate(BaseModel):
     def non_empty_update(self):
         if not (self.model_fields_set - {"expected_version", "change_note"}):
             raise ValueError("At least one scene field must be updated")
+        if "title" in self.model_fields_set and self.title is None:
+            raise ValueError("title cannot be null")
         return self
