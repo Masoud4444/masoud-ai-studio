@@ -58,7 +58,7 @@ Last updated: 2026-11-19
 
 - Windows desktop shell/packaging (Tauri), Android companion and hardened Web/PWA.
 - Multimodal Research Vault intake, safe document parsing, OCR/transcription, source credibility scoring, semantic search and AI-assisted evidence extraction. The manual source/evidence/claim foundation is implemented.
-- Story Engine, script/scene/dialogue/versioning, Character Bible, World Bible, continuity and universe/series management.
+- Story Engine expansion: full script editor, dialogue, beat/act structures, scene reorder and richer scene editing, character/world links, Character Bible, World Bible, continuity and universe/series/season/episode management. The dossier, ordered scene outline and immutable revision foundation are implemented.
 - Visual Style Engine, character model sheets, cinematography, shot planning, storyboard/animatic completion.
 - Image/video/audio generation, subtitles, non-destructive editing, VFX/compositing.
 - Human Value, Creative Identity, Originality, YouTube compliance and Creator Growth intelligence modules.
@@ -72,7 +72,7 @@ Last updated: 2026-11-19
 3. Add end-to-end integration tests for project, asset, Research Vault, production and Agent screens.
 4. Harden local deployment: configuration validation, safe telemetry, Windows DPAPI credential storage, backup/restore and startup/shutdown behavior.
 5. Implement hard worker execution isolation and multi-worker-safe claims before registering creative handlers; then extend Agent Runtime/Tool Broker with explicit permission checks, approval enforcement, budget reconciliation and sandboxing.
-6. Build Story Engine, Character/World continuity, Visual/Cinematography, production media tools, QA/compliance, export and companion clients.
+6. Expand Story Engine into script/beat/dialogue editing and series hierarchy; then implement Character/World continuity, Visual/Cinematography, production media tools, QA/compliance, export and companion clients.
 
 ## Status vocabulary
 
