@@ -31,12 +31,13 @@ Package 003 is **designed and documented**, but its application code has not bee
 
 - Package 003 architecture and acceptance criteria are committed.
 - The Foundation 002 ZIP is present in the personal Library, but raw-byte access was unavailable in this session. Its source has not been inspected or imported.
-- Required unblock: attach `storyforge-ai-studio-foundation-002.zip` directly to this conversation so its exact bytes can be inspected and safely imported.
+- Foundation 002 has now been attached directly to the conversation (`/mnt/data/storyforge-ai-studio-foundation-002.zip`). The attachment is present, but archive inspection and source import remain pending because the data-analysis capability is temporarily unavailable.
 - No new application tests have been run in this session.
+- The attached ZIP has not yet been opened, extracted, or verified; no claims are made about its current integrity or contents.
 
 ## Next actions
 
-1. Inspect Foundation 002 contents and preserve its exact source baseline.
+1. When data analysis is available, inspect the attached Foundation 002 archive and preserve its exact source baseline.
 2. Import the baseline into this repository without replacing unrelated files.
 3. Run the existing test suite and record actual results.
 4. Reconcile Package 003 with the imported models, routes, settings, migrations, and task infrastructure.
