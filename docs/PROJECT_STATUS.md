@@ -195,3 +195,12 @@ Never infer one status from another.
 - The UI selects project/story, creates in-world events, optionally links events to screenplay scenes, records in-world time markers, sets explicit earlier/later constraints and displays the partial-order analysis.
 - The UI does not infer event chronology from screenplay scene order. Unrelated events remain unordered.
 - This UI increment is committed after the timeline backend increment; frontend build and browser interaction have not yet been verified for this commit.
+
+
+## Story Prop Registry v0.1 — 2026-11-19
+
+- Added stable story-scoped prop records with canonical name, category, description, origin, initial state, optional current character holder, lifecycle status and optimistic versioning.
+- Added list/create/update API routes under /api/v1/stories/{sid}/props with story ownership checks and case-insensitive duplicate-name protection.
+- Continuity facts now accept a registered prop ID and resolve its canonical name instead of treating every prop as a free-text identity.
+- Migration 0017_story_prop_registry follows 0016_timeline_events.
+- Backend registry and continuity integration are implemented; the Character & World UI still needs the prop creation/editor and registered-prop selector.

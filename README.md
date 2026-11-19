@@ -34,6 +34,7 @@ A public-code, private-by-design, local-first AI creative production studio for 
 - Research Vault with project-scoped sources, exact evidence excerpts/locators, claims, provenance, search and bounded local PDF/DOCX text extraction.
 - Story Engine with story dossiers, ordered scene outlines and immutable revision history.
 - Character and World Bible with relationships, locations, rules and scene links.
+- Story prop registry with stable object identity and continuity references.
 - Deterministic continuity facts and issue analysis with human review controls.
 
 ### Frontend
@@ -41,7 +42,7 @@ A public-code, private-by-design, local-first AI creative production studio for 
 - Overview, Projects, Production, AI Agents and Assets workspaces.
 - Research Vault workspace with source/evidence/claim management, search and document extraction.
 - Story Engine workspace for story dossiers, scenes and revision history.
-- Characters & Worlds workspace for character/location/world data and continuity review.
+- Characters & Worlds workspace for character/location/world data and continuity review; registered-prop UI integration is pending.
 - Timeline workspace for in-world events, explicit chronology constraints and cycle analysis.
 - Video & Audio, Compliance and some Settings capabilities remain staged; no incomplete module is represented as production-ready.
 

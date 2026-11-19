@@ -11,6 +11,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 from .database import Base, get_db
 from .models import Story, StoryScene
 from .character_world import Character, Location, SceneCharacter, SceneLocation
+from .props import StoryProp
 
 def _now(): return datetime.now(timezone.utc)
 def _json(v): return json.dumps(v,ensure_ascii=False,sort_keys=True,separators=(",",":"))
