@@ -245,8 +245,10 @@ def test_missing_replay_encryption_key_fails_before_provider_call(monkeypatch):
     engine.dispose()
 
 
-def test_concurrent_duplicate_idempotency_key_is_rejected(monkeypatch):
-    engine, Session = gateway_db()
+def test_concurrent_duplicate_idempotency_key_is_rejected(tmp_path, monkeypatch):
+    engine = create_engine(f"sqlite:///{tmp_path / 'concurrency.db'}", connect_args={"check_same_thread": False})
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
     monkeypatch.setenv("MASOUD_STUDIO_CREDENTIAL_KEY", base64.urlsafe_b64encode(b"c" * 32).decode("ascii"))
     async def scenario():
         started = asyncio.Event()
@@ -262,7 +264,7 @@ def test_concurrent_duplicate_idempotency_key_is_rejected(monkeypatch):
         first_db, second_db = Session(), Session()
         try:
             first_task = asyncio.create_task(generate_chat_completion(first_db, request, "concurrent-key-01"))
-            await started.wait()
+            await asyncio.wait_for(started.wait(), timeout=5)
             with pytest.raises(HTTPException) as exc:
                 await generate_chat_completion(second_db, request, "concurrent-key-01")
             second_db.rollback()
