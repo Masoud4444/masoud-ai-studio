@@ -57,7 +57,6 @@ No public claim/complete endpoints exist. Keep the API and opt-in worker on loca
 
 ## Not yet implemented
 
-- Production Orchestrator graph definitions and dependency expansion.
 - Windows service/desktop process management, worker health telemetry, bounded execution timeouts, and multi-worker-safe claim coordination.
 - Dead-letter queue UI and operator dashboard.
 - Cancellation signalling for already-running work.
