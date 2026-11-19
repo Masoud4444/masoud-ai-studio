@@ -31,6 +31,7 @@ All routes are under /api/v1:
 
 - POST /research/sources
 - GET /research/sources?project_id=...&limit=...&offset=...
+- GET /research/search?q=...&project_id=...&limit=... (read-only search across source metadata, exact evidence excerpts/locators and claims)
 - GET /research/sources/{source_id}
 - POST /research/sources/{source_id}/projects/{project_id}
 - DELETE /research/sources/{source_id}/projects/{project_id}
@@ -50,6 +51,7 @@ All routes are under /api/v1:
 - A claim can only cite evidence from a source linked to that claim's project.
 - Claim/evidence links are unique per pair; changing the relationship updates the existing link and appends an event. An accepted claim cannot lose its last supporting relation, and a rejected claim cannot lose its last contradicting relation.
 - Research events store entity IDs and action metadata, not full source excerpts or secrets.
+- Search is read-only, case-insensitive, project-scoped when requested, escapes SQL LIKE wildcard characters and returns bounded results separately for sources, evidence and claims.
 
 ## Later milestones
 
@@ -67,3 +69,13 @@ All routes are under /api/v1:
 - HTTP integration tests cover the source → evidence → claim → review flow and verify that a source cannot be detached while a project claim still cites its evidence.
 - Asset-link validation tests ensure a source cannot attach a file from a different project.
 - The complete backend suite and Alembic migration to revision 0012 passed in GitHub Actions run 44510598517 (86 tests, one non-failing warning).
+
+
+## Research search v0.2
+
+The workspace now provides one read-only search across source title/URL/author/publisher/summary, exact evidence excerpt/locator and claim statement/rationale. Results can be scoped to a project or searched across the vault. Search does not rewrite evidence, create embeddings, fetch remote URLs or change provenance. Each result group has an independent bounded limit and reports the full matching count.
+
+## Verification
+
+- Backend CI run [44515790910](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44515790910): 88 tests passed, 1 warning; migration to head succeeded.
+- Frontend build run [44515790960](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44515790960): successful.

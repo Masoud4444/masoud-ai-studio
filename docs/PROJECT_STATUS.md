@@ -21,7 +21,7 @@ Last updated: 2026-11-19
 - Worker Supervisor: handler allowlist, lease heartbeat, bounded JSON results, sanitized handler errors and graceful shutdown. Disabled by default; only `system.healthcheck` is registered out of the box.
 - Production Orchestrator: code-defined `creative.preproduction` v1 workflow, persisted runs/steps, idempotent creation, approval gates, pause/resume/cancel.
 - Agent Manager: draft/enabled/disabled lifecycle, versioned config, provider/model checks, permissions/tool grants, approval requirements for write/execute grants, audit events and internal budget reservation ledger. A first text-only Agent Runtime is implemented at `POST /api/v1/agents/{agent_id}/run`, with explicit `ai.generate` permission, required model pricing, conservative pre-call budget reservation and Gateway idempotency.
-- Research Vault v0.1: source records, reusable project-source links, asset references, metadata-only URL records, exact evidence excerpts with locators, SHA-256 evidence deduplication, project claims, supporting/contradicting/contextualizing relationships, review gates and append-only provenance events. Migration 0012.
+- Research Vault v0.2: source records, reusable project-source links, asset references, metadata-only URL records, exact evidence excerpts with locators, SHA-256 evidence deduplication, project claims, supporting/contradicting/contextualizing relationships, review gates, append-only provenance events and project-scoped full-text search across source metadata, evidence and claims. No migration required for search.
 
 ## Implemented frontend
 
@@ -30,14 +30,14 @@ Last updated: 2026-11-19
 - Production room: create/list preproduction runs, inspect step state and approval gates, pause/resume/cancel controls.
 - AI agents: create draft profiles, view registry, enable/disable where provider/model requirements permit.
 - Assets: project selection, upload, list and detach. Detach does not delete the shared content-addressed blob.
-- Research Vault workspace: register sources, browse project-linked sources, capture exact evidence excerpts/locators, create project claims, link evidence as support/contradiction/context and accept/reject claims only when the required evidence relation exists. Existing project assets can be attached to source records, and the API verifies the asset is linked to the selected project. HTTP-level integration tests cover source creation, evidence capture, claim acceptance and safe refusal to detach referenced sources.
+- Research Vault workspace: register sources, browse project-linked sources, capture exact evidence excerpts/locators, create project claims, link evidence as support/contradiction/context, accept/reject claims only when the required evidence relation exists, and search source metadata, excerpts, locators and claims with optional project scope. Existing project assets can be attached to source records, and the API verifies the asset is linked to the selected project. HTTP-level integration tests cover source creation, evidence capture, claim acceptance and safe refusal to detach referenced sources.
 - Characters & Worlds, Video & Audio, Compliance and Settings remain staged modules.
 - Windows setup/start scripts and frontend guide are present under `scripts/` and `docs/FRONTEND.md`. The setup script checks Python 3.11+/Node.js 20+, installs dependencies, builds the frontend, then applies migrations.
 
 ## Verification evidence
 
-- Latest backend run [44510598517](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44510598517), commit `e121777f9cfcf35fa4a5900cf7697117e3a4e7cb`: **86 passed, 1 warning**; fresh SQLite Alembic upgrade through head succeeded through migration 0012, including HTTP-level Research Vault flow and project-asset integrity tests.
-- Latest frontend build [44510598581](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44510598581), commit `e121777f9cfcf35fa4a5900cf7697117e3a4e7cb`: successful.
+- Latest backend run [44515790910](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44515790910), commit `48166b4d72792e4e261e44f5eadde42eb7bc3538`: **88 passed, 1 warning**; fresh SQLite Alembic upgrade through head succeeded through migration 0012, including Research Vault search tests.
+- Latest frontend build [44515790960](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44515790960), commit `48166b4d72792e4e261e44f5eadde42eb7bc3538`: successful.
 - These are Linux CI checks. Windows install/runtime, real browser workflows, provider interoperability, concurrency/load behavior and desktop packaging have not been verified.
 - CI mocks provider generation/model-list responses; no billable provider calls are made by CI.
 - One Starlette/httpx deprecation warning remains.
@@ -93,3 +93,11 @@ Never infer one status from another.
 - This does not add lease expiry, hard process termination, or automatic reconciliation for abandoned reservations.
 
 - Duplicate Runtime callers that encounter an active Gateway idempotency lease now leave the reservation running for safe retry instead of prematurely settling it as failed; a regression test covers this case.
+
+
+## Research Vault search v0.2
+
+- Added read-only `GET /api/v1/research/search` for source metadata, exact evidence excerpts/locators, and project claim statements/rationale.
+- Supports optional project scope, case-insensitive matching, escaped SQL LIKE wildcards, bounded query length and independent bounded result sets/counts.
+- Added regression tests for cross-entity matches, project isolation, wildcard escaping and query validation.
+- Added a Research Vault search interface with grouped result cards; search does not modify provenance or trigger network/AI activity.
