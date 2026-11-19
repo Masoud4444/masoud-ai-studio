@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from uuid import uuid4
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, Boolean
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, Boolean, Numeric
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
 
@@ -76,6 +76,8 @@ class AIUsage(Base):
     prompt_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     completion_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    estimated_cost_usd: Mapped[float | None] = mapped_column(Numeric(18, 8), nullable=True)
+    pricing_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
 class AIModelCapability(Base):
@@ -91,4 +93,16 @@ class AIModelCapability(Base):
     supports_streaming: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     supports_tools: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     supports_vision: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+class AIModelPricing(Base):
+    __tablename__ = "ai_model_pricing"
+    __table_args__ = (UniqueConstraint("provider_id", "model_id", name="uq_provider_model_pricing"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    provider_id: Mapped[str] = mapped_column(ForeignKey("ai_providers.id", ondelete="RESTRICT"), index=True, nullable=False)
+    model_id: Mapped[str] = mapped_column(String(160), nullable=False)
+    input_usd_per_million: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
+    output_usd_per_million: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    source_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
