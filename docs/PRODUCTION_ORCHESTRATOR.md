@@ -48,3 +48,10 @@ Approval is an explicit gate: a task in `waiting_approval` is not claimable. App
 - Run aggregate status is a read-time projection of step task states; GET/list calls do not write or commit database changes.
 - Cancellation of an entire run, pause/resume at run level, parallel branch fan-in/fan-out templates, human review artifacts/comments, and approval audit identity are not implemented yet.
 - Migration 0008 and Orchestrator/Worker tests are awaiting CI verification.
+
+
+## Production run controls
+- `POST /api/v1/production/runs/{run_id}/pause` pauses queued and approval-waiting steps. Active steps are allowed to finish; the run reports `pausing` until they finish, then `paused`.
+- `POST /api/v1/production/runs/{run_id}/resume` restores each paused task to its exact prior state (`queued` or `waiting_approval`).
+- `POST /api/v1/production/runs/{run_id}/cancel` cancels pending, paused, approval-waiting, and blocked steps. It refuses cancellation while any step is running; it never claims to forcibly stop an active handler.
+- Pause/resume/cancel transitions are appended to task events. Run control state is persisted; read endpoints remain side-effect free.
