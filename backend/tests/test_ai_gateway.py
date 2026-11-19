@@ -60,3 +60,72 @@ def test_provider_create_never_returns_credential(monkeypatch):
         assert "api_key" not in result and "encrypted_api_key" not in result
         assert result["models"] == ["model-a"]
     engine.dispose()
+
+
+import asyncio
+from backend.app.ai_gateway import generate_chat_completion
+from backend.app.models import AIProvider, AIRequest, AIUsage
+from backend.app.gateway_schemas import ChatCompletionRequest
+
+
+def gateway_db():
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+    return engine, Session
+
+
+def test_provider_disable_preserves_history(monkeypatch):
+    from backend.app.ai_gateway import delete_provider
+    engine, Session = gateway_db()
+    with Session() as db:
+        provider = AIProvider(name="History Provider", base_url="https://api.example/v1", models_json='["m1"]')
+        db.add(provider)
+        db.commit()
+        delete_provider(db, provider.id)
+        assert db.get(AIProvider, provider.id).is_enabled is False
+    engine.dispose()
+
+
+def test_idempotent_chat_replays_without_second_provider_call(monkeypatch):
+    engine, Session = gateway_db()
+    monkeypatch.setenv("MASOUD_STUDIO_CREDENTIAL_KEY", base64.urlsafe_b64encode(b"z" * 32).decode("ascii"))
+    calls = {"count": 0}
+
+    async def fake_send(provider, payload):
+        calls["count"] += 1
+        return {"id": "response-1", "model": payload.model, "content": "hello", "prompt_tokens": 3, "completion_tokens": 2, "total_tokens": 5}
+
+    monkeypatch.setattr("backend.app.ai_gateway._send_chat_completion", fake_send)
+    request = ChatCompletionRequest(model="m1", messages=[{"role": "user", "content": "hello"}])
+    with Session() as db:
+        provider = AIProvider(name="Gateway Provider", base_url="https://api.example/v1", models_json='["m1"]')
+        db.add(provider)
+        db.commit()
+        first = asyncio.run(generate_chat_completion(db, request, "stable-key-001"))
+        second = asyncio.run(generate_chat_completion(db, request, "stable-key-001"))
+        assert first["content"] == "hello"
+        assert first["replayed"] is False
+        assert second["replayed"] is True
+        assert calls["count"] == 1
+        assert db.query(AIUsage).count() == 1
+    engine.dispose()
+
+
+def test_idempotency_key_cannot_be_reused_for_different_payload(monkeypatch):
+    engine, Session = gateway_db()
+    monkeypatch.setenv("MASOUD_STUDIO_CREDENTIAL_KEY", base64.urlsafe_b64encode(b"y" * 32).decode("ascii"))
+    async def fake_send(provider, payload):
+        return {"id": "response-2", "model": payload.model, "content": "ok", "prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
+    monkeypatch.setattr("backend.app.ai_gateway._send_chat_completion", fake_send)
+    with Session() as db:
+        db.add(AIProvider(name="Conflict Provider", base_url="https://api.example/v1", models_json='["m1"]'))
+        db.commit()
+        first = ChatCompletionRequest(model="m1", messages=[{"role":"user","content":"one"}])
+        second = ChatCompletionRequest(model="m1", messages=[{"role":"user","content":"two"}])
+        asyncio.run(generate_chat_completion(db, first, "stable-key-002"))
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(generate_chat_completion(db, second, "stable-key-002"))
+        assert exc.value.status_code == 409
+        assert exc.value.detail["code"] == "idempotency_key_conflict"
+    engine.dispose()
