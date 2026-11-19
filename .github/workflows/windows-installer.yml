@@ -56,6 +56,8 @@ jobs:
           $app = Resolve-Path "dist/MasoudAIStudio/MasoudAIStudio.exe"
           $process = Start-Process -FilePath $app -ArgumentList "--smoke-test" -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Packaged application smoke test failed with exit code $($process.ExitCode)" }
+      - name: Build offline backup restore utility
+        run: pyinstaller --noconfirm --clean --onefile --console --name MasoudStudioRestore --paths . --distpath dist/MasoudAIStudio --workpath build/restore-tool desktop/restore_backup.py
       - name: Install Inno Setup
         run: choco install innosetup --yes --no-progress
       - name: Build Windows installer

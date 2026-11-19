@@ -104,7 +104,7 @@ def create_backup(database_path: Path, storage_root: Path, backup_dir: Path) -> 
                     "notes": ["The Windows DPAPI credential key is intentionally excluded."]
                 }
                 archive.writestr(MANIFEST_NAME, json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2))
-            with temp_archive.open("rb") as stream:
+            with temp_archive.open("rb+") as stream:
                 os.fsync(stream.fileno())
             os.replace(temp_archive, final_path)
         finally:
@@ -159,15 +159,21 @@ def verify_backup(archive_path: Path) -> dict:
             for record in records:
                 name = record["path"]
                 _safe_member(name)
-                raw = archive.read(name)
-                if len(raw) != record.get("size") or hashlib.sha256(raw).hexdigest() != record.get("sha256"):
+                digest = hashlib.sha256()
+                size = 0
+                with archive.open(name, "r") as source:
+                    for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                        digest.update(chunk)
+                        size += len(chunk)
+                if size != record.get("size") or digest.hexdigest() != record.get("sha256"):
                     raise BackupError(f"Integrity check failed for {name}.")
             db_name = manifest.get("database")
             if db_name != "database/studio.sqlite3":
                 raise BackupError("Backup database path is invalid.")
             with tempfile.TemporaryDirectory(prefix="masoud-verify-") as temp:
                 db_copy = Path(temp) / "studio.sqlite3"
-                db_copy.write_bytes(archive.read(db_name))
+                with archive.open(db_name, "r") as source, db_copy.open("wb") as target:
+                    shutil.copyfileobj(source, target, length=1024 * 1024)
                 with sqlite3.connect(db_copy) as db:
                     check = db.execute("PRAGMA integrity_check").fetchone()
                     if not check or check[0] != "ok":
@@ -196,13 +202,15 @@ def restore_backup(archive_path: Path, database_path: Path, storage_root: Path) 
         staged_storage = stage / "storage"
         staged_storage.mkdir()
         with ZipFile(archive_path, "r") as archive:
-            staged_db.write_bytes(archive.read("database/studio.sqlite3"))
+            with archive.open("database/studio.sqlite3", "r") as source, staged_db.open("wb") as target:
+                shutil.copyfileobj(source, target, length=1024 * 1024)
             for info in archive.infolist():
                 if info.filename.startswith("storage/") and not info.is_dir():
                     relative = _safe_member(info.filename).relative_to("storage")
                     target = staged_storage.joinpath(*relative.parts)
                     target.parent.mkdir(parents=True, exist_ok=True)
-                    target.write_bytes(archive.read(info.filename))
+                    with archive.open(info.filename, "r") as source, target.open("wb") as output:
+                        shutil.copyfileobj(source, output, length=1024 * 1024)
         with sqlite3.connect(staged_db) as db:
             if db.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
                 raise BackupError("Staged database failed integrity validation.")
