@@ -152,3 +152,12 @@ Never infer one status from another.
 - Worker starts only when `MASOUD_STUDIO_WORKER_ENABLED=true`; default is disabled. Graceful shutdown waits for the current synchronous handler to finish.
 - Only `system.healthcheck` is built in. Creative workflow task types intentionally remain queued until their actual modules register handlers.
 - Known limits: synchronous handlers cannot be forcibly interrupted; lease heartbeat/renewal, per-handler execution timeout, process isolation, multi-worker SQLite coordination, and operator telemetry remain future work.
+
+
+## Latest implementation checkpoint
+- Production run reads are side-effect free; aggregate status is projected from task state without a database write.
+- Task and production-run pagination use database-side counts.
+- Added regression coverage for read-only run status and SQLite naive lease timestamps.
+- Added an opt-in Worker Supervisor with a handler allowlist, lease recovery, safe result bounds, sanitized errors, and graceful shutdown. Only the non-billable `system.healthcheck` handler is registered by default.
+- The worker remains disabled unless `MASOUD_STUDIO_WORKER_ENABLED=true`. Creative production task handlers are not yet registered.
+- Verification status for this checkpoint: **CI pending**. Do not treat code presence as test success.
