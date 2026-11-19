@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from .database import get_db
 from .projects import create_project, get_project, list_projects, serialize, set_archived, update_project
 from .schemas import ProjectCreate, ProjectPage, ProjectRead, ProjectUpdate
-from .storage import detach_project_asset, ingest_upload, list_project_assets
+from .storage import detach_project_asset, ingest_upload, list_project_assets\nfrom .ai_gateway import create_provider, list_providers, delete_provider\nfrom .gateway_schemas import ProviderCreate, ProviderRead
 
 router = APIRouter(prefix="/api/v1", tags=["studio"])
 
@@ -47,3 +47,18 @@ def get_project_assets(project_id: str, db: Session = Depends(get_db)):
 @router.delete("/projects/{project_id}/assets/{link_id}", status_code=204)
 def delete_project_asset(project_id: str, link_id: str, db: Session = Depends(get_db)):
     detach_project_asset(db, project_id, link_id)
+
+
+@router.post("/ai/providers", response_model=ProviderRead, status_code=201)
+def post_ai_provider(payload: ProviderCreate, db: Session = Depends(get_db)):
+    return create_provider(db, payload)
+
+
+@router.get("/ai/providers", response_model=list[ProviderRead])
+def get_ai_providers(db: Session = Depends(get_db)):
+    return list_providers(db)
+
+
+@router.delete("/ai/providers/{provider_id}", status_code=204)
+def remove_ai_provider(provider_id: str, db: Session = Depends(get_db)):
+    delete_provider(db, provider_id)
