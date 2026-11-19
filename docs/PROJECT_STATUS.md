@@ -204,3 +204,10 @@ Never infer one status from another.
 - Continuity facts now accept a registered prop ID and resolve its canonical name instead of treating every prop as a free-text identity.
 - Migration 0017_story_prop_registry follows 0016_timeline_events.
 - Backend registry and continuity integration are implemented; the Character & World UI still needs the prop creation/editor and registered-prop selector.
+
+
+### Prop registry UI — 2026-11-19
+
+- Character & Worlds now loads the story-scoped prop registry, creates canonical props, edits metadata/status/current holder and selects registered props when recording continuity facts.
+- Free-text prop identity is no longer used by the UI continuity form; facts reference stable prop IDs.
+- UI code is committed; latest frontend CI/browser verification is pending.
