@@ -10,7 +10,7 @@ The Task Manager is the durable execution ledger for future Studio workflows. It
 - Idempotent task creation using a SHA-256 hash of the caller's idempotency key and a canonical request hash. Reusing a key for a different request returns `409`.
 - Prerequisite dependencies. A task is claimable only after every prerequisite succeeds. A failed/cancelled/blocked prerequisite moves the dependent task to `blocked`.
 - Lifecycle primitives: claim, complete, fail, bounded retry scheduling, manual retry, cancellation of queued/blocked tasks, and expired-lease recovery.
-- Append-only lifecycle events for creation, claim, completion, failure/retry, cancellation, dependency blocking, and lease recovery.
+- Append-only lifecycle events for creation, claim, completion, failure/retry, cancellation, dependency blocking, lease recovery, and lease renewal.
 - Priority ordering: lower numeric value is preferred; creation time breaks ties.
 
 ## API
@@ -48,6 +48,7 @@ The internal service functions in `backend/app/task_manager.py` are the worker c
 - `complete_task(db, task_id, worker_id, result)`
 - `fail_task(db, task_id, worker_id, error_code, error_message, retry_delay_seconds=30)`
 - `recover_expired_leases(db)`
+- `renew_task_lease(db, task_id, worker_id, lease_seconds=120)`
 
 Workers must only store sanitized error messages. Raw provider responses, prompts, credentials, and secrets must not be placed in task error fields or event details.
 
