@@ -1,7 +1,14 @@
 from logging.config import fileConfig
 import os
+from pathlib import Path
+
 from alembic import context
+from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+load_dotenv(ROOT_DIR / ".env", override=False)
+
 from backend.app.database import Base
 from backend.app import models  # noqa: F401 - register all mapped tables
 

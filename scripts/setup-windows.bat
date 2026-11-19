@@ -60,9 +60,8 @@ if errorlevel 1 goto failed
 
 echo.
 echo Setup completed.
-echo Start scripts\start-backend-windows.bat in one terminal.
-echo Start scripts\start-frontend-windows.bat in a second terminal.
-echo Then open http://127.0.0.1:5173
+echo Setup completed. Double-click scripts\start-studio-windows.bat to launch the studio.
+echo The local app will open at http://127.0.0.1:8000
 pause
 exit /b 0
 
