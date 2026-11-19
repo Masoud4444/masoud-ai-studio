@@ -136,3 +136,22 @@ def test_run_cancellation_refuses_while_task_is_running(db_session):
         cancel_production_run(db_session, run["id"])
     assert exc.value.status_code == 409
     assert exc.value.detail["code"] == "production_run_has_running_tasks"
+
+
+
+def test_pause_waits_for_active_step_then_resumes_pending_steps(db_session):
+    run = create_production_run(
+        db_session, "creative.preproduction", {"brief": "Pause while running"}, "production-key-pause-02",
+    )
+    active = claim_task(db_session, "worker-pause-active")
+    assert active is not None
+    paused = pause_production_run(db_session, run["id"])
+    assert paused["status"] == "pausing"
+    assert next(step for step in paused["steps"] if step["task_id"] == active["id"])["status"] == "running"
+
+    complete_task(db_session, active["id"], "worker-pause-active", {"research": "finished"})
+    fetched = get_production_run(db_session, run["id"])
+    assert fetched["status"] == "paused"
+    resumed = resume_production_run(db_session, run["id"])
+    assert resumed["status"] == "waiting_approval"
+    assert next(step for step in resumed["steps"] if step["task_id"] == active["id"])["status"] == "succeeded"
