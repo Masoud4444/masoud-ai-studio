@@ -128,4 +128,7 @@ def test_worker_lease_renewal_requires_live_owner(db_session):
     assert renew_task_lease(db_session, task["id"], "another-worker", 10) is False
     assert renew_task_lease(db_session, task["id"], "worker-renewal", 10) is True
     row = db_session.get(StudioTask, task["id"])
-    assert row.lease_expires_at > datetime.now(timezone.utc)
+    lease_expiry = row.lease_expires_at
+    if lease_expiry.tzinfo is None:
+        lease_expiry = lease_expiry.replace(tzinfo=timezone.utc)
+    assert lease_expiry > datetime.now(timezone.utc)

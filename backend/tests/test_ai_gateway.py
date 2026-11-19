@@ -250,6 +250,9 @@ def test_concurrent_duplicate_idempotency_key_is_rejected(tmp_path, monkeypatch)
     Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     monkeypatch.setenv("MASOUD_STUDIO_CREDENTIAL_KEY", base64.urlsafe_b64encode(b"c" * 32).decode("ascii"))
+    with Session() as setup_db:
+        setup_db.add(AIProvider(name="Concurrent Provider", base_url="https://api.example/v1", models_json='["m1"]'))
+        setup_db.commit()
     async def scenario():
         started = asyncio.Event()
         release = asyncio.Event()

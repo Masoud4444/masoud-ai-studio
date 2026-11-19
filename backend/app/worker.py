@@ -139,7 +139,7 @@ class WorkerSupervisor:
                 return True
             self._complete(task["id"], result)
         except Exception as exc:
-            code = "handler_invalid_result" if isinstance(exc, TypeError) else "handler_error"
+            code = "handler_invalid_result" if isinstance(exc, (TypeError, ValueError)) else "handler_error"
             self._fail(task["id"], code, "Task handler failed; inspect local diagnostic tooling")
         return True
 

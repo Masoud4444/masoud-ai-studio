@@ -4,6 +4,7 @@ from pydantic import ValidationError
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+from uuid import uuid4
 
 from backend.app.database import Base
 from backend.app.models import AIProvider, AgentEvent, StudioAgent
@@ -39,9 +40,9 @@ def provider(db_session):
     return item
 
 
-def create_draft(db_session, provider_id=None):
+def create_draft(db_session, provider_id=None, slug=None):
     return create_agent(db_session, AgentCreate(
-        slug="research-agent", name="Research Agent",
+        slug=slug or f"research-agent-{uuid4().hex[:8]}", name="Research Agent",
         purpose="Collect and synthesize source-backed research",
         system_prompt="You are a careful research assistant.",
         provider_id=provider_id, model_id="model-a" if provider_id else None,
@@ -87,7 +88,7 @@ def test_agent_write_and_execute_tools_require_approval(db_session):
         {"tool_name": "filesystem.write", "permission": "write", "approval_required": True},
     ]))
     assert len(configured["tools"]) == 2
-    assert configured["tools"][1]["approval_required"] is True
+    assert next(tool for tool in configured["tools"] if tool["tool_name"] == "filesystem.write")["approval_required"] is True
 
 
 def test_agent_disable_and_audit_events(db_session):
@@ -101,9 +102,9 @@ def test_agent_disable_and_audit_events(db_session):
 
 
 def test_agent_slug_conflict_is_structured(db_session):
-    create_draft(db_session)
+    create_draft(db_session, slug="research-agent-conflict")
     with pytest.raises(HTTPException) as exc:
-        create_draft(db_session)
+        create_draft(db_session, slug="research-agent-conflict")
     assert exc.value.status_code == 409
     assert exc.value.detail["code"] == "agent_slug_conflict"
 

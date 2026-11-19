@@ -77,8 +77,12 @@ def _request_hash(task_type: str, project_id: str | None, priority: int,
 
 def create_task(db: Session, task_type: str, payload: dict, idempotency_key: str,
                 project_id: str | None = None, priority: int = 100,
-                dependencies: list[str] | None = None, max_attempts: int = 3) -> dict:
-    dependencies = list(dict.fromkeys(dependencies or []))
+                dependencies: list[str] | None = None, max_attempts: int = 3,
+                depends_on: list[str] | None = None) -> dict:
+    # `depends_on` is retained as a compatibility alias for direct callers.
+    if dependencies is not None and depends_on is not None and set(dependencies) != set(depends_on):
+        raise HTTPException(status_code=422, detail={"code": "conflicting_task_dependencies"})
+    dependencies = list(dict.fromkeys(dependencies if dependencies is not None else (depends_on or [])))
     if not idempotency_key or len(idempotency_key) > 200:
         raise HTTPException(status_code=422, detail={"code": "invalid_idempotency_key"})
     key_hash = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
