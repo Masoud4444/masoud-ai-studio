@@ -4,7 +4,7 @@ from .database import get_db
 from .projects import create_project, get_project, list_projects, serialize, set_archived, update_project
 from .schemas import ProjectCreate, ProjectPage, ProjectRead, ProjectUpdate
 from .storage import detach_project_asset, ingest_upload, list_project_assets
-from .ai_gateway import create_provider, list_providers, delete_provider, generate_chat_completion, list_model_capabilities, update_model_capability, test_provider_connection, set_model_pricing, get_usage_summary
+from .ai_gateway import create_provider, list_providers, delete_provider, generate_chat_completion, list_model_capabilities, update_model_capability, test_provider_connection, set_model_pricing, get_usage_summary, list_model_pricing_history
 from .gateway_schemas import ProviderCreate, ProviderRead, ChatCompletionRequest, ChatCompletionRead, ModelCapabilityUpdate, ModelPricingUpdate
 
 router = APIRouter(prefix="/api/v1", tags=["studio"])
@@ -108,3 +108,8 @@ def put_ai_model_pricing(
 @router.get("/ai/usage/summary")
 def get_ai_usage_summary(db: Session = Depends(get_db)):
     return get_usage_summary(db)
+
+
+@router.get("/ai/providers/{provider_id}/models/{model_id}/pricing/history")
+def get_ai_model_pricing_history(provider_id: str, model_id: str, db: Session = Depends(get_db)):
+    return list_model_pricing_history(db, provider_id, model_id)
