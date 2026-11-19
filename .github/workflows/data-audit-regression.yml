@@ -1,0 +1,21 @@
+name: Data audit regression
+
+on:
+  push:
+    branches: [implementation/bootstrap-001]
+    paths:
+      - "desktop/data_audit.py"
+      - "backend/tests/test_data_audit.py"
+      - ".github/workflows/data-audit-regression.yml"
+  workflow_dispatch:
+
+jobs:
+  data-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run focused data audit regression
+        run: python -m pytest backend/tests/test_data_audit.py -q
