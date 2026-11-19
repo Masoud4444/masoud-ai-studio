@@ -10,8 +10,8 @@ from .task_manager import create_task, get_task, list_tasks, cancel_task, retry_
 from .task_schemas import TaskCreate, TaskRead
 from .orchestrator import (list_workflows, create_production_run, get_production_run, list_production_runs, pause_production_run, resume_production_run, cancel_production_run)
 from .orchestrator_schemas import ProductionRunCreate
-from .agent_manager import create_agent, get_agent, list_agents, update_agent, replace_agent_tools, enable_agent, disable_agent
-from .agent_schemas import AgentCreate, AgentUpdate, AgentToolsUpdate
+from .agent_manager import create_agent, get_agent, list_agents, update_agent, replace_agent_tools, enable_agent, disable_agent\nfrom .agent_runtime import run_agent
+from .agent_schemas import AgentCreate, AgentUpdate, AgentToolsUpdate, AgentRunRequest
 
 router = APIRouter(prefix="/api/v1", tags=["studio"])
 
@@ -264,3 +264,13 @@ def post_agent_enable(agent_id: str, db: Session = Depends(get_db)):
 @router.post("/agents/{agent_id}/disable")
 def post_agent_disable(agent_id: str, db: Session = Depends(get_db)):
     return disable_agent(db, agent_id)
+
+
+@router.post("/agents/{agent_id}/run")
+async def post_agent_run(
+    agent_id: str,
+    payload: AgentRunRequest,
+    idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=8, max_length=180),
+    db: Session = Depends(get_db),
+):
+    return await run_agent(db, agent_id, payload.message, idempotency_key)
