@@ -253,3 +253,10 @@ Never infer one status from another.
 - Added a Settings center combining Backup & Restore with operational storage, disk-capacity, path and security panels. Path changes are intentionally not exposed as a UI toggle because moving a live SQLite database/content-addressed store requires a controlled migration and restart.
 - Added focused regression coverage and a dedicated CI workflow that runs only the new diagnostics test. Previously passed suites are not manually rerun.
 - The diagnostics endpoint is local operational visibility, not authentication. Packaged desktop mode remains loopback-bound; same-user local processes can still reach the API.
+
+
+## Backup retention preferences v0.1 — 2026-11-19
+
+- Added a locally persisted settings file (atomic write + fsync) for backup retention policy. Supported retention limits: 3, 5, 10, 20, 30, 50 or 100 archives; server validates 3–100.
+- Backup creation verifies the newly written archive (manifest SHA-256 and SQLite integrity) before pruning older archives. At least three are retained. Existing archives are untouched when backup creation or verification fails.
+- Settings UI exposes retention choice and explicit save action. Data-path changes remain disabled until a separate offline migration flow is implemented.

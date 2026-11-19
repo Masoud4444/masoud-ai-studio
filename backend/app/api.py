@@ -312,6 +312,61 @@ def get_system_settings():
     }
 
 
+
+def _settings_file():
+    from pathlib import Path
+    database_name = engine.url.database
+    if not database_name or database_name == ":memory:":
+        raise HTTPException(409, detail={"code": "settings_require_file_database"})
+    return Path(database_name).expanduser().resolve().parent / "studio-settings.json"
+
+
+def _read_preferences():
+    import json
+    path = _settings_file()
+    defaults = {"backup_retention_count": 20}
+    if not path.exists():
+        return defaults
+    if path.is_symlink() or path.stat().st_size > 16384:
+        raise HTTPException(409, detail={"code": "settings_file_unsafe"})
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        count = raw.get("backup_retention_count", 20)
+        if isinstance(count, bool) or not isinstance(count, int) or not 3 <= count <= 100:
+            raise ValueError("Invalid backup retention setting")
+        return {"backup_retention_count": count}
+    except (OSError, ValueError, TypeError):
+        raise HTTPException(409, detail={"code": "settings_file_invalid"})
+
+
+@router.get("/settings/preferences")
+def get_settings_preferences():
+    return _read_preferences()
+
+
+@router.put("/settings/preferences")
+def put_settings_preferences(payload: dict):
+    import json
+    import os
+    if set(payload) != {"backup_retention_count"}:
+        raise HTTPException(422, detail={"code": "unsupported_settings_fields"})
+    count = payload.get("backup_retention_count")
+    if isinstance(count, bool) or not isinstance(count, int) or not 3 <= count <= 100:
+        raise HTTPException(422, detail={"code": "invalid_backup_retention", "minimum": 3, "maximum": 100})
+    path = _settings_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(path.name + ".tmp")
+    try:
+        with temp.open("w", encoding="utf-8") as stream:
+            json.dump({"backup_retention_count": count}, stream, sort_keys=True)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temp, path)
+    finally:
+        temp.unlink(missing_ok=True)
+    return {"backup_retention_count": count}
+
+
 # Local backup management. Restore is deliberately offline-only.
 def _backup_locations():
     database_name = engine.url.database
@@ -326,7 +381,22 @@ def _backup_locations():
 def post_backup():
     database_path, backup_dir = _backup_locations()
     try:
-        return create_backup(database_path, STORAGE_ROOT, backup_dir)
+        result = create_backup(database_path, STORAGE_ROOT, backup_dir)
+        # Only prune older archives after the newly-created archive passes full verification.
+        verification = verify_backup(__import__("pathlib").Path(result["path"]))
+        if not verification.get("valid"):
+            raise BackupError("New backup did not pass integrity verification.")
+        retention = _read_preferences()["backup_retention_count"]
+        archives = sorted(
+            (item for item in backup_dir.glob("masoud-studio-*.zip")
+             if item.is_file() and not item.is_symlink()),
+            key=lambda item: item.stat().st_mtime,
+            reverse=True,
+        )
+        for obsolete in archives[retention:]:
+            obsolete.unlink()
+        result["retained_backups"] = min(len(archives), retention)
+        return result
     except BackupError as exc:
         raise HTTPException(409, detail={"code": "backup_failed", "message": str(exc)})
 
