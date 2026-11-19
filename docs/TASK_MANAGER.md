@@ -8,7 +8,7 @@ The Task Manager is the durable execution ledger for future Studio workflows. It
 
 - Durable task records with project association, task type, JSON payload/result, priority, attempt budget, availability time, worker lease, and error fields.
 - Idempotent task creation using a SHA-256 hash of the caller's idempotency key and a canonical request hash. Reusing a key for a different request returns `409`.
-- Prerequisite dependencies. A task is claimable only after every prerequisite succeeds. A failed/cancelled/blocked prerequisite moves the dependent task to `blocked`.
+- Prerequisite dependencies. A task is claimable only after every prerequisite succeeds. A failed/cancelled/blocked/paused prerequisite moves the dependent task to `blocked`.
 - Lifecycle primitives: claim, complete, fail, bounded retry scheduling, manual retry, cancellation of queued/blocked tasks, and expired-lease recovery.
 - Append-only lifecycle events for creation, claim, completion, failure/retry, cancellation, dependency blocking, lease recovery, and lease renewal.
 - Priority ordering: lower numeric value is preferred; creation time breaks ties.
@@ -65,3 +65,6 @@ No public claim/complete endpoints exist. Keep the API and opt-in worker on loca
 - Authentication/authorization for worker operations.
 - Multi-process SQLite coordination and PostgreSQL concurrency/load verification.
 - CI verification of migrations 0007–0008 and the Task Manager, Orchestrator, and Worker tests.
+
+
+**Run pause integration:** production runs can pause queued and approval-waiting tasks. Each task stores its prior state in `paused_from_status` (migration 0009), and resume restores it. Paused tasks are not claimable. A run with active work enters `pausing`; active work is not forcibly interrupted. Run cancellation is rejected while any task is running.
