@@ -364,3 +364,76 @@ def update_model_capability(db: Session, provider_id: str, model_id: str, payloa
         "supports_streaming": row.supports_streaming, "supports_tools": row.supports_tools,
         "supports_vision": row.supports_vision,
     }
+
+
+async def _fetch_provider_model_list(provider: AIProvider) -> list[str]:
+    parsed = urlsplit(provider.base_url)
+    host = parsed.hostname
+    if not host or parsed.scheme != "https" or parsed.port not in (None, 443):
+        raise HTTPException(status_code=422, detail={"code": "provider_url_rejected"})
+    pinned = await _resolve_public_addresses(host)
+    connector = aiohttp.TCPConnector(resolver=_PinnedResolver(pinned), use_dns_cache=False, ssl=True)
+    timeout = aiohttp.ClientTimeout(total=20, connect=10, sock_read=15)
+    headers = {}
+    if provider.encrypted_api_key:
+        try:
+            secret = decrypt_secret(provider.encrypted_api_key, "provider", provider.key_version)
+        except Exception:
+            raise HTTPException(status_code=503, detail={"code": "provider_credential_decryption_failed"})
+        headers["Authorization"] = f"Bearer {secret}"
+    endpoint = provider.base_url.rstrip("/") + "/models"
+    try:
+        async with aiohttp.ClientSession(connector=connector, timeout=timeout, trust_env=False) as session:
+            async with session.get(endpoint, headers=headers, allow_redirects=False) as response:
+                raw = await response.content.read(1024 * 1024 + 1)
+                if len(raw) > 1024 * 1024:
+                    raise HTTPException(status_code=502, detail={"code": "provider_response_too_large"})
+                if response.status in (401, 403):
+                    raise HTTPException(status_code=502, detail={"code": "provider_authentication_failed"})
+                if response.status == 429:
+                    raise HTTPException(status_code=429, detail={"code": "provider_rate_limited"})
+                if response.status < 200 or response.status >= 300:
+                    raise HTTPException(status_code=502, detail={"code": "provider_connection_test_failed"})
+                try:
+                    data = json.loads(raw.decode("utf-8"))
+                    items = data.get("data")
+                    if not isinstance(items, list):
+                        raise ValueError
+                    return sorted({
+                        str(item["id"]) for item in items
+                        if isinstance(item, dict) and isinstance(item.get("id"), str)
+                    })
+                except (ValueError, TypeError, KeyError):
+                    raise HTTPException(status_code=502, detail={"code": "provider_response_invalid"})
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail={"code": "provider_timeout"})
+    except aiohttp.ClientError:
+        raise HTTPException(status_code=502, detail={"code": "provider_connection_failed"})
+
+
+async def test_provider_connection(db: Session, provider_id: str) -> dict:
+    provider = db.get(AIProvider, provider_id)
+    if provider is None:
+        raise HTTPException(status_code=404, detail={"code": "provider_not_found"})
+    if not provider.is_enabled:
+        raise HTTPException(status_code=409, detail={"code": "provider_disabled"})
+    remote_models = await _fetch_provider_model_list(provider)
+    declared_models = set(json.loads(provider.models_json))
+    verified = sorted(declared_models.intersection(remote_models))
+    for model_id in verified:
+        row = db.scalar(select(AIModelCapability).where(
+            AIModelCapability.provider_id == provider.id,
+            AIModelCapability.model_id == model_id,
+        ))
+        if row is None:
+            row = AIModelCapability(id=str(uuid4()), provider_id=provider.id, model_id=model_id)
+            db.add(row)
+        row.verification_status = "verified"
+    db.commit()
+    return {
+        "provider_id": provider.id,
+        "status": "verified" if verified else "reachable_models_not_matched",
+        "verified_models": verified,
+        "unmatched_declared_models": sorted(declared_models - set(remote_models)),
+        "remote_model_count": len(remote_models),
+    }
