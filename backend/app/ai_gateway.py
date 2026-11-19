@@ -473,7 +473,7 @@ async def test_provider_connection(db: Session, provider_id: str) -> dict:
     db.commit()
     return {
         "provider_id": provider.id,
-        "status": "verified" if verified else "reachable_models_not_matched",
+        "status": "model_id_verified" if verified else "reachable_models_not_matched",
         "verified_models": verified,
         "unmatched_declared_models": sorted(declared_models - set(remote_models)),
         "remote_model_count": len(remote_models),
