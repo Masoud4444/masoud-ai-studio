@@ -74,7 +74,9 @@ async def run_agent(db: Session, agent_id: str, user_message: str, idempotency_k
         "max_output_tokens": agent.max_output_tokens,
     }
     request_hash = _hash_payload(request_identity)
-    # Hash caller-controlled keys so the persisted composite key stays bounded.\n    caller_key_hash = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()\n    runtime_key = f"agent:{agent.id}:{caller_key_hash}"
+    # Hash caller-controlled keys so the persisted composite key stays bounded.
+    caller_key_hash = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
+    runtime_key = f"agent:{agent.id}:{caller_key_hash}"
     reservation = reserve_agent_budget(
         db, agent.id, runtime_key, request_hash,
         _upper_bound_cost(agent, pricing, user_message),
