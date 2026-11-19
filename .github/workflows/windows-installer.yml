@@ -40,6 +40,16 @@ jobs:
           python -m pip install "pyinstaller>=6.10,<7.0"
       - name: Build self-contained application directory
         run: pyinstaller --noconfirm --clean desktop/MasoudAIStudio.spec
+      - name: Build isolated PDF/DOCX parser helper
+        run: pyinstaller --noconfirm --clean --distpath dist/MasoudAIStudio --workpath build/document-parser desktop/DocumentParser.spec
+      - name: Smoke-test isolated document parser
+        shell: pwsh
+        run: |
+          python -c "from docx import Document; d=Document(); d.add_paragraph('Masoud AI Studio parser smoke check'); d.save('parser-smoke.docx')"
+          $output = & "dist/MasoudAIStudio/MasoudDocumentParser.exe" "parser-smoke.docx" "docx"
+          if ($LASTEXITCODE -ne 0) { throw "Document parser helper failed with exit code $LASTEXITCODE" }
+          $result = $output | ConvertFrom-Json
+          if ($result.chunks.Count -lt 1) { throw "Document parser returned no extracted chunks" }
       - name: Smoke-test packaged application and migrations
         shell: pwsh
         run: |

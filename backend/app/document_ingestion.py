@@ -22,7 +22,8 @@ def extract_document(db:Session,source_id:str)->dict:
     if sig.startswith(b"%PDF-") and asset.mime_type=="application/pdf": kind="pdf"
     elif sig[:4] == bytes((0x50, 0x4b, 0x03, 0x04)) and asset.mime_type=="application/zip": kind="docx"
     else: raise HTTPException(415,detail={"code":"unsupported_document_format","supported":["PDF","DOCX"]})
-    env={"PATH":os.environ.get("PATH",""),"PYTHONIOENCODING":"utf-8"}
+    env={key:os.environ[key] for key in ("PATH","SYSTEMROOT","WINDIR","TEMP","TMP") if os.environ.get(key)}
+    env["PYTHONIOENCODING"]="utf-8"
     try:
         run=subprocess.run([sys.executable,"-I",str(PARSER),str(path),kind],stdin=subprocess.DEVNULL,capture_output=True,text=True,encoding="utf-8",errors="replace",timeout=30,check=False,cwd=str(PARSER.parents[2]),env=env)
     except subprocess.TimeoutExpired: raise HTTPException(408,detail={"code":"document_parser_timeout"})

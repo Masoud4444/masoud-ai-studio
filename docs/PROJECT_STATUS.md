@@ -227,3 +227,10 @@ Never infer one status from another.
 - Added a runtime-only dependency manifest so the installer does not bundle pytest and development-only HTTP test dependencies.
 - Backend test workflow now uses relevant path filters, avoiding automatic reruns for packaging-only or documentation-only changes. Existing passed tests are not manually rerun.
 - The installer has not yet been built or run on a Windows machine. The Windows Actions workflow must complete successfully before an installer artifact exists. The package is not code-signed; Tauri-native windowing, automatic updates, backup/restore, creative Agent Runtime/tool sandbox and complete production handlers remain future work.
+
+
+### Packaged document extraction helper — 2026-11-19
+
+- The packaged Windows application now invokes a dedicated one-file `MasoudDocumentParser.exe` helper for PDF/DOCX extraction, preserving the existing bounded subprocess boundary when the main application is frozen.
+- The Windows installer workflow builds the helper separately and includes a DOCX extraction smoke check before packaging the installer.
+- The parser subprocess receives only a small environment allowlist and is launched without opening a console window.

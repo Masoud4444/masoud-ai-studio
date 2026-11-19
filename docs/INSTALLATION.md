@@ -10,7 +10,7 @@ Masoud AI Studio now has two Windows installation paths: a self-contained x64 in
 4. Run the installer. It installs the application for the current user; administrator rights are not required.
 5. Launch Masoud AI Studio from the Start menu (or the optional desktop shortcut).
 
-The package includes the Python backend, compiled React frontend, runtime dependencies and Alembic migrations. Python and Node.js do not need to be installed separately on the target PC.
+The package includes the Python backend, compiled React frontend, runtime dependencies, Alembic migrations and a separate bounded PDF/DOCX parser helper. Python and Node.js do not need to be installed separately on the target PC.
 
 At first launch, the application:
 - creates its private data directory under `%LOCALAPPDATA%\\Masoud AI Studio`;
