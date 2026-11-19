@@ -63,7 +63,7 @@ def test_provider_create_never_returns_credential(monkeypatch):
 
 
 import asyncio
-from backend.app.ai_gateway import generate_chat_completion, set_model_pricing, get_usage_summary
+from backend.app.ai_gateway import generate_chat_completion, set_model_pricing, get_usage_summary, list_model_pricing_history
 from backend.app.models import AIProvider, AIRequest, AIUsage
 from backend.app.gateway_schemas import ChatCompletionRequest, ModelPricingUpdate
 
@@ -211,4 +211,6 @@ def test_model_pricing_versions_are_explicit_and_auditable():
         assert first["version"] == 1
         assert second["version"] == 2
         assert second["input_usd_per_million"] == 0.3
+        history = list_model_pricing_history(db, provider.id, "priced-model")
+        assert [item["version"] for item in history] == [2, 1]
     engine.dispose()
