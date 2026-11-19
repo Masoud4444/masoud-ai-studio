@@ -63,9 +63,9 @@ def test_provider_create_never_returns_credential(monkeypatch):
 
 
 import asyncio
-from backend.app.ai_gateway import generate_chat_completion
+from backend.app.ai_gateway import generate_chat_completion, set_model_pricing, get_usage_summary
 from backend.app.models import AIProvider, AIRequest, AIUsage
-from backend.app.gateway_schemas import ChatCompletionRequest
+from backend.app.gateway_schemas import ChatCompletionRequest, ModelPricingUpdate
 
 
 def gateway_db():
@@ -102,6 +102,7 @@ def test_idempotent_chat_replays_without_second_provider_call(monkeypatch):
         provider = AIProvider(name="Gateway Provider", base_url="https://api.example/v1", models_json='["m1"]')
         db.add(provider)
         db.commit()
+        set_model_pricing(db, provider.id, "m1", ModelPricingUpdate(input_usd_per_million=1, output_usd_per_million=2))
         first = asyncio.run(generate_chat_completion(db, request, "stable-key-001"))
         second = asyncio.run(generate_chat_completion(db, request, "stable-key-001"))
         assert first["content"] == "hello"
@@ -109,6 +110,11 @@ def test_idempotent_chat_replays_without_second_provider_call(monkeypatch):
         assert second["replayed"] is True
         assert calls["count"] == 1
         assert db.query(AIUsage).count() == 1
+        usage = db.query(AIUsage).one()
+        assert str(usage.estimated_cost_usd) == "0.00000700"
+        summary = get_usage_summary(db)
+        assert summary["requests"] == 1
+        assert summary["estimated_cost_usd"] == "0.00000700"
     engine.dispose()
 
 
@@ -190,4 +196,19 @@ def test_expired_idempotency_lease_can_be_recovered(monkeypatch):
         result = asyncio.run(generate_chat_completion(db, request, "lease-key-001"))
         assert result["content"] == "recovered"
         assert calls["count"] == 1
+    engine.dispose()
+
+def test_model_pricing_versions_are_explicit_and_auditable():
+    from backend.app.ai_gateway import set_model_pricing
+    from backend.app.gateway_schemas import ModelPricingUpdate
+    engine, Session = gateway_db()
+    with Session() as db:
+        provider = AIProvider(name="Pricing Provider", base_url="https://api.example/v1", models_json='["priced-model"]')
+        db.add(provider)
+        db.commit()
+        first = set_model_pricing(db, provider.id, "priced-model", ModelPricingUpdate(input_usd_per_million=0.2, output_usd_per_million=0.8, source_note="Provider pricing page, checked manually"))
+        second = set_model_pricing(db, provider.id, "priced-model", ModelPricingUpdate(input_usd_per_million=0.3, output_usd_per_million=0.9))
+        assert first["version"] == 1
+        assert second["version"] == 2
+        assert second["input_usd_per_million"] == 0.3
     engine.dispose()
