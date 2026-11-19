@@ -9,7 +9,7 @@ Last updated: 2026-11-19
 - The implementation branch is intentionally separate from `main`; no merge has been performed.
 - The Foundation 002 archive has not been inspected or imported into this implementation branch. The backend work below is a fresh implementation and must not be described as an import.
 - Last fully verified implementation commit: `cf24526ff43c85ba6bcde6fcc8a9757dc20b485d` (21 tests passed; migrations 0001–0005). Provider priority routing and migration 0006 have been added after that commit and are awaiting CI verification.
-- Later documentation-only commits update the README and AI Gateway guide; their CI is tracked separately.
+- Later commits added provider priority, local-provider support, migration 0006, CI timeout protection, and the Task Manager foundation. These changes are awaiting CI verification.
 
 ## Implemented code
 
@@ -46,7 +46,19 @@ Last updated: 2026-11-19
 - Provider model registry backfill migration for existing provider configurations.
 - Deterministic provider selection by model availability, enabled state, priority and creation time.
 
-### AI Gateway API routes
+### Central Task Manager
+
+- Durable task, dependency, and append-only task-event tables added in migration 0007.
+- Idempotent task creation with request-hash conflict detection.
+- Priority ordering, prerequisite gating, bounded attempt budgets, lease claims, completion/failure transitions, retry scheduling, manual retry, queued/blocked cancellation, and expired-lease recovery implemented as service primitives.
+- API routes: `POST /tasks`, `GET /tasks`, `GET /tasks/{task_id}`, `POST /tasks/{task_id}/cancel`, and `POST /tasks/{task_id}/retry`.
+- Worker claim/complete/fail functions are internal only; no public worker endpoints or background worker process have been enabled. This avoids exposing unauthenticated execution controls.
+- SQLite operation is currently single-worker only. Multi-process locking, PostgreSQL concurrency, cancellation signalling for running work, quotas, and worker supervision remain future hardening tasks.
+- Migration 0007 and Task Manager tests are implemented but have not yet passed CI.
+
+See [Task Manager contract](TASK_MANAGER.md).
+
+## AI Gateway API routes
 
 All routes are under `/api/v1`:
 
@@ -90,7 +102,7 @@ See [AI Gateway implementation guide](AI_GATEWAY.md) for setup, environment conf
 - React/TypeScript frontend and Web/PWA.
 - Android companion client.
 - Agent Manager, agent permissions, tool sandbox and agent execution lifecycle.
-- Production Orchestrator and central Task Manager / queue / DLQ / recovery.
+- Production Orchestrator graph planning, worker supervisor, DLQ UI, and recovery dashboard.
 - Research Vault, multimodal intake, provenance and evidence graph.
 - Story Engine, Character Bible, World Bible, continuity and universe/series management.
 - Visual Style Engine, Character/Cinematography/Visual Continuity pipeline.
@@ -104,8 +116,9 @@ See [AI Gateway implementation guide](AI_GATEWAY.md) for setup, environment conf
 1. Add integration tests for the outbound HTTP transport, DNS pinning, response sanitization, credential-key rotation, and concurrent idempotency.
 2. Complete AI Gateway operational controls: provider priority/routing, safe failure policy, budget controls, concurrency limits, circuit breaker, and optional streaming.
 3. Add Windows DPAPI-backed secret custody and Windows CI / packaging verification.
-4. Implement the central Task Manager and Production Orchestrator foundations before agent and studio workflows.
-5. Continue with Research/Intake, Studio OS, Story, Character/Universe, Visual, Video, Audio, QA/Compliance, Export, Analytics, and companion clients.
+4. Verify migration 0007 and Task Manager lifecycle tests; harden lease ownership and multi-worker claiming before enabling workers.
+5. Implement Production Orchestrator graph planning and worker supervision on top of the Task Manager.
+6. Continue with Research/Intake, Studio OS, Story, Character/Universe, Visual, Video, Audio, QA/Compliance, Export, Analytics, and companion clients.
 
 ## Status vocabulary
 
