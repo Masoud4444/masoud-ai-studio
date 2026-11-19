@@ -10,7 +10,8 @@ All routes are under `/api/v1`.
 |---|---|---|
 | POST | `/ai/providers` | Register an OpenAI-compatible provider (optional priority 1–1000; lower wins) |
 | GET | `/ai/providers` | List providers (credential fields are never returned) |
-| PATCH | `/ai/providers/{provider_id}` | Change provider priority or enabled state |\n| DELETE | `/ai/providers/{provider_id}` | Disable a provider; history is retained |
+| PATCH | `/ai/providers/{provider_id}` | Change provider priority or enabled state |
+| DELETE | `/ai/providers/{provider_id}` | Disable a provider; history is retained |
 | POST | `/ai/providers/{provider_id}/test` | Check the provider's `/models` endpoint and verify matching model IDs |
 | GET | `/ai/models` | List model capability declarations and verification status |
 | PATCH | `/ai/providers/{provider_id}/models/{model_id}` | Set model capability declarations |
