@@ -4,7 +4,7 @@ Last updated: 2026-11-19
 
 ## Repository and branch
 
-- Repository: `Masoud4444/masoud-ai-studio` (private).
+- Repository: `Masoud4444/masoud-ai-studio` (public source repository; studio data is designed to remain local/private).
 - Active implementation branch: `implementation/bootstrap-001`.
 - The implementation branch is intentionally separate from `main`; no merge has been performed.
 - The Foundation 002 archive has not been inspected or imported into this implementation branch. The backend work below is a fresh implementation and must not be described as an import.
@@ -154,7 +154,7 @@ Never infer one status from another.
 - Known limits: synchronous handlers cannot be forcibly interrupted; per-handler hard timeouts, process isolation, multi-worker SQLite coordination, and operator telemetry remain future work.
 
 
-## Latest implementation checkpoint
+## Frontend foundation (2026-11-19)\n\n- Added a React + TypeScript + Vite frontend under `frontend/`.\n- Implemented a responsive dark studio shell with workspace navigation, overview dashboard, API health feedback, project search, project listing, and project creation through the existing Projects API.\n- Vite development proxy targets the local FastAPI service at `127.0.0.1:8000`.\n- This is the first usable UI slice, not a completed studio interface. Research, production, assets, agents, compliance, media tools, and desktop packaging remain incremental work.\n- Frontend build has not yet been verified in CI.\n\n## Latest implementation checkpoint
 - Production run reads are side-effect free; aggregate status is projected from task state without a database write.
 - Task and production-run pagination use database-side counts.
 - Added regression coverage for read-only run status and SQLite naive lease timestamps.
