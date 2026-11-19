@@ -6,7 +6,7 @@ Last updated: 2026-11-19
 
 - Repository: `Masoud4444/masoud-ai-studio` (public source code; workspace data is designed to remain local/private).
 - Active branch: `implementation/bootstrap-001`.
-- Latest saved branch head before this status refresh: `e4ce157a5830cbc16194d70194c548e21af15855`.
+- Latest saved branch head: `3a73c65df1a03d144da92dd02272207829d55972`.
 - `main` remains untouched. No merge or release has been performed.
 - Product principle: **Full Vision, Simplified Architecture, Incremental Implementation**.
 - Architecture: modular monolith; one backend, primary database, storage layer, AI Gateway, Agent Manager, Production Orchestrator and central Task Manager.
@@ -31,7 +31,7 @@ Last updated: 2026-11-19
 - AI agents: create draft profiles, view registry, enable/disable where provider/model requirements permit.
 - Assets: project selection, upload, list and detach. Detach does not delete the shared content-addressed blob.
 - Research Vault, Characters & Worlds, Video & Audio, Compliance and Settings appear as staged modules; they are not implemented feature-complete screens.
-- Windows setup/start scripts and frontend guide are present under `scripts/` and `docs/FRONTEND.md`.
+- Windows setup/start scripts and frontend guide are present under `scripts/` and `docs/FRONTEND.md`. The setup script checks Python 3.11+/Node.js 20+, installs dependencies, builds the frontend, then applies migrations.
 
 ## Verification evidence
 
