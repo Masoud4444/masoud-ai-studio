@@ -20,7 +20,7 @@ def extract_document(db:Session,source_id:str)->dict:
     if not path.is_file() or path.stat().st_size!=asset.size_bytes: raise HTTPException(409,detail={"code":"document_blob_unavailable"})
     with path.open("rb") as f: sig=f.read(8)
     if sig.startswith(b"%PDF-") and asset.mime_type=="application/pdf": kind="pdf"
-    elif sig.startswith(b"PK\\x03\\x04") and asset.mime_type=="application/zip": kind="docx"
+    elif sig[:4] == bytes((0x50, 0x4b, 0x03, 0x04)) and asset.mime_type=="application/zip": kind="docx"
     else: raise HTTPException(415,detail={"code":"unsupported_document_format","supported":["PDF","DOCX"]})
     env={"PATH":os.environ.get("PATH",""),"PYTHONIOENCODING":"utf-8"}
     try:
