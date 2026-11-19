@@ -66,3 +66,8 @@ class ModelCapabilityUpdate(BaseModel):
     supports_streaming: bool = False
     supports_tools: bool = False
     supports_vision: bool = False
+
+class ModelPricingUpdate(BaseModel):
+    input_usd_per_million: float = Field(ge=0, le=100000)
+    output_usd_per_million: float = Field(ge=0, le=100000)
+    source_note: str | None = Field(default=None, max_length=500)
