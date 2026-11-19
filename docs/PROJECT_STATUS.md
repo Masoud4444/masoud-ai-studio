@@ -168,3 +168,12 @@ Never infer one status from another.
 - The Worker Supervisor now renews leases periodically while synchronous handlers are executing and discards results if ownership can no longer be confirmed.
 - Added a long-running handler regression test that expects at least one persisted lease-renewal event.
 - Hard interruption/timeouts for synchronous handlers are still not provided; process isolation is required for that guarantee.
+
+
+### Production run controls update
+- Added migration 0009 to persist each task's pre-pause state.
+- Added run-level pause/resume/cancel operations and API routes.
+- Pause stops new claims by moving queued/approval-waiting tasks to a dedicated paused state and restores their exact state on resume.
+- Active tasks are allowed to finish; the run reports `pausing` until no active tasks remain. Cancellation is rejected while any task is running.
+- Added regression tests for pause/resume restoration, pending-task cancellation, and refusing to cancel active work.
+- CI verification remains pending; migration and tests must pass before treating this feature as verified.
