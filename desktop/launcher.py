@@ -31,18 +31,30 @@ def _blob(data: bytes):
 def _dpapi(data: bytes, protect: bool) -> bytes:
     source, keepalive = _blob(data)
     output = DATA_BLOB()
-    crypt = ctypes.windll.crypt32
-    kernel = ctypes.windll.kernel32
+    crypt = ctypes.WinDLL("crypt32", use_last_error=True)
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    crypt.CryptProtectData.argtypes = [
+        ctypes.POINTER(DATA_BLOB), wintypes.LPCWSTR, ctypes.POINTER(DATA_BLOB),
+        ctypes.c_void_p, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(DATA_BLOB),
+    ]
+    crypt.CryptProtectData.restype = wintypes.BOOL
+    crypt.CryptUnprotectData.argtypes = [
+        ctypes.POINTER(DATA_BLOB), ctypes.POINTER(wintypes.LPWSTR), ctypes.POINTER(DATA_BLOB),
+        ctypes.c_void_p, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(DATA_BLOB),
+    ]
+    crypt.CryptUnprotectData.restype = wintypes.BOOL
+    kernel.LocalFree.argtypes = [ctypes.c_void_p]
+    kernel.LocalFree.restype = ctypes.c_void_p
     if protect:
         ok = crypt.CryptProtectData(ctypes.byref(source), "Masoud AI Studio credential key", None, None, None, 0, ctypes.byref(output))
     else:
         ok = crypt.CryptUnprotectData(ctypes.byref(source), None, None, None, None, 0, ctypes.byref(output))
     if not ok:
-        raise ctypes.WinError()
+        raise ctypes.WinError(ctypes.get_last_error())
     try:
         return ctypes.string_at(output.pbData, output.cbData)
     finally:
-        kernel.LocalFree(output.pbData)
+        kernel.LocalFree(ctypes.cast(output.pbData, ctypes.c_void_p))
 
 
 def _load_master_key(data_dir: Path) -> bytes:
@@ -147,6 +159,11 @@ def main() -> int:
         server.should_exit = True
         thread.join(timeout=10)
         return 5
+
+    if "--smoke-test" in sys.argv:
+        server.should_exit = True
+        thread.join(timeout=20)
+        return 0 if not thread.is_alive() else 6
 
     def open_studio(_icon=None, _item=None):
         webbrowser.open("http://127.0.0.1:8000", new=2)

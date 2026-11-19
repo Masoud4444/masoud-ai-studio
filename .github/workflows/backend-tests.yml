@@ -7,7 +7,6 @@ on:
       - "requirements.txt"
       - "alembic.ini"
       - "pyproject.toml"
-      - ".github/workflows/backend-tests.yml"
   pull_request:
     paths:
       - "backend/**"
