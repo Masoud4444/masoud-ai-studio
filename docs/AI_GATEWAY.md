@@ -8,9 +8,9 @@ All routes are under `/api/v1`.
 
 | Method | Route | Purpose |
 |---|---|---|
-| POST | `/ai/providers` | Register an OpenAI-compatible provider |
+| POST | `/ai/providers` | Register an OpenAI-compatible provider (optional priority 1–1000; lower wins) |
 | GET | `/ai/providers` | List providers (credential fields are never returned) |
-| DELETE | `/ai/providers/{provider_id}` | Disable a provider; history is retained |
+| PATCH | `/ai/providers/{provider_id}` | Change provider priority or enabled state |\n| DELETE | `/ai/providers/{provider_id}` | Disable a provider; history is retained |
 | POST | `/ai/providers/{provider_id}/test` | Check the provider's `/models` endpoint and verify matching model IDs |
 | GET | `/ai/models` | List model capability declarations and verification status |
 | PATCH | `/ai/providers/{provider_id}/models/{model_id}` | Set model capability declarations |
@@ -60,7 +60,7 @@ Example request body (send directly to the local API; never paste a real API key
 
 The URL validator accepts HTTPS on port 443, rejects credentials/query/fragment/local and non-public destinations, and checks DNS at registration. Immediately before each outbound call, the gateway resolves again, rejects any non-global answer, and pins the connection to the validated address while preserving TLS hostname verification. Redirects and environment proxies are disabled.
 
-The provider connectivity test calls `GET {base_url}/models`. It verifies that declared model IDs are present in the provider's returned list. This does **not** prove that each declared capability (vision, tools, audio, etc.) works. The status `model_id_verified` is deliberately narrower than capability verification.
+Model routing selects the first enabled provider declaring the requested model, ordered by ascending priority and then creation time. Provider priority can be changed with the provider PATCH route.\n\nThe provider connectivity test calls `GET {base_url}/models`. It verifies that declared model IDs are present in the provider's returned list. This does **not** prove that each declared capability (vision, tools, audio, etc.) works. The status `model_id_verified` is deliberately narrower than capability verification.
 
 ## Send a chat completion
 
