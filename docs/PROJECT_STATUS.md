@@ -54,7 +54,7 @@ Last updated: 2026-11-19
 - API routes: `POST /tasks`, `GET /tasks`, `GET /tasks/{task_id}`, `POST /tasks/{task_id}/cancel`, and `POST /tasks/{task_id}/retry`.
 - Worker claim/complete/fail functions remain internal only. A single-process Worker Supervisor, handler allowlist, lease recovery, result-size limit, sanitized failure persistence, and graceful shutdown are implemented. It is disabled by default and starts only with `MASOUD_STUDIO_WORKER_ENABLED=true`; only `system.healthcheck` is registered out of the box.
 - SQLite operation is currently single-worker only. Multi-process locking, PostgreSQL concurrency, cancellation signalling for running work, quotas, and worker supervision remain future hardening tasks.
-- Migrations 0007–0010 and Task Manager, Orchestrator, Worker, and Agent Manager tests are implemented but have not yet passed CI.
+- Migrations 0007–0011 and Task Manager, Orchestrator, Worker, and Agent Manager tests are implemented but have not yet passed CI.
 
 See [Task Manager contract](TASK_MANAGER.md).
 
@@ -129,7 +129,7 @@ See [AI Gateway implementation guide](AI_GATEWAY.md) for setup, environment conf
 1. Add integration tests for the outbound HTTP transport, DNS pinning, response sanitization, credential-key rotation, and concurrent idempotency.
 2. Complete AI Gateway operational controls: provider priority/routing, safe failure policy, budget controls, concurrency limits, circuit breaker, and optional streaming.
 3. Add Windows DPAPI-backed secret custody and Windows CI / packaging verification.
-4. Verify migrations 0007–0010 and Task Manager/Orchestrator/Worker/Agent Manager tests; add hard execution timeouts/process isolation and multi-worker-safe claims before enabling creative handlers.
+4. Verify migrations 0007–0011 and Task Manager/Orchestrator/Worker/Agent Manager tests; add hard execution timeouts/process isolation and multi-worker-safe claims before enabling creative handlers.
 5. Add a versioned workflow registry, hard worker timeout/process isolation, and operator recovery tooling.
 6. Implement task handlers and proceed with Research/Intake, Story, Character/Universe, Visual, Video, Audio, QA/Compliance, Export, Analytics, and companion clients.
 
@@ -193,6 +193,7 @@ Never infer one status from another.
 - Added provider/model validation at creation and activation; disabled or unregistered provider models cannot activate an agent.
 - Added bounded per-run and monthly budget configuration, controlled agent permission vocabulary, explicit per-tool grants, and mandatory human approval for write/execute grants.
 - Added append-only agent lifecycle/tool-grant audit events and migration 0010.
+- Added an internal idempotent budget reservation ledger in migration 0011 with per-run/monthly ceilings, running/settled/released states, and conservative settlement checks.
 - Added API endpoints and regression tests for lifecycle, provider/model checks, grants, duplicate slugs, and audit events.
-- Important boundary: this is configuration governance only. No agent execution, tool broker, budget reservation/enforcement, or runtime authorization is implemented. Do not enable billable or external tool execution until those controls exist.
+- Important boundary: this is configuration governance only. No agent execution, tool broker, runtime authorization, or provider usage reconciliation is implemented. Budget reservation and ceiling checks exist as internal service operations but are not yet wired into execution. Do not enable billable or external tool execution until those controls exist.
 - CI verification for this checkpoint is pending; no test pass is claimed.
