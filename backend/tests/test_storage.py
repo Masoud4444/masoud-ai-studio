@@ -34,7 +34,7 @@ def create_project(client):
 
 def test_upload_hashes_and_lists_asset(client, tmp_path):
     project_id = create_project(client)
-    content = b"\\x89PNG\\r\\n\\x1a\\n" + b"image-data"
+    content = b"\x89PNG\r\n\x1a\n" + b"image-data"
     response = client.post(f"/api/v1/projects/{project_id}/assets",
                            files={"file": ("../unsafe name.png", content, "text/plain")})
     assert response.status_code == 201
@@ -60,5 +60,6 @@ def test_detach_keeps_blob_bytes(client, tmp_path):
 
 def test_empty_upload_rejected(client):
     project_id = create_project(client)
-    response = client.post(f"/api/v1/projects/{project_id}/assets", files={"file": ("empty.bin", b"", "application/octet-stream")})
+    response = client.post(f"/api/v1/projects/{project_id}/assets",
+                           files={"file": ("empty.bin", b"", "application/octet-stream")})
     assert response.status_code == 400
