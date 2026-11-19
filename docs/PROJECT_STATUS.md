@@ -75,3 +75,13 @@ Never infer one status from another.
 - The implementation branch retains the approved project documentation and is separate from `main` pending review.
 - Tests have **not** been executed in this environment. CI results must be checked before marking this foundation tested.
 - Storage/asset ingestion, AI Gateway, agents, orchestration, frontend, desktop packaging, and companion clients are not yet implemented.
+
+
+## Storage & Asset implementation — 2026-11-19
+
+- Implemented Asset and ProjectAsset relational models with SHA-256 content identity.
+- Added streamed upload ingestion in 1 MiB chunks, a configurable 100 MiB default limit, temporary staging, SHA-256 hashing, atomic blob placement, MIME signature sniffing, filename sanitization, and project-scoped asset listing/detachment.
+- Project detachment intentionally does not delete blob bytes; safe garbage collection is deferred until a reference audit/recovery mechanism exists.
+- Added storage API routes and automated tests for hashing, MIME detection, unsafe filename normalization, listing, detach safety, and empty uploads.
+- Tests are committed but have not been executed locally. GitHub Actions status was queried and returned no status entries at the time of this update; CI is not yet verified.
+- Storage schema currently uses create_all bootstrap. A versioned Alembic migration is still required before treating schema evolution as production-ready.
