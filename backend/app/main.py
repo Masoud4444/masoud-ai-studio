@@ -6,11 +6,13 @@ from .database import Base, engine
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    os.makedirs("data", exist_ok=True)
-    Base.metadata.create_all(bind=engine)
+    # create_all is a development bootstrap only. Managed installs use Alembic.
+    if os.getenv("MASOUD_STUDIO_SCHEMA_MODE", "migrate").lower() == "create":
+        os.makedirs("data", exist_ok=True)
+        Base.metadata.create_all(bind=engine)
     yield
 
-app = FastAPI(title="Masoud AI Studio API", version="0.1.0",
+app = FastAPI(title="Masoud AI Studio API", version="0.2.0",
               description="Private, local-first creative production studio", lifespan=lifespan)
 app.include_router(router)
 
