@@ -294,11 +294,19 @@ def reserve_agent_budget(db: Session, agent_id: str, idempotency_key: str,
 
 
 def start_agent_budget_reservation(db: Session, reservation_id: str) -> dict:
-    row = db.get(AgentBudgetReservation, reservation_id)
+    row = db.scalar(select(AgentBudgetReservation).where(
+        AgentBudgetReservation.id == reservation_id
+    ).with_for_update())
     if row is None:
         raise HTTPException(status_code=404, detail={"code": "agent_budget_reservation_not_found"})
     if row.status != "reserved":
         raise HTTPException(status_code=409, detail={"code": "agent_budget_reservation_not_startable"})
+    agent = db.get(StudioAgent, row.agent_id)
+    provider = db.get(AIProvider, agent.provider_id) if agent and agent.provider_id else None
+    if agent is None or agent.status != "enabled":
+        raise HTTPException(status_code=409, detail={"code": "agent_not_enabled"})
+    if provider is None or not provider.is_enabled or agent.model_id not in json.loads(provider.models_json):
+        raise HTTPException(status_code=409, detail={"code": "agent_provider_model_unavailable"})
     row.status = "running"
     row.updated_at = _now()
     _event(db, row.agent_id, "budget_execution_started", {"reservation_id": row.id})
