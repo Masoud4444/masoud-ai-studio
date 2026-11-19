@@ -110,7 +110,7 @@ def _snapshot(db,sid,note):
     data={"characters":[_char(x) for x in cs],"relationships":[{"source_id":x.source_id,"target_id":x.target_id,"kind":x.kind,"description":x.description} for x in rs],"locations":[_loc(x) for x in ls],"rules":[{"category":x.category,"statement":x.statement,"rationale":x.rationale} for x in rules],"scene_characters":[{"scene_id":x.scene_id,"character_id":x.character_id,"presence_type":x.presence_type,"note":x.note} for x in sc],"scene_locations":[{"scene_id":x.scene_id,"location_id":x.location_id,"note":x.note} for x in sl]}
     db.add(BibleRevision(story_id=sid,version=version,snapshot_json=_dump(data),change_note=note))
 @router.get("/stories/{sid}/bible")
-def get_bible(sid:str,db:Session=Depends(get_db))
+def get_bible(sid:str,db:Session=Depends(get_db)):
     _story(db,sid); cs=db.scalars(select(Character).where(Character.story_id==sid)).all(); rs=db.scalars(select(Relationship).where(Relationship.story_id==sid)).all()
     ls=db.scalars(select(Location).where(Location.story_id==sid)).all(); rules=db.scalars(select(WorldRule).where(WorldRule.story_id==sid)).all()
     rev=db.scalars(select(BibleRevision).where(BibleRevision.story_id==sid).order_by(BibleRevision.version.desc()).limit(50)).all()
@@ -118,17 +118,17 @@ def get_bible(sid:str,db:Session=Depends(get_db))
     sc=db.scalars(select(SceneCharacter).where(SceneCharacter.scene_id.in_(ids))).all() if ids else []; sl=db.scalars(select(SceneLocation).where(SceneLocation.scene_id.in_(ids))).all() if ids else []
     return {"story_id":sid,"characters":[_char(x) for x in cs],"relationships":[{"id":x.id,"source_id":x.source_id,"target_id":x.target_id,"kind":x.kind,"description":x.description} for x in rs],"locations":[_loc(x) for x in ls],"rules":[{"id":x.id,"category":x.category,"statement":x.statement,"rationale":x.rationale} for x in rules],"scene_characters":[{"scene_id":x.scene_id,"character_id":x.character_id,"presence_type":x.presence_type,"note":x.note} for x in sc],"scene_locations":[{"scene_id":x.scene_id,"location_id":x.location_id,"note":x.note} for x in sl],"revisions":[{"version":x.version,"change_note":x.change_note,"created_at":x.created_at} for x in rev]}
 @router.post("/stories/{sid}/characters",status_code=201)
-def create_character(sid:str,p:CharacterIn,db:Session=Depends(get_db))
+def create_character(sid:str,p:CharacterIn,db:Session=Depends(get_db)):
     _story(db,sid); x=Character(story_id=sid,name=p.name.strip(),role=p.role,age=p.age,appearance_json=_dump(p.appearance),psychology_json=_dump(p.psychology),backstory=p.backstory,goals=p.goals,conflict=p.conflict,arc=p.arc,voice_notes=p.voice_notes)
     db.add(x);db.flush();_snapshot(db,sid,"Character created");db.commit();db.refresh(x);return _char(x)
 @router.patch("/stories/{sid}/characters/{cid}")
-def update_character(sid:str,cid:str,p:CharacterEdit,db:Session=Depends(get_db))
+def update_character(sid:str,cid:str,p:CharacterEdit,db:Session=Depends(get_db)):
     x=_owned(db,Character,cid,sid)
     if x.version!=p.expected_version: raise HTTPException(409,detail={"code":"character_version_conflict","current_version":x.version})
     for k,v in p.model_dump(exclude={"expected_version"}).items(): setattr(x,{"appearance":"appearance_json","psychology":"psychology_json"}.get(k,k),_dump(v) if k in ("appearance","psychology") else v.strip() if k=="name" else v)
     x.version+=1;x.updated_at=_now();_snapshot(db,sid,"Character updated");db.commit();db.refresh(x);return _char(x)
 @router.post("/stories/{sid}/relationships",status_code=201)
-def create_relationship(sid:str,p:RelationshipIn,db:Session=Depends(get_db))
+def create_relationship(sid:str,p:RelationshipIn,db:Session=Depends(get_db)):
     _story(db,sid)
     if p.source_id==p.target_id: raise HTTPException(422,detail={"code":"self_relationship_not_allowed"})
     _owned(db,Character,p.source_id,sid);_owned(db,Character,p.target_id,sid)
@@ -137,20 +137,20 @@ def create_relationship(sid:str,p:RelationshipIn,db:Session=Depends(get_db))
     except Exception: db.rollback();raise HTTPException(409,detail={"code":"relationship_conflict"})
     return {"id":x.id,"source_id":x.source_id,"target_id":x.target_id,"kind":x.kind,"description":x.description}
 @router.post("/stories/{sid}/locations",status_code=201)
-def create_location(sid:str,p:LocationIn,db:Session=Depends(get_db))
+def create_location(sid:str,p:LocationIn,db:Session=Depends(get_db)):
     _story(db,sid);x=Location(story_id=sid,name=p.name.strip(),location_type=p.location_type,description=p.description,geography_json=_dump(p.geography),culture_json=_dump(p.culture))
     db.add(x);db.flush();_snapshot(db,sid,"World location created");db.commit();db.refresh(x);return _loc(x)
 @router.patch("/stories/{sid}/locations/{lid}")
-def update_location(sid:str,lid:str,p:LocationEdit,db:Session=Depends(get_db))
+def update_location(sid:str,lid:str,p:LocationEdit,db:Session=Depends(get_db)):
     x=_owned(db,Location,lid,sid)
     if x.version!=p.expected_version: raise HTTPException(409,detail={"code":"location_version_conflict","current_version":x.version})
     for k,v in p.model_dump(exclude={"expected_version"}).items(): setattr(x,{"geography":"geography_json","culture":"culture_json"}.get(k,k),_dump(v) if k in ("geography","culture") else v.strip() if k=="name" else v)
     x.version+=1;x.updated_at=_now();_snapshot(db,sid,"World location updated");db.commit();db.refresh(x);return _loc(x)
 @router.post("/stories/{sid}/rules",status_code=201)
-def create_rule(sid:str,p:RuleIn,db:Session=Depends(get_db))
+def create_rule(sid:str,p:RuleIn,db:Session=Depends(get_db)):
     _story(db,sid);x=WorldRule(story_id=sid,**p.model_dump());db.add(x);db.flush();_snapshot(db,sid,"World rule created");db.commit();return {"id":x.id,"category":x.category,"statement":x.statement,"rationale":x.rationale}
 @router.post("/stories/{sid}/scenes/{scene_id}/characters",status_code=201)
-def attach_character(sid:str,scene_id:str,p:SceneCharacterIn,db:Session=Depends(get_db))
+def attach_character(sid:str,scene_id:str,p:SceneCharacterIn,db:Session=Depends(get_db)):
     _story(db,sid);scene=db.get(StoryScene,scene_id)
     if not scene or scene.story_id!=sid: raise HTTPException(404,detail={"code":"scene_not_found"})
     _owned(db,Character,p.character_id,sid);x=SceneCharacter(scene_id=scene_id,**p.model_dump());db.add(x)
@@ -158,7 +158,7 @@ def attach_character(sid:str,scene_id:str,p:SceneCharacterIn,db:Session=Depends(
     except Exception: db.rollback();raise HTTPException(409,detail={"code":"scene_character_link_conflict"})
     return {"scene_id":scene_id,"character_id":x.character_id,"presence_type":x.presence_type,"note":x.note}
 @router.post("/stories/{sid}/scenes/{scene_id}/locations",status_code=201)
-def attach_location(sid:str,scene_id:str,p:SceneLocationIn,db:Session=Depends(get_db))
+def attach_location(sid:str,scene_id:str,p:SceneLocationIn,db:Session=Depends(get_db)):
     _story(db,sid);scene=db.get(StoryScene,scene_id)
     if not scene or scene.story_id!=sid: raise HTTPException(404,detail={"code":"scene_not_found"})
     _owned(db,Location,p.location_id,sid);x=SceneLocation(scene_id=scene_id,**p.model_dump());db.add(x)
