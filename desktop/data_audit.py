@@ -95,7 +95,16 @@ def main() -> int:
     args = parser.parse_args()
     if sys.platform != "win32":
         parser.error("The packaged data audit utility is currently supported on Windows only.")
-    root = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Masoud AI Studio" / "data"
+    app_root = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Masoud AI Studio"
+    settings_file = app_root / "desktop-settings.json"
+    if settings_file.is_symlink() or (settings_file.exists() and settings_file.stat().st_size > 16384):
+        parser.error("Desktop data settings file is unsafe.")
+    settings = json.loads(settings_file.read_text(encoding="utf-8")) if settings_file.exists() else {}
+    if not isinstance(settings, dict):
+        parser.error("Desktop data settings file is invalid.")
+    root = Path(settings.get("data_directory", app_root / "data")).expanduser()
+    if not root.is_absolute() or root.is_symlink():
+        parser.error("Configured data directory is invalid.")
     database = args.database or root / "masoud_studio.db"
     storage = args.storage or root / "storage"
     try:

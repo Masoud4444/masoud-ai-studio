@@ -149,8 +149,14 @@ def main() -> int:
     app_root = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Masoud AI Studio"
     settings = app_root / "desktop-settings.json"
     try:
+        if settings.is_symlink() or (settings.exists() and settings.stat().st_size > 16384):
+            raise ValueError("Desktop data settings file is unsafe.")
         config = json.loads(settings.read_text(encoding="utf-8")) if settings.exists() else {}
-        current = Path(config.get("data_directory", app_root / "data"))
+        if not isinstance(config, dict):
+            raise ValueError("Desktop data settings file is invalid.")
+        current = Path(config.get("data_directory", app_root / "data")).expanduser()
+        if not current.is_absolute() or current.is_symlink():
+            raise ValueError("Configured source data directory is invalid.")
         result = migrate_data(current, args.destination, settings)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
