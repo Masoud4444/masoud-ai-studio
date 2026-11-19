@@ -163,3 +163,32 @@ class TaskEvent(Base):
     to_status: Mapped[str | None] = mapped_column(String(24), nullable=True)
     detail_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class ProductionRun(Base):
+    __tablename__ = "production_runs"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    project_id: Mapped[str | None] = mapped_column(ForeignKey("projects.id", ondelete="RESTRICT"), index=True, nullable=True)
+    workflow_key: Mapped[str] = mapped_column(String(120), nullable=False)
+    workflow_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="queued", index=True, nullable=False)
+    input_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    idempotency_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+
+class ProductionStep(Base):
+    __tablename__ = "production_steps"
+    __table_args__ = (
+        UniqueConstraint("run_id", "step_key", name="uq_production_run_step"),
+        UniqueConstraint("task_id", name="uq_production_step_task"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    run_id: Mapped[str] = mapped_column(ForeignKey("production_runs.id", ondelete="RESTRICT"), index=True, nullable=False)
+    step_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    task_id: Mapped[str] = mapped_column(ForeignKey("studio_tasks.id", ondelete="RESTRICT"), nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    approval_required: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
