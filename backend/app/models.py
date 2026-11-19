@@ -63,6 +63,7 @@ class AIRequest(Base):
     status: Mapped[str] = mapped_column(String(20), default="pending", index=True, nullable=False)
     encrypted_response: Mapped[str | None] = mapped_column(Text, nullable=True)
     response_key_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    lease_expires_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
