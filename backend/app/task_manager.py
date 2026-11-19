@@ -179,7 +179,7 @@ def claim_task(db: Session, worker_id: str, lease_seconds: int = 120) -> dict | 
         select(StudioTask).where(
             StudioTask.status == "queued", StudioTask.available_at <= now,
             StudioTask.attempt_count < StudioTask.max_attempts,
-        ).order_by(StudioTask.priority.asc(), StudioTask.created_at.asc()).limit(100)
+        ).order_by(StudioTask.priority.asc(), StudioTask.created_at.asc()).limit(100).with_for_update(skip_locked=True)
     ).all()
     for task in candidates:
         dependencies = db.scalars(
@@ -216,7 +216,7 @@ def complete_task(db: Session, task_id: str, worker_id: str, result: dict) -> di
     task = db.get(StudioTask, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail={"code": "task_not_found"})
-    if task.status != "running" or task.locked_by != worker_id:
+    if task.status != "running" or task.locked_by != worker_id or not task.lease_expires_at or task.lease_expires_at <= _now():
         raise HTTPException(status_code=409, detail={"code": "task_lease_not_owned"})
     before = task.status
     task.status = "succeeded"
@@ -238,7 +238,7 @@ def fail_task(db: Session, task_id: str, worker_id: str, error_code: str,
     task = db.get(StudioTask, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail={"code": "task_not_found"})
-    if task.status != "running" or task.locked_by != worker_id:
+    if task.status != "running" or task.locked_by != worker_id or not task.lease_expires_at or task.lease_expires_at <= _now():
         raise HTTPException(status_code=409, detail={"code": "task_lease_not_owned"})
     if not 0 <= retry_delay_seconds <= 86400:
         raise HTTPException(status_code=422, detail={"code": "invalid_retry_delay"})
