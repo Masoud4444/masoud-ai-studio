@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session
 from .database import get_db
 from .projects import create_project, get_project, list_projects, serialize, set_archived, update_project
 from .schemas import ProjectCreate, ProjectPage, ProjectRead, ProjectUpdate
+from .storage import detach_project_asset, ingest_upload, list_project_assets
 
 router = APIRouter(prefix="/api/v1", tags=["studio"])
 
@@ -31,3 +32,18 @@ def archive_project(project_id: str, db: Session = Depends(get_db)):
 @router.post("/projects/{project_id}/restore", response_model=ProjectRead)
 def restore_project(project_id: str, db: Session = Depends(get_db)):
     return serialize(set_archived(db, project_id, False))
+
+@router.post("/projects/{project_id}/assets", status_code=201)
+async def upload_project_asset(project_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    asset, link = await ingest_upload(db, project_id, file)
+    return {"id": link.id, "asset_id": asset.id, "sha256": asset.sha256,
+            "size_bytes": asset.size_bytes, "mime_type": asset.mime_type,
+            "filename": link.original_filename, "created_at": link.created_at}
+
+@router.get("/projects/{project_id}/assets")
+def get_project_assets(project_id: str, db: Session = Depends(get_db)):
+    return list_project_assets(db, project_id)
+
+@router.delete("/projects/{project_id}/assets/{link_id}", status_code=204)
+def delete_project_asset(project_id: str, link_id: str, db: Session = Depends(get_db)):
+    detach_project_asset(db, project_id, link_id)
