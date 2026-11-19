@@ -7,12 +7,13 @@ provider response bodies. A worker only claims task types it has registered.
 import asyncio
 import json
 import re
+import threading
 from collections.abc import Callable
 from typing import Any
 
 from sqlalchemy.orm import sessionmaker
 
-from .task_manager import claim_task, complete_task, fail_task, recover_expired_leases
+from .task_manager import claim_task, complete_task, fail_task, recover_expired_leases, renew_task_lease
 
 TaskHandler = Callable[[dict[str, Any]], dict[str, Any]]
 _TASK_TYPE = re.compile(r"^[a-z][a-z0-9_.-]{0,99}$")
@@ -90,9 +91,46 @@ class WorkerSupervisor:
             # Defensive guard; claim filtering should make this unreachable.
             self._fail(task["id"], "handler_unavailable", "No handler is registered")
             return True
+        heartbeat_stop = threading.Event()
+        lease_lost = threading.Event()
+
+        def heartbeat_loop() -> None:
+            interval = max(1.0, self.lease_seconds / 3)
+            while not heartbeat_stop.wait(interval):
+                db = self.session_factory()
+                try:
+                    if not renew_task_lease(db, task["id"], self.worker_id, self.lease_seconds):
+                        lease_lost.set()
+                        return
+                except Exception:
+                    # If ownership cannot be confirmed, never commit a stale result.
+                    lease_lost.set()
+                    return
+                finally:
+                    db.close()
+
+        heartbeat = threading.Thread(
+            target=heartbeat_loop, name=f"lease-heartbeat-{task['id'][:8]}", daemon=True
+        )
+        heartbeat.start()
         try:
             payload = task.get("payload") or {}
             result = handler(payload)
+        except Exception as exc:
+            heartbeat_stop.set()
+            heartbeat.join()
+            if not lease_lost.is_set():
+                code = "handler_invalid_result" if isinstance(exc, TypeError) else "handler_error"
+                self._fail(task["id"], code, "Task handler failed; inspect local diagnostic tooling")
+            return True
+        finally:
+            heartbeat_stop.set()
+            heartbeat.join()
+
+        if lease_lost.is_set():
+            # The task may have been recovered/reclaimed. Its result is discarded.
+            return True
+        try:
             if not isinstance(result, dict):
                 raise TypeError("Task handlers must return an object")
             encoded = json.dumps(result, ensure_ascii=False, separators=(",", ":"))
@@ -101,11 +139,8 @@ class WorkerSupervisor:
                 return True
             self._complete(task["id"], result)
         except Exception as exc:
-            # Do not persist exception messages: they may contain prompts,
-            # credentials, URLs, or raw provider response fragments.
             code = "handler_invalid_result" if isinstance(exc, TypeError) else "handler_error"
             self._fail(task["id"], code, "Task handler failed; inspect local diagnostic tooling")
-        return True
 
     def _complete(self, task_id: str, result: dict[str, Any]) -> None:
         db = self.session_factory()
