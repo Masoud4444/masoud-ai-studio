@@ -108,3 +108,7 @@ class AgentRead(BaseModel):
     tools: list[dict]
     created_at: datetime
     updated_at: datetime
+
+
+class AgentRunRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=100000)
