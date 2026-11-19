@@ -141,3 +141,12 @@ Never infer one status from another.
 - Character and location edits use optimistic version checks. Every Bible mutation stores an append-only full snapshot; history metadata is read-only.
 - API routes: GET /api/v1/stories/{story_id}/bible; POST/PATCH character and location routes; relationship/rule creation; scene character/location links.
 - Automated continuity inference, prop tracking, model sheets and a dedicated visual editor remain future increments. Prior passing test suites were not rerun.
+
+
+## Character & World Bible UI v0.2
+- Connected the Characters & Worlds workspace to the Story Engine and Character/World Bible APIs.
+- Added character and location creation, optimistic-version edits, world-rule creation, directed character relationships and scene-level character/location linking.
+- Added read views for canonical profiles, relationships, scene connections and immutable Bible revision history.
+- The UI is a structured editor; appearance, psychology, geography and culture remain JSON-backed structured fields pending dedicated visual model-sheet editors.
+- Continuity detection and prop/object state tracking remain the next implementation increment.
+- No previously passing test suite was rerun for this UI increment.
