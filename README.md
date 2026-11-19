@@ -30,7 +30,7 @@ A public-code, private-by-design, local-first AI creative production studio for 
 - Central Task Manager with dependencies, idempotency, leases, retries and append-only events.
 - Production Orchestrator with preproduction workflow, approval gates and run pause/resume/cancel.
 - Worker Supervisor with handler allowlist, lease heartbeat, bounded JSON results and sanitized failures; disabled by default.
-- Agent Manager with lifecycle governance, tool grants and internal budget reservation ledger. Agent Runtime and Tool Broker are not implemented.
+- Agent Manager with lifecycle governance, tool grants and internal budget reservation ledger. A first text-only Agent Runtime slice is implemented with explicit AI-generation permission, configured pricing, conservative budget reservation and AI Gateway idempotency. Tool Broker, tool execution and process sandbox are not implemented.
 
 ### Frontend
 - React, TypeScript, Vite and responsive dark studio shell.
@@ -88,7 +88,7 @@ Build frontend with `npm run build`.
 - Do not commit provider API keys, encryption keys, database files, generated assets or personal data.
 - No paid provider credentials are included. No billable provider calls are made by the default setup.
 - Worker is disabled by default. Creative task handlers are not registered.
-- Agent profiles start as drafts. Agent Runtime, Tool Broker, execution sandbox and runtime budget enforcement are not complete.
+- Agent profiles start as drafts. Text-only Agent Runtime is available only after explicit provider/model/pricing configuration and activation; no tools are executed. Tool Broker, execution sandbox and hard runtime isolation are not complete.
 - Windows credential protection via DPAPI/OS keychain, hard worker process isolation, multi-worker coordination, backup/restore verification and independent security review remain required.
 
 ## Project documentation

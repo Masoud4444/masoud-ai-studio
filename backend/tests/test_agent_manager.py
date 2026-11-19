@@ -204,3 +204,39 @@ def test_agent_budget_reservation_cannot_start_after_agent_is_disabled(db_sessio
     with pytest.raises(HTTPException) as exc:
         start_agent_budget_reservation(db_session, reservation["id"])
     assert exc.value.detail["code"] == "agent_not_enabled"
+
+
+
+def test_agent_budget_start_is_idempotent_for_running_reservation(db_session):
+    agent_id = enabled_agent(db_session)
+    reservation = reserve_agent_budget(
+        db_session, agent_id, "budget-request-recovery-01", "3" * 64, 0.5
+    )
+    first = start_agent_budget_reservation(db_session, reservation["id"])
+    replay = start_agent_budget_reservation(db_session, reservation["id"])
+    assert first["status"] == "running"
+    assert replay["status"] == "running"
+    assert replay["replayed"] is True
+    events = db_session.scalars(
+        select(AgentEvent).where(
+            AgentEvent.agent_id == agent_id,
+            AgentEvent.event_type == "budget_execution_started",
+        )
+    ).all()
+    assert len(events) == 1
+
+
+def test_agent_budget_settlement_is_idempotent_but_immutable(db_session):
+    agent_id = enabled_agent(db_session)
+    reservation = reserve_agent_budget(
+        db_session, agent_id, "budget-request-settle-01", "4" * 64, 0.5
+    )
+    start_agent_budget_reservation(db_session, reservation["id"])
+    first = settle_agent_budget_reservation(db_session, reservation["id"], 0.2)
+    replay = settle_agent_budget_reservation(db_session, reservation["id"], 0.2)
+    assert first["status"] == "succeeded"
+    assert replay["status"] == "succeeded"
+    assert replay["replayed"] is True
+    with pytest.raises(HTTPException) as conflict:
+        settle_agent_budget_reservation(db_session, reservation["id"], 0.3)
+    assert conflict.value.detail["code"] == "agent_budget_reservation_already_settled"

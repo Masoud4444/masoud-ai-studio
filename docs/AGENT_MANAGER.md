@@ -88,3 +88,10 @@ This endpoint inherits the current API's localhost/trusted-network-only
 deployment constraint because authentication and authorization are not yet
 implemented. Do not expose it publicly. Provider credentials and billable
 execution remain unconfigured until the owner explicitly configures them.
+
+
+## Runtime recovery and idempotency hardening
+
+- Retrying a reservation already in `running` returns the existing reservation instead of starting a second ledger execution. The caller must reuse the same idempotency key; the AI Gateway then deduplicates/replays the corresponding model request.
+- Repeated settlement is accepted only when both final status and actual cost exactly match the first settlement. Conflicting settlement attempts are rejected, and audit events are not duplicated.
+- This supports recovery after a caller/process interruption and concurrent duplicate submissions. It does not replace a durable runtime execution record, lease expiry policy, or operator reconciliation for genuinely abandoned reservations.

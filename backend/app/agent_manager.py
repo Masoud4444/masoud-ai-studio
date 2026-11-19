@@ -299,6 +299,10 @@ def start_agent_budget_reservation(db: Session, reservation_id: str) -> dict:
     ).with_for_update())
     if row is None:
         raise HTTPException(status_code=404, detail={"code": "agent_budget_reservation_not_found"})
+    # Recover a previously started reservation using the same idempotency key.
+    # The AI Gateway deduplicates the associated provider request independently.
+    if row.status == "running":
+        return _reservation_payload(row, replayed=True)
     if row.status != "reserved":
         raise HTTPException(status_code=409, detail={"code": "agent_budget_reservation_not_startable"})
     agent = db.get(StudioAgent, row.agent_id)
@@ -320,13 +324,19 @@ def settle_agent_budget_reservation(db: Session, reservation_id: str,
     row = db.get(AgentBudgetReservation, reservation_id)
     if row is None:
         raise HTTPException(status_code=404, detail={"code": "agent_budget_reservation_not_found"})
-    if row.status != "running":
-        raise HTTPException(status_code=409, detail={"code": "agent_budget_reservation_not_settleable"})
     actual = _money(actual_cost_usd)
     if actual > Decimal(str(row.reserved_usd)):
         raise HTTPException(status_code=409, detail={"code": "actual_cost_exceeds_reserved_budget"})
+    target_status = "succeeded" if succeeded else "failed"
+    if row.status in {"succeeded", "failed"}:
+        # Accept exact settlement replays; never overwrite a settled ledger row.
+        if row.status == target_status and row.actual_cost_usd == actual:
+            return _reservation_payload(row, replayed=True)
+        raise HTTPException(status_code=409, detail={"code": "agent_budget_reservation_already_settled"})
+    if row.status != "running":
+        raise HTTPException(status_code=409, detail={"code": "agent_budget_reservation_not_settleable"})
     row.actual_cost_usd = actual
-    row.status = "succeeded" if succeeded else "failed"
+    row.status = target_status
     row.updated_at = _now()
     _event(db, row.agent_id, "budget_settled", {
         "reservation_id": row.id, "actual_cost_usd": str(actual), "status": row.status,

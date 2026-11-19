@@ -20,7 +20,7 @@ Last updated: 2026-11-19
 - Central Task Manager: idempotent task creation, dependency gates, priority, bounded attempts, leases, retries, cancellation, expired lease recovery and append-only events.
 - Worker Supervisor: handler allowlist, lease heartbeat, bounded JSON results, sanitized handler errors and graceful shutdown. Disabled by default; only `system.healthcheck` is registered out of the box.
 - Production Orchestrator: code-defined `creative.preproduction` v1 workflow, persisted runs/steps, idempotent creation, approval gates, pause/resume/cancel.
-- Agent Manager: draft/enabled/disabled lifecycle, versioned config, provider/model checks, permissions/tool grants, approval requirements for write/execute grants, audit events and internal budget reservation ledger.
+- Agent Manager: draft/enabled/disabled lifecycle, versioned config, provider/model checks, permissions/tool grants, approval requirements for write/execute grants, audit events and internal budget reservation ledger. A first text-only Agent Runtime is implemented at `POST /api/v1/agents/{agent_id}/run`, with explicit `ai.generate` permission, required model pricing, conservative pre-call budget reservation and Gateway idempotency.
 
 ## Implemented frontend
 
@@ -46,7 +46,7 @@ Last updated: 2026-11-19
 - Never commit provider keys, encryption keys, local database files, generated assets or private project data.
 - No provider API keys are configured by default. The system does not make paid calls automatically.
 - Worker is disabled by default; creative workflow handlers are not registered.
-- Agent Manager is governance/configuration only. Agent Runtime, Tool Broker, runtime authorization, execution sandbox and runtime budget enforcement/reconciliation are not implemented.
+- Agent Runtime currently performs text-only model generation; it does not execute tool grants or access files. Tool Broker, tool execution, process sandbox, hard timeouts and operator recovery for abandoned reservations are not implemented. Runtime budget reservation and settlement are integrated for text-generation calls, but provider invoice reconciliation is not implemented.
 - SQLite is single-worker only until multi-process locking is verified.
 - Synchronous handlers cannot be forcibly interrupted; hard process-level timeout/isolation is not implemented.
 - Windows DPAPI/OS keychain, streaming, automatic retries/fallback, circuit breakers, provider concurrency controls, invoice reconciliation and independent security review remain outstanding.
@@ -80,3 +80,11 @@ Last updated: 2026-11-19
 - **Released:** a versioned build or release artifact exists.
 
 Never infer one status from another.
+
+
+## Agent Runtime recovery checkpoint
+
+- Repeated start of an already-running budget reservation now returns the existing reservation, allowing a caller to recover with the same idempotency key after interruption.
+- Settlement replay is accepted only for an exact match of the previously recorded final status and actual cost. Conflicting updates are rejected and do not mutate the ledger.
+- Added regression tests for repeated start, repeated settlement, conflicting settlement, and avoiding duplicate start audit events.
+- This does not add lease expiry, hard process termination, or automatic reconciliation for abandoned reservations.
