@@ -51,7 +51,7 @@ Approval is an explicit gate: a task in `waiting_approval` is not claimable. App
 
 
 ## Production run controls
-- `POST /api/v1/production/runs/{run_id}/pause` pauses queued and approval-waiting steps. Active steps are allowed to finish; the run reports `pausing` until they finish, then `paused`.
+- `POST /api/v1/production/runs/{run_id}/pause` pauses queued and approval-waiting steps. Active steps are allowed to finish; the run reports `pausing` until they finish, then `paused`. If an active step fails or its lease expires and a retry is scheduled during the pause, the retry is held in `paused` until the run resumes.
 - `POST /api/v1/production/runs/{run_id}/resume` restores each paused task to its exact prior state (`queued` or `waiting_approval`).
 - `POST /api/v1/production/runs/{run_id}/cancel` cancels pending, paused, approval-waiting, and blocked steps. It refuses cancellation while any step is running; it never claims to forcibly stop an active handler.
 - Pause/resume/cancel transitions are appended to task events. Run control state is persisted; read endpoints remain side-effect free.
