@@ -20,7 +20,7 @@ The current setup does not install Python or Node.js for you. Install these prer
 4. Double-click scripts/setup-windows.bat.
 5. Wait for dependency installation, frontend production build and database migrations to complete.
 
-The setup script creates a local .venv folder, installs requirements from requirements.txt, runs npm install and npm run build in frontend/, creates the data directory and applies Alembic migrations through the current head.
+The setup script creates a local .venv folder, installs requirements from requirements.txt, creates a local .env file with a random 256-bit credential-encryption key if one does not already exist, runs npm install and npm run build in frontend/, creates the data directory and applies Alembic migrations through the current head. The application loads .env before initializing the database and AI Gateway. Keep this file private and include it in secure backups; losing it can make previously encrypted provider credentials unrecoverable.
 
 ## Daily launch
 

@@ -36,6 +36,12 @@ if not exist ".venv\Scripts\python.exe" (
 call ".venv\Scripts\activate.bat"
 if errorlevel 1 goto failed
 
+if not exist ".env" (
+  echo Creating a local encryption key in .env...
+  python -c "import base64,secrets,pathlib; p=pathlib.Path('.env'); p.write_text('MASOUD_STUDIO_CREDENTIAL_KEY='+base64.urlsafe_b64encode(secrets.token_bytes(32)).decode()+'\n',encoding='utf-8',newline='')"
+  if errorlevel 1 goto failed
+)
+
 python -m pip install --upgrade pip
 if errorlevel 1 goto failed
 python -m pip install -r requirements.txt

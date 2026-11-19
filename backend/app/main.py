@@ -5,6 +5,10 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from dotenv import load_dotenv
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+load_dotenv(ROOT_DIR / ".env", override=False)
 
 from .api import router
 from .character_world import router as character_world_router
@@ -62,7 +66,7 @@ def health():
 # In a production-style local install, serve the compiled React app from the
 # same loopback-only FastAPI process. API routes are registered first so the
 # static mount cannot shadow /api or /health.
-_frontend_dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+_frontend_dist = ROOT_DIR / "frontend" / "dist"
 if (_frontend_dist / "index.html").is_file():
     app.mount(
         "/",
