@@ -144,7 +144,7 @@ def cancel_task(db: Session, task_id: str) -> dict:
     task = db.get(StudioTask, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail={"code": "task_not_found"})
-    if task.status not in {"queued", "blocked"}:
+    if task.status not in {"queued", "blocked", "waiting_approval"}:
         raise HTTPException(status_code=409, detail={"code": "task_not_cancellable", "status": task.status})
     before = task.status
     task.status = "cancelled"
