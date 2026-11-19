@@ -136,6 +136,7 @@ class StudioTask(Base):
     max_attempts: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
     available_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True, nullable=False)
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    paused_from_status: Mapped[str | None] = mapped_column(String(24), nullable=True)
     locked_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
     error_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
     error_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
