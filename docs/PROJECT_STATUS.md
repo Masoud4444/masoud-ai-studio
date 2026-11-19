@@ -150,3 +150,13 @@ Never infer one status from another.
 - The UI is a structured editor; appearance, psychology, geography and culture remain JSON-backed structured fields pending dedicated visual model-sheet editors.
 - Continuity detection and prop/object state tracking remain the next implementation increment.
 - No previously passing test suite was rerun for this UI increment.
+
+
+## Continuity Engine backend v0.1
+- Added scene-scoped continuity facts for characters, locations and props, including attribute/value, evidence note, transition explanation, optimistic version and soft deactivation.
+- Deterministic analysis detects conflicting values for the same subject/attribute within one scene, unexplained state changes between ordered scenes, and character/location facts whose entities are not linked to that scene.
+- Issues have stable fingerprints, severity, occurrence counts, first/last seen timestamps and human review states (accepted, dismissed, resolved).
+- Analysis never edits story text or silently changes canonical facts. Transition notes explicitly distinguish intentional changes from possible continuity gaps.
+- API: GET/POST/PATCH /api/v1/stories/{story_id}/continuity/facts; POST /analyze; GET /issues; PATCH /issues/{issue_id}.
+- Scope limitation: scene position is used as narrative order, not an inferred in-world timestamp. Automatic screenplay NLP, object/prop identity resolution, cross-episode timeline reasoning and visual frame comparison are future increments.
+- Previously passed test suites were not rerun. No manual test result is claimed for this increment.
