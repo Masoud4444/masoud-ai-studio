@@ -186,3 +186,13 @@ Never infer one status from another.
 - Added regression tests for idle pause/resume, cancellation, cancellation rejection during active work, and pausing while a step is active.
 - Added worker result validation rejecting non-finite JSON numbers and oversized outputs.
 - Latest branch-head CI status: pending; no test pass is claimed.
+
+
+### Agent Manager foundation update
+- Added the Agent Manager registry with draft/enabled/disabled lifecycle and versioned configuration.
+- Added provider/model validation at creation and activation; disabled or unregistered provider models cannot activate an agent.
+- Added bounded per-run and monthly budget configuration, controlled agent permission vocabulary, explicit per-tool grants, and mandatory human approval for write/execute grants.
+- Added append-only agent lifecycle/tool-grant audit events and migration 0010.
+- Added API endpoints and regression tests for lifecycle, provider/model checks, grants, duplicate slugs, and audit events.
+- Important boundary: this is configuration governance only. No agent execution, tool broker, budget reservation/enforcement, or runtime authorization is implemented. Do not enable billable or external tool execution until those controls exist.
+- CI verification for this checkpoint is pending; no test pass is claimed.
