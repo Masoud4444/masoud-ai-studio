@@ -110,7 +110,8 @@ class _PinnedResolver(aiohttp.abc.AbstractResolver):
         results = []
         for address in self.pinned:
             parsed = ipaddress.ip_address(address)
-            if family not in (socket.AF_UNSPEC, parsed.version == 4 and socket.AF_INET or socket.AF_INET6):
+            expected_family = socket.AF_INET if parsed.version == 4 else socket.AF_INET6
+            if family not in (socket.AF_UNSPEC, expected_family):
                 continue
             results.append({
                 "hostname": host,
@@ -212,7 +213,10 @@ async def _send_chat_completion(provider: AIProvider, payload: ChatCompletionReq
     endpoint = provider.base_url.rstrip("/") + "/chat/completions"
     headers = {"Content-Type": "application/json"}
     if provider.encrypted_api_key:
-        secret = decrypt_secret(provider.encrypted_api_key, "provider", provider.key_version)
+        try:
+            secret = decrypt_secret(provider.encrypted_api_key, "provider", provider.key_version)
+        except Exception:
+            raise HTTPException(status_code=503, detail={"code": "provider_credential_decryption_failed"})
         headers["Authorization"] = f"Bearer {secret}"
     body = {
         "model": payload.model,
@@ -265,6 +269,8 @@ async def generate_chat_completion(db: Session, payload: ChatCompletionRequest, 
         raise HTTPException(status_code=400, detail={"code": "idempotency_key_invalid"})
     if len(payload.model_dump_json().encode("utf-8")) > 1_000_000:
         raise HTTPException(status_code=413, detail={"code": "ai_request_too_large"})
+    # Ensure encrypted replay storage can succeed before any billable provider call.
+    _master_key(KEY_VERSION)
     provider = _select_provider(db, payload)
     idem_hash = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
     req_hash = _request_hash(payload)
