@@ -141,6 +141,7 @@ class WorkerSupervisor:
         except Exception as exc:
             code = "handler_invalid_result" if isinstance(exc, TypeError) else "handler_error"
             self._fail(task["id"], code, "Task handler failed; inspect local diagnostic tooling")
+        return True
 
     def _complete(self, task_id: str, result: dict[str, Any]) -> None:
         db = self.session_factory()
