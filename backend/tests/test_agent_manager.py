@@ -193,3 +193,13 @@ def test_agent_budget_cannot_settle_above_reserved_amount(db_session):
     with pytest.raises(HTTPException) as over:
         settle_agent_budget_reservation(db_session, reservation["id"], 0.6)
     assert over.value.detail["code"] == "actual_cost_exceeds_reserved_budget"
+
+
+
+def test_agent_budget_reservation_cannot_start_after_agent_is_disabled(db_session):
+    agent_id = enabled_agent(db_session)
+    reservation = reserve_agent_budget(db_session, agent_id, "budget-request-0007", "2" * 64, 0.5)
+    disable_agent(db_session, agent_id)
+    with pytest.raises(HTTPException) as exc:
+        start_agent_budget_reservation(db_session, reservation["id"])
+    assert exc.value.detail["code"] == "agent_not_enabled"
