@@ -312,7 +312,7 @@ def settle_agent_budget_reservation(db: Session, reservation_id: str,
     row = db.get(AgentBudgetReservation, reservation_id)
     if row is None:
         raise HTTPException(status_code=404, detail={"code": "agent_budget_reservation_not_found"})
-    if row.status not in {"reserved", "running"}:
+    if row.status != "running":
         raise HTTPException(status_code=409, detail={"code": "agent_budget_reservation_not_settleable"})
     actual = _money(actual_cost_usd)
     if actual > Decimal(str(row.reserved_usd)):
