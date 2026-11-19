@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { AgentsPanel, AssetsPanel, ComingSoonPanel, ProductionPanel } from "./WorkspacePanels";
 import {
   Activity, ArrowUpRight, AudioLines, BookOpen, Check, ChevronDown,
   CircleHelp, Clapperboard, Command, FolderKanban, Gauge, Image, Layers3,
@@ -127,6 +128,7 @@ function App() {
           {notice && <div className="notice"><Check size={15} />{notice}<button onClick={() => setNotice("")} aria-label="Dismiss"><X size={14} /></button></div>}
           {error && <div className="connection-banner"><Activity size={18} /><div><b>Backend connection unavailable</b><span>{error}. Start the FastAPI service on port 8000, then refresh.</span></div><button onClick={() => void loadProjects()}>Retry</button></div>}
 
+          {(active === "Overview" || active === "Projects") && <>
           <section className="metric-grid">
             <article className="metric-card"><div className="metric-top"><span>ACTIVE PROJECTS</span><FolderKanban size={17} /></div><strong>{loading ? "—" : total}</strong><small>Across your workspace</small></article>
             <article className="metric-card"><div className="metric-top"><span>PRODUCTION RUNS</span><Clapperboard size={17} /></div><strong>—</strong><small>Orchestrator overview coming next</small></article>
@@ -144,6 +146,16 @@ function App() {
           </section>
 
           <section className="pipeline-strip"><div className="pipeline-intro"><span className="eyebrow">CREATIVE PIPELINE</span><h2>From first thought to final cut.</h2><p>A connected workflow with human review at every important checkpoint.</p></div><div className="pipeline-steps">{[{n:"01",t:"Research",s:"Evidence & insight",i:BookOpen},{n:"02",t:"Story",s:"Script & structure",i:Sparkles},{n:"03",t:"Visuals",s:"Characters & shots",i:Image},{n:"04",t:"Production",s:"Image, video & audio",i:Video},{n:"05",t:"Review",s:"Quality & approval",i:ShieldCheck}].map(step => { const Icon = step.i; return <div className="pipeline-step" key={step.n}><span>{step.n}</span><Icon size={18}/><b>{step.t}</b><small>{step.s}</small></div>; })}</div></section>
+
+          </>}
+          {active === "Production room" && <ProductionPanel projects={projects}/>}
+          {active === "AI agents" && <AgentsPanel/>}
+          {active === "Assets" && <AssetsPanel projects={projects}/>}
+          {active === "Research vault" && <ComingSoonPanel title="Research vault" description="Multimodal source intake, evidence records, provenance, source comparison and research synthesis are part of the approved product vision. This module will be connected to the backend in a later implementation phase."/>}
+          {active === "Characters & worlds" && <ComingSoonPanel title="Characters & worlds" description="Character Bible, World Bible, model sheets and continuity tools are planned as a connected creative-development workspace."/>}
+          {active === "Video & audio" && <ComingSoonPanel title="Video & audio" description="Media generation, audio, subtitles, editing and compositing will be integrated incrementally through the production pipeline."/>}
+          {active === "Compliance" && <ComingSoonPanel title="Compliance" description="Originality, rights, platform policy and publishing-readiness checks will be added as a dedicated review layer."/>}
+          {active === "Settings" && <ComingSoonPanel title="Studio settings" description="Local storage, provider configuration, security and workspace preferences will be exposed here as their management interfaces are completed."/>}
           <footer><span>MASOUD AI STUDIO <i>·</i> PRIVATE BY DESIGN</span><span>Full vision. Simplified architecture. Incremental implementation.</span></footer>
         </div>
       </main>
