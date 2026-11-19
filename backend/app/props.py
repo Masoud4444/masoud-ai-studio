@@ -26,7 +26,7 @@ class StoryProp(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     origin: Mapped[str | None] = mapped_column(Text, nullable=True)
     initial_state: Mapped[str | None] = mapped_column(Text, nullable=True)
-    current_holder_id: Mapped[str | None] = mapped_column(ForeignKey("characters.id", ondelete="RESTRICT"), index=True, nullable=True)
+    current_holder_id: Mapped[str | None] = mapped_column(ForeignKey("story_characters.id", ondelete="RESTRICT"), index=True, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)

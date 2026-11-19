@@ -18,7 +18,7 @@ def upgrade():
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("origin", sa.Text(), nullable=True),
         sa.Column("initial_state", sa.Text(), nullable=True),
-        sa.Column("current_holder_id", sa.String(36), sa.ForeignKey("characters.id", ondelete="RESTRICT"), nullable=True),
+        sa.Column("current_holder_id", sa.String(36), sa.ForeignKey("story_characters.id", ondelete="RESTRICT"), nullable=True),
         sa.Column("status", sa.String(20), nullable=False),
         sa.Column("version", sa.Integer(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
