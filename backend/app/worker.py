@@ -120,7 +120,7 @@ class WorkerSupervisor:
             heartbeat_stop.set()
             heartbeat.join()
             if not lease_lost.is_set():
-                code = "handler_invalid_result" if isinstance(exc, TypeError) else "handler_error"
+                code = "handler_invalid_result" if isinstance(exc, (TypeError, ValueError)) else "handler_error"
                 self._fail(task["id"], code, "Task handler failed; inspect local diagnostic tooling")
             return True
         finally:
