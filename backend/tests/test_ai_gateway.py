@@ -265,10 +265,11 @@ def test_concurrent_duplicate_idempotency_key_is_rejected(monkeypatch):
             await started.wait()
             with pytest.raises(HTTPException) as exc:
                 await generate_chat_completion(second_db, request, "concurrent-key-01")
+            second_db.rollback()
             assert exc.value.status_code == 409
             assert exc.value.detail["code"] == "request_in_progress"
             release.set()
-            result = await first_task
+            result = await asyncio.wait_for(first_task, timeout=10)
             assert result["content"] == "one"
             assert calls["count"] == 1
         finally:
