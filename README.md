@@ -1,39 +1,33 @@
 # Masoud AI Studio
 
-Private, local-first creative production studio. The complete approved product vision is retained; implementation is delivered incrementally as a modular monolith.
+A private, local-first AI creative production studio for research, story development, visual design, image/video/audio production, editing, quality review, and publishing workflows.
 
-## Executable foundation 0.1
+## Product principles
 
-- FastAPI backend and health endpoint
-- SQLite by default; configure with `MASOUD_STUDIO_DATABASE_URL`
-- Project create/list/read/update/archive/restore API
-- Optimistic version checks and duplicate-slug conflict handling
-- Backend tests and GitHub Actions workflow
+- **Full Vision, Simplified Architecture, Incremental Implementation**
+- Windows desktop is the primary platform; Android and Web/PWA are companion clients.
+- Local-first and offline-first by default; cloud-ready without requiring a distributed architecture.
+- Modular monolith: one backend, one primary database, one storage layer, one AI Gateway, one Agent Manager, and one Production Orchestrator.
+- Human approval is required for consequential creative and publishing decisions.
+- Preserve provenance, version history, continuity, privacy, recoverability, and cost visibility.
+- The product is a private owner-operated studio, not a multi-tenant SaaS.
 
-This is the first executable foundation, not the complete product. Storage ingestion, assets, AI Gateway, agents, orchestration, creative workspaces, desktop packaging, and companion clients remain to be implemented.
+## Planned technology baseline
 
-## Run
+- Frontend: React, TypeScript, Tailwind CSS
+- Backend: Python, FastAPI, SQLAlchemy 2, Pydantic, Alembic
+- Initial database: SQLite
+- Desktop shell: Tauri
+- Companion clients: Android and Web/PWA
 
-```bash
-python -m venv .venv
-# Windows: .venv\\Scripts\\activate
-pip install -r requirements.txt
-uvicorn backend.app.main:app --reload
-```
+Technology choices remain subject to the architecture decisions and compatibility checks documented in this repository.
 
-API docs: http://127.0.0.1:8000/docs
+## Repository status
 
-## Test
+This repository was initially created empty. The first commit establishes project documentation and repository conventions only.
 
-```bash
-pytest
-```
+The previously produced **Foundation 002** archive is retained in the project's file library and is the intended implementation baseline. Its reported Linux test result was 8/8 tests passed; this result has not yet been independently re-run from this repository. The archive has not yet been imported into this repository, so no claim is made that its source code is present here.
 
-## API routes
+**Next milestone:** safely inspect and import Foundation 002, then implement Package 003 — Projects & Storage Foundation — without overwriting or duplicating existing work.
 
-- POST /api/v1/projects
-- GET /api/v1/projects
-- GET /api/v1/projects/{project_id}
-- PATCH /api/v1/projects/{project_id} (requires expected_version)
-- POST /api/v1/projects/{project_id}/archive
-- POST /api/v1/projects/{project_id}/restore
+See [Project Status](docs/PROJECT_STATUS.md) and [Architecture](docs/ARCHITECTURE.md).
