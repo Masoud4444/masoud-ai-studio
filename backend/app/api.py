@@ -6,6 +6,8 @@ from .schemas import ProjectCreate, ProjectPage, ProjectRead, ProjectUpdate
 from .storage import detach_project_asset, ingest_upload, list_project_assets
 from .ai_gateway import create_provider, list_providers, delete_provider, update_provider, generate_chat_completion, list_model_capabilities, update_model_capability, test_provider_connection, set_model_pricing, get_usage_summary, list_model_pricing_history
 from .gateway_schemas import ProviderCreate, ProviderRead, ProviderUpdate, ChatCompletionRequest, ChatCompletionRead, ModelCapabilityUpdate, ModelPricingUpdate
+from .task_manager import create_task, get_task, list_tasks, cancel_task, retry_task
+from .task_schemas import TaskCreate, TaskRead
 
 router = APIRouter(prefix="/api/v1", tags=["studio"])
 
@@ -118,3 +120,43 @@ def get_ai_model_pricing_history(provider_id: str, model_id: str, db: Session = 
 @router.patch("/ai/providers/{provider_id}", response_model=ProviderRead)
 def patch_ai_provider(provider_id: str, payload: ProviderUpdate, db: Session = Depends(get_db)):
     return update_provider(db, provider_id, payload)
+
+
+@router.post("/tasks", status_code=201)
+def post_task(
+    payload: TaskCreate,
+    idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=8, max_length=200),
+    db: Session = Depends(get_db),
+):
+    return create_task(
+        db, task_type=payload.task_type, payload=payload.payload,
+        idempotency_key=idempotency_key, project_id=payload.project_id,
+        priority=payload.priority, dependencies=payload.depends_on,
+        max_attempts=payload.max_attempts,
+    )
+
+
+@router.get("/tasks")
+def get_tasks(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    status: str | None = Query(None, min_length=1, max_length=24),
+    project_id: str | None = Query(None, min_length=36, max_length=36),
+    db: Session = Depends(get_db),
+):
+    return list_tasks(db, limit=limit, offset=offset, status=status, project_id=project_id)
+
+
+@router.get("/tasks/{task_id}")
+def get_task_route(task_id: str, db: Session = Depends(get_db)):
+    return get_task(db, task_id)
+
+
+@router.post("/tasks/{task_id}/cancel")
+def post_task_cancel(task_id: str, db: Session = Depends(get_db)):
+    return cancel_task(db, task_id)
+
+
+@router.post("/tasks/{task_id}/retry")
+def post_task_retry(task_id: str, db: Session = Depends(get_db)):
+    return retry_task(db, task_id)
