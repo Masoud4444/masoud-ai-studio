@@ -161,3 +161,10 @@ Never infer one status from another.
 - Added an opt-in Worker Supervisor with a handler allowlist, lease recovery, safe result bounds, sanitized errors, and graceful shutdown. Only the non-billable `system.healthcheck` handler is registered by default.
 - The worker remains disabled unless `MASOUD_STUDIO_WORKER_ENABLED=true`. Creative production task handlers are not yet registered.
 - Verification status for this checkpoint: **CI pending**. Do not treat code presence as test success.
+
+
+### Worker lease heartbeat update
+- Added ownership-checked lease renewal; renewal is refused for expired leases, non-running tasks, or a different worker identity.
+- The Worker Supervisor now renews leases periodically while synchronous handlers are executing and discards results if ownership can no longer be confirmed.
+- Added a long-running handler regression test that expects at least one persisted lease-renewal event.
+- Hard interruption/timeouts for synchronous handlers are still not provided; process isolation is required for that guarantee.
