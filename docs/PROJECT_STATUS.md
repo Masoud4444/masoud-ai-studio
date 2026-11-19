@@ -19,7 +19,7 @@ Last updated: 2026-11-19
 - SQLAlchemy 2 models and SQLite default configuration.
 - Project create, list, read, update, archive, and restore endpoints.
 - Optimistic project version checks and duplicate-slug conflict handling.
-- Alembic migrations 0001–0006 (0006 provider priority is pending CI verification); application startup defaults to migration-managed schema mode. Development-only `create_all` bootstrap requires `MASOUD_STUDIO_SCHEMA_MODE=create`.
+- Alembic migrations 0001–0006 (0006 provider priority; latest migration and local-provider code are pending CI verification); application startup defaults to migration-managed schema mode. Development-only `create_all` bootstrap requires `MASOUD_STUDIO_SCHEMA_MODE=create`.
 
 ### Storage and asset management
 
@@ -33,7 +33,7 @@ Last updated: 2026-11-19
 - Provider registry API: create, list, disable, enable/disable update, and configurable priority (lower number is preferred).
 - OpenAI-compatible non-streaming chat completion endpoint.
 - AES-256-GCM encryption for provider credentials and stored idempotent responses; per-record key versioning and version-specific environment key support.
-- Provider URL validation at registration and again before outbound requests.
+- Provider URL validation at registration and again before outbound requests.\n- Explicit local OpenAI-compatible provider mode for localhost/127.0.0.1/::1 with a required port; non-loopback private/LAN destinations remain rejected.
 - HTTPS-only, port 443, rejection of embedded credentials, query strings, fragments, localhost and non-public destinations.
 - DNS resolution at request time and a pinned resolver for the actual HTTPS connection; TLS hostname verification remains enabled. Redirects and environment proxies are disabled.
 - Structured, sanitized provider errors; provider response body is never copied into public error details.
@@ -67,7 +67,7 @@ See [AI Gateway implementation guide](AI_GATEWAY.md) for setup, environment conf
 - GitHub Actions workflow run `44445452582` completed successfully for commit `cf24526ff43c85ba6bcde6fcc8a9757dc20b485d`.
 - Result: **21 passed, 1 warning** on Python 3.11 / Ubuntu runner.
 - The same CI run successfully executed Alembic upgrades through revisions 0001–0005 on a fresh SQLite database.
-- Provider priority, migration 0006, and the newest concurrency-test adjustment were added afterward; those changes must not be treated as verified until their own CI run completes.
+- Provider priority, migration 0006, local loopback providers, and the newest concurrency-test adjustment were added afterward; those changes must not be treated as verified until their own CI run completes.
 - Earlier failing CI runs exposed implementation defects; those were corrected and the successful run above is the verified result.
 - This is Linux CI verification only. Windows behavior, real provider interoperability, DNS/TLS behavior against external providers, load/concurrency behavior, and recovery on actual desktop storage have not yet been verified.
 - The CI tests mock provider generation and provider model-list responses; they do not make billable requests to a real AI provider.
