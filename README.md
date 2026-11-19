@@ -31,3 +31,12 @@ The previously produced **Foundation 002** archive is retained in the project's 
 **Next milestone:** safely inspect and import Foundation 002, then implement Package 003 — Projects & Storage Foundation — without overwriting or duplicating existing work.
 
 See [Project Status](docs/PROJECT_STATUS.md) and [Architecture](docs/ARCHITECTURE.md).
+
+
+## Project asset endpoints
+
+- `POST /api/v1/projects/{project_id}/assets` (multipart field: `file`)
+- `GET /api/v1/projects/{project_id}/assets`
+- `DELETE /api/v1/projects/{project_id}/assets/{link_id}` (detaches the project link; it does not delete shared blob bytes)
+
+Blobs are stored locally under `data/storage/blobs/<sha256-prefix>/<sha256>` by default. Configure with `MASOUD_STUDIO_STORAGE_ROOT`; configure the upload limit with `MASOUD_STUDIO_MAX_UPLOAD_BYTES`.
