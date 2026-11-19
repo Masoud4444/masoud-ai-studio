@@ -50,6 +50,7 @@ class AIProvider(Base):
     key_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     models_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    priority: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
