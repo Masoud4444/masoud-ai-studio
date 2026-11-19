@@ -62,7 +62,13 @@ def _run_payload(run: ProductionRun, db: Session, replayed: bool = False) -> dic
                 .where(TaskDependency.task_id == task.id)).all(),
             "error_code": task.error_code,
         })
-    if states and all(s == "succeeded" for s in states):
+    if run.status == "cancelled":
+        status = "cancelled"
+    elif run.status == "paused" or (run.status == "pausing" and not any(s == "running" for s in states)):
+        status = "paused"
+    elif run.status == "pausing":
+        status = "pausing"
+    elif states and all(s == "succeeded" for s in states):
         status = "succeeded"
     elif any(s in {"failed", "cancelled"} for s in states):
         status = "failed"
@@ -190,3 +196,110 @@ def list_production_runs(db: Session, limit: int = 50, offset: int = 0,
                       .offset(offset).limit(limit)).all()
     return {"items": [_run_payload(row, db) for row in rows],
             "total": total, "limit": limit, "offset": offset}
+
+
+
+def _run_and_steps(db: Session, run_id: str):
+    run = db.get(ProductionRun, run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail={"code": "production_run_not_found"})
+    rows = db.execute(
+        select(ProductionStep, StudioTask)
+        .join(StudioTask, StudioTask.id == ProductionStep.task_id)
+        .where(ProductionStep.run_id == run_id)
+        .order_by(ProductionStep.position.asc())
+    ).all()
+    return run, rows
+
+
+def pause_production_run(db: Session, run_id: str) -> dict:
+    run, rows = _run_and_steps(db, run_id)
+    if run.status == "cancelled":
+        raise HTTPException(status_code=409, detail={"code": "production_run_cancelled"})
+    if run.status in {"paused", "pausing"}:
+        return _run_payload(run, db)
+    if rows and all(task.status in {"succeeded", "failed", "cancelled", "blocked"} for _, task in rows):
+        raise HTTPException(status_code=409, detail={"code": "production_run_terminal"})
+    now = _now()
+    running = False
+    for _, task in rows:
+        if task.status == "running":
+            running = True
+            continue
+        if task.status not in {"queued", "waiting_approval"}:
+            continue
+        before = task.status
+        task.paused_from_status = before
+        task.status = "paused"
+        task.updated_at = now
+        _event = TaskEvent(
+            id=str(uuid4()), task_id=task.id, event_type="run_paused",
+            from_status=before, to_status="paused",
+            detail_json=json.dumps({"run_id": run_id}, separators=(",", ":")),
+            created_at=now,
+        )
+        db.add(_event)
+    run.status = "pausing" if running else "paused"
+    run.updated_at = now
+    db.commit()
+    db.refresh(run)
+    return _run_payload(run, db)
+
+
+def resume_production_run(db: Session, run_id: str) -> dict:
+    run, rows = _run_and_steps(db, run_id)
+    if run.status not in {"paused", "pausing"}:
+        raise HTTPException(status_code=409, detail={"code": "production_run_not_paused"})
+    now = _now()
+    for _, task in rows:
+        if task.status != "paused":
+            continue
+        restored = task.paused_from_status or "queued"
+        before = task.status
+        task.status = restored
+        task.paused_from_status = None
+        task.updated_at = now
+        db.add(TaskEvent(
+            id=str(uuid4()), task_id=task.id, event_type="run_resumed",
+            from_status=before, to_status=restored,
+            detail_json=json.dumps({"run_id": run_id}, separators=(",", ":")),
+            created_at=now,
+        ))
+    run.status = "queued"
+    run.updated_at = now
+    db.commit()
+    db.refresh(run)
+    return _run_payload(run, db)
+
+
+def cancel_production_run(db: Session, run_id: str) -> dict:
+    run, rows = _run_and_steps(db, run_id)
+    if run.status == "cancelled":
+        return _run_payload(run, db)
+    if any(task.status == "running" for _, task in rows):
+        raise HTTPException(status_code=409, detail={
+            "code": "production_run_has_running_tasks",
+            "message": "Wait for active tasks to finish before cancelling the run",
+        })
+    if rows and all(task.status == "succeeded" for _, task in rows):
+        raise HTTPException(status_code=409, detail={"code": "production_run_already_succeeded"})
+    now = _now()
+    for _, task in rows:
+        if task.status not in {"queued", "waiting_approval", "paused", "blocked"}:
+            continue
+        before = task.status
+        task.status = "cancelled"
+        task.paused_from_status = None
+        task.finished_at = now
+        task.updated_at = now
+        db.add(TaskEvent(
+            id=str(uuid4()), task_id=task.id, event_type="run_cancelled",
+            from_status=before, to_status="cancelled",
+            detail_json=json.dumps({"run_id": run_id}, separators=(",", ":")),
+            created_at=now,
+        ))
+    run.status = "cancelled"
+    run.updated_at = now
+    db.commit()
+    db.refresh(run)
+    return _run_payload(run, db)
