@@ -105,7 +105,7 @@ See [AI Gateway implementation guide](AI_GATEWAY.md) for setup, environment conf
 - Never commit encryption keys or provider secrets, place them in frontend code, or send them through chat.
 - A future Windows desktop release should use Windows DPAPI / OS-protected credential storage rather than relying on manually managed environment variables.
 - No user authentication or authorization layer has been implemented. Keep the API bound to localhost or a trusted private environment; do not expose it to the public internet or an untrusted LAN.
-- Streaming, automatic retries/fallback, circuit breakers, provider concurrency limits, monthly budget enforcement, and provider-invoice reconciliation are not implemented.
+- Streaming, automatic retries/fallback, circuit breakers, provider concurrency limits, provider-invoice reconciliation and runtime integration of Agent budget controls are not implemented.
 - Cost estimates depend on manually entered provider pricing and token counts. They are not invoices and may omit provider-specific billing dimensions.
 - The outbound adapter uses pinned DNS answers and disables redirects/proxies, but the implementation still requires an independent security review before handling sensitive production data.
 
@@ -114,7 +114,7 @@ See [AI Gateway implementation guide](AI_GATEWAY.md) for setup, environment conf
 - Windows desktop UI and packaging (Tauri).
 - React/TypeScript frontend and Web/PWA.
 - Android companion client.
-- Tool sandbox, runtime permission enforcement, budget reservation/enforcement, and agent execution lifecycle.
+- Tool sandbox, runtime permission enforcement, integration of the Agent budget ledger into execution, and agent execution lifecycle.
 - Remaining Production Orchestrator capabilities: database-managed workflow templates, parallel branch fan-in/fan-out, DLQ UI, and recovery dashboard. Run-level pause/resume/cancel is implemented.
 - Research Vault, multimodal intake, provenance and evidence graph.
 - Story Engine, Character Bible, World Bible, continuity and universe/series management.
@@ -197,3 +197,12 @@ Never infer one status from another.
 - Added API endpoints and regression tests for lifecycle, provider/model checks, grants, duplicate slugs, and audit events.
 - Important boundary: this is configuration governance only. No agent execution, tool broker, runtime authorization, or provider usage reconciliation is implemented. Budget reservation and ceiling checks exist as internal service operations but are not yet wired into execution. Do not enable billable or external tool execution until those controls exist.
 - CI verification for this checkpoint is pending; no test pass is claimed.
+
+
+### Agent budget ledger update
+- Added migration 0011 and an internal idempotent reservation ledger.
+- Reservations enforce per-run and current UTC calendar-month ceilings before execution, with idempotency hash/request hash conflict handling.
+- Reservations transition through reserved, running, succeeded/failed, or released; settlement rejects actual cost above the reserved ceiling.
+- Starting a reservation revalidates that the Agent and its configured Provider/Model remain enabled.
+- Added regression tests for replay, idempotency conflicts, per-run/monthly ceilings, release, settlement limits, and disabling an Agent before start.
+- Budget ledger is not yet wired to an Agent Runtime or AI Gateway usage reconciliation. Runtime must reserve a conservative upper bound before any provider request.
