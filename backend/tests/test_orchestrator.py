@@ -6,7 +6,7 @@ from sqlalchemy.pool import StaticPool
 
 from backend.app.database import Base
 from backend.app.models import StudioTask, ProductionStep, ProductionRun
-from backend.app.orchestrator import create_production_run, get_production_run, list_workflows
+from backend.app.orchestrator import (create_production_run, get_production_run, list_workflows, pause_production_run, resume_production_run, cancel_production_run)
 from backend.app.task_manager import claim_task, complete_task, approve_task
 
 
@@ -96,3 +96,43 @@ def test_run_status_is_projected_without_mutating_persisted_run(db_session):
     assert fetched["status"] == "waiting_approval"
     assert stored.status == "queued"
     assert not db_session.dirty
+
+
+
+def test_run_pause_and_resume_restore_queued_and_approval_states(db_session):
+    run = create_production_run(
+        db_session, "creative.preproduction", {"brief": "Pause safely"}, "production-key-pause-01",
+    )
+    task_ids = [step["task_id"] for step in run["steps"]]
+    paused = pause_production_run(db_session, run["id"])
+    assert paused["status"] == "paused"
+    assert all(step["status"] == "paused" for step in paused["steps"])
+    assert claim_task(db_session, "worker-paused") is None
+
+    resumed = resume_production_run(db_session, run["id"])
+    assert resumed["status"] == "waiting_approval"
+    assert [step["status"] for step in resumed["steps"]] == [
+        "queued", "queued", "waiting_approval", "queued", "waiting_approval", "queued"
+    ]
+    assert all(db_session.get(StudioTask, task_id).paused_from_status is None for task_id in task_ids)
+
+
+def test_run_cancellation_cancels_pending_tasks_and_is_audited(db_session):
+    run = create_production_run(
+        db_session, "creative.preproduction", {"brief": "Cancel safely"}, "production-key-cancel-01",
+    )
+    cancelled = cancel_production_run(db_session, run["id"])
+    assert cancelled["status"] == "cancelled"
+    assert all(step["status"] == "cancelled" for step in cancelled["steps"])
+
+
+def test_run_cancellation_refuses_while_task_is_running(db_session):
+    run = create_production_run(
+        db_session, "creative.preproduction", {"brief": "Do not kill active work"}, "production-key-cancel-02",
+    )
+    claimed = claim_task(db_session, "worker-active")
+    assert claimed is not None
+    with pytest.raises(HTTPException) as exc:
+        cancel_production_run(db_session, run["id"])
+    assert exc.value.status_code == 409
+    assert exc.value.detail["code"] == "production_run_has_running_tasks"
