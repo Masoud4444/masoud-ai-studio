@@ -59,3 +59,10 @@ All routes are under /api/v1:
 - AI-assisted claim extraction with model/prompt/version provenance and mandatory human review.
 - Source credibility assessment, cross-source corroboration, contradiction graphs and evidence confidence.
 - Semantic search and embeddings behind a local-first index abstraction.
+
+
+## Verification
+
+- Service-level tests cover URL validation/canonicalization, project association, source-link idempotency, evidence deduplication, claim review requirements and provenance events.
+- HTTP integration tests cover the source → evidence → claim → review flow and verify that a source cannot be detached while a project claim still cites its evidence.
+- The complete backend suite and Alembic migration to revision 0012 passed in GitHub Actions run 44510354753 (85 tests, one non-failing warning).

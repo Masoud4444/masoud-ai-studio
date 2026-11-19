@@ -40,3 +40,6 @@ The API and Vite server are bound to loopback by default. Do not expose the back
 ## Research Vault scope
 
 The first UI slice is a manual curation workspace. It does not fetch URLs, crawl sites, parse uploaded documents, run OCR/transcription or invoke AI extraction. URL records are metadata only. See RESEARCH_VAULT.md for the data contract and safety boundaries.
+
+
+- Backend HTTP integration tests exercise the Research Vault endpoints used by this workspace; browser-level Windows interaction remains to be verified locally.

@@ -30,13 +30,13 @@ Last updated: 2026-11-19
 - Production room: create/list preproduction runs, inspect step state and approval gates, pause/resume/cancel controls.
 - AI agents: create draft profiles, view registry, enable/disable where provider/model requirements permit.
 - Assets: project selection, upload, list and detach. Detach does not delete the shared content-addressed blob.
-- Research Vault workspace: register sources, browse project-linked sources, capture exact evidence excerpts/locators, create project claims, link evidence as support/contradiction/context and accept/reject claims only when the required evidence relation exists.
+- Research Vault workspace: register sources, browse project-linked sources, capture exact evidence excerpts/locators, create project claims, link evidence as support/contradiction/context and accept/reject claims only when the required evidence relation exists. HTTP-level integration tests cover source creation, evidence capture, claim acceptance and safe refusal to detach referenced sources.
 - Characters & Worlds, Video & Audio, Compliance and Settings remain staged modules.
 - Windows setup/start scripts and frontend guide are present under `scripts/` and `docs/FRONTEND.md`. The setup script checks Python 3.11+/Node.js 20+, installs dependencies, builds the frontend, then applies migrations.
 
 ## Verification evidence
 
-- Latest backend run [44510146431](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44510146431), commit `d7415d748f1b76d3253e01543ebbfc3807bd4060`: **83 passed, 1 warning**; fresh SQLite Alembic upgrade through head succeeded through migration 0012.
+- Latest backend run [44510354753](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44510354753), commit `4c4a41852929a009e6f3ac6440287704114abe85`: **85 passed, 1 warning**; fresh SQLite Alembic upgrade through head succeeded through migration 0012, including HTTP-level Research Vault flow and integrity tests.
 - Latest frontend build [44509841316](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44509841316), commit `270fc8cce654b19dfc99f5ce257c8df2bcf510da`: successful.
 - These are Linux CI checks. Windows install/runtime, real browser workflows, provider interoperability, concurrency/load behavior and desktop packaging have not been verified.
 - CI mocks provider generation/model-list responses; no billable provider calls are made by CI.

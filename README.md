@@ -60,7 +60,7 @@ The backend listens on `127.0.0.1:8000`. The frontend dev server proxies `/api` 
 
 ## CI verification checkpoint
 
-- Latest backend run [44510146431](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44510146431): **83 passed, 1 warning**; Alembic upgrade to head succeeded on a fresh SQLite database through migration 0012.
+- Latest backend run [44510354753](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44510354753): **85 passed, 1 warning**; Alembic upgrade to head succeeded on a fresh SQLite database through migration 0012, including Research Vault API integration coverage.
 - Latest frontend build run [44509841316](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44509841316): successful for the Research Vault workspace.
 - CI ran on Linux. Windows installation, local browser interaction, provider interoperability and desktop packaging still require hands-on verification.
 
