@@ -63,41 +63,59 @@ def _validate_ip_addresses(addresses: set[str]) -> list[str]:
     return sorted({str(address) for address in parsed})
 
 
-def validate_provider_url(value: str) -> str:
+def validate_provider_url(value: str, allow_local: bool = False) -> str:
     try:
-        if any(ord(ch) < 32 for ch in value) or "\\" in value:
+        if any(ord(ch) < 32 for ch in value) or "\\\\" in value:
             raise ValueError
         parsed = urlsplit(value.strip())
-        if parsed.scheme.lower() != "https" or not parsed.hostname:
-            raise ValueError
-        if parsed.username or parsed.password or parsed.query or parsed.fragment:
-            raise ValueError
-        if parsed.port not in (None, 443):
+        if not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
             raise ValueError
         host = parsed.hostname.rstrip(".").encode("idna").decode("ascii").lower()
-        if host in {"localhost", "localhost.localdomain"} or host.endswith((".localhost", ".local", ".internal", ".test")):
-            raise ValueError
-        try:
-            addresses = {str(ipaddress.ip_address(host))}
-        except ValueError:
-            answers = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
-            addresses = {answer[4][0] for answer in answers}
-        _validate_ip_addresses(addresses)
+        port = parsed.port
+        if allow_local:
+            if parsed.scheme.lower() not in ("http", "https") or port is None:
+                raise ValueError
+            if host not in {"localhost", "127.0.0.1", "::1"}:
+                raise ValueError
+            if host == "localhost":
+                answers = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+                addresses = {ipaddress.ip_address(answer[4][0]) for answer in answers}
+            else:
+                addresses = {ipaddress.ip_address(host)}
+            if not addresses or any(not address.is_loopback for address in addresses):
+                raise ValueError
+        else:
+            if parsed.scheme.lower() != "https" or port not in (None, 443):
+                raise ValueError
+            if host in {"localhost", "localhost.localdomain"} or host.endswith((".localhost", ".local", ".internal", ".test")):
+                raise ValueError
+            try:
+                addresses = {ipaddress.ip_address(host)}
+            except ValueError:
+                answers = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+                addresses = {ipaddress.ip_address(answer[4][0]) for answer in answers}
+            if not addresses or any(not address.is_global for address in addresses):
+                raise ValueError
         authority = f"[{host}]" if ":" in host else host
-        return urlunsplit(("https", authority, parsed.path.rstrip("/"), "", ""))
+        if port:
+            authority = f"{authority}:{port}"
+        return urlunsplit((parsed.scheme.lower(), authority, parsed.path.rstrip("/"), "", ""))
     except Exception:
         raise HTTPException(status_code=422, detail={"code": "provider_url_rejected"})
 
-
-async def _resolve_public_addresses(host: str) -> list[str]:
+async def _resolve_provider_addresses(host: str, port: int, allow_local: bool) -> list[str]:
     try:
         try:
-            addresses = {str(ipaddress.ip_address(host))}
+            addresses = {ipaddress.ip_address(host)}
         except ValueError:
             loop = asyncio.get_running_loop()
-            answers = await loop.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
-            addresses = {answer[4][0] for answer in answers}
-        return _validate_ip_addresses(addresses)
+            answers = await loop.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+            addresses = {ipaddress.ip_address(answer[4][0]) for answer in answers}
+        if allow_local:
+            if not addresses or any(not address.is_loopback for address in addresses):
+                raise ValueError("Local providers must resolve exclusively to loopback")
+            return sorted({str(address) for address in addresses})
+        return _validate_ip_addresses({str(address) for address in addresses})
     except Exception:
         raise HTTPException(status_code=422, detail={"code": "provider_dns_rejected"})
 
@@ -144,11 +162,11 @@ def _serialize(provider: AIProvider) -> dict:
 
 
 def create_provider(db: Session, payload: ProviderCreate) -> dict:
-    base_url = validate_provider_url(payload.base_url)
+    base_url = validate_provider_url(payload.base_url, allow_local=payload.connection_type == "local")
     key = payload.api_key.get_secret_value() if payload.api_key else None
     encrypted = encrypt_secret(key, "provider", KEY_VERSION) if key else None
     provider = AIProvider(
-        id=str(uuid4()), name=payload.name.strip(), provider_type="openai_compatible",
+        id=str(uuid4()), name=payload.name.strip(), provider_type="local_openai_compatible" if payload.connection_type == "local" else "openai_compatible",
         base_url=base_url, encrypted_api_key=encrypted, key_version=KEY_VERSION,
         models_json=json.dumps(payload.models), is_enabled=True, priority=payload.priority,
     )
@@ -205,11 +223,12 @@ def _decrypt_response(response: str, key_version: int) -> dict:
 async def _send_chat_completion(provider: AIProvider, payload: ChatCompletionRequest) -> dict:
     parsed = urlsplit(provider.base_url)
     host = parsed.hostname
-    if not host or parsed.scheme != "https" or parsed.port not in (None, 443):
+    allow_local = provider.provider_type == "local_openai_compatible"
+    if not host or (allow_local and (parsed.scheme not in ("http", "https") or parsed.port is None)) or (not allow_local and (parsed.scheme != "https" or parsed.port not in (None, 443))):
         raise HTTPException(status_code=422, detail={"code": "provider_url_rejected"})
-    pinned = await _resolve_public_addresses(host)
+    pinned = await _resolve_provider_addresses(host, parsed.port or 443, allow_local)
     resolver = _PinnedResolver(pinned)
-    connector = aiohttp.TCPConnector(resolver=resolver, use_dns_cache=False, ssl=True)
+    connector = aiohttp.TCPConnector(resolver=resolver, use_dns_cache=False, ssl=parsed.scheme == "https")
     timeout = aiohttp.ClientTimeout(total=PROVIDER_TIMEOUT_SECONDS, connect=15, sock_read=75)
     endpoint = provider.base_url.rstrip("/") + "/chat/completions"
     headers = {"Content-Type": "application/json"}
@@ -417,10 +436,11 @@ def update_model_capability(db: Session, provider_id: str, model_id: str, payloa
 async def _fetch_provider_model_list(provider: AIProvider) -> list[str]:
     parsed = urlsplit(provider.base_url)
     host = parsed.hostname
-    if not host or parsed.scheme != "https" or parsed.port not in (None, 443):
+    allow_local = provider.provider_type == "local_openai_compatible"
+    if not host or (allow_local and (parsed.scheme not in ("http", "https") or parsed.port is None)) or (not allow_local and (parsed.scheme != "https" or parsed.port not in (None, 443))):
         raise HTTPException(status_code=422, detail={"code": "provider_url_rejected"})
-    pinned = await _resolve_public_addresses(host)
-    connector = aiohttp.TCPConnector(resolver=_PinnedResolver(pinned), use_dns_cache=False, ssl=True)
+    pinned = await _resolve_provider_addresses(host, parsed.port or 443, allow_local)
+    connector = aiohttp.TCPConnector(resolver=_PinnedResolver(pinned), use_dns_cache=False, ssl=parsed.scheme == "https")
     timeout = aiohttp.ClientTimeout(total=20, connect=10, sock_read=15)
     headers = {}
     if provider.encrypted_api_key:
