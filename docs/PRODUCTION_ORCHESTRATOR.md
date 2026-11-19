@@ -46,8 +46,8 @@ Approval is an explicit gate: a task in `waiting_approval` is not claimable. App
 - A generic opt-in Worker Supervisor exists, but no creative workflow task handlers are registered yet. Only the safe `system.healthcheck` handler is built in. The worker is disabled by default and requires `MASOUD_STUDIO_WORKER_ENABLED=true`.
 - The API is unauthenticated. Keep it on localhost or a trusted private network; do not expose it publicly. Approval routes must remain under the same trust boundary until authentication/authorization is added.
 - Run aggregate status is a read-time projection of step task states; GET/list calls do not write or commit database changes.
-- Cancellation of an entire run, pause/resume at run level, parallel branch fan-in/fan-out templates, human review artifacts/comments, and approval audit identity are not implemented yet.
-- Migration 0008 and Orchestrator/Worker tests are awaiting CI verification.
+- Parallel branch fan-in/fan-out templates, human review artifacts/comments, and authenticated approval identity are not implemented yet.
+- Migrations 0007–0009 and Orchestrator/Worker tests are awaiting CI verification.
 
 
 ## Production run controls
