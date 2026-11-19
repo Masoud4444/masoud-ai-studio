@@ -295,7 +295,7 @@ def get_system_settings():
                     database_bytes += candidate.stat().st_size
             except OSError:
                 pass
-    key_file = data_root / "credential-key.dpapi"
+    key_file = Path(os.getenv("MASOUD_STUDIO_CREDENTIAL_KEY_FILE", str(data_root / "credential-key.dpapi"))).expanduser()
     return {
         "app_data_root": str(data_root),
         "database_path": str(database_path) if database_path else None,

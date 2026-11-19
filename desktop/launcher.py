@@ -74,14 +74,30 @@ def _load_master_key(data_dir: Path) -> bytes:
 
 def _configure_environment() -> Path:
     root = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Masoud AI Studio"
-    data_dir = root / "data"
     logs_dir = root / "logs"
+    settings_file = root / "desktop-settings.json"
+    data_dir = root / "data"
+    if settings_file.is_symlink() or (settings_file.exists() and settings_file.stat().st_size > 16384):
+        raise RuntimeError("Desktop data settings file is unsafe.")
+    if settings_file.exists():
+        import json
+        settings = json.loads(settings_file.read_text(encoding="utf-8"))
+        if not isinstance(settings, dict):
+            raise RuntimeError("Desktop data settings file is invalid.")
+        configured = settings.get("data_directory")
+        if configured:
+            data_dir = Path(configured).expanduser()
+            if not data_dir.is_absolute():
+                raise RuntimeError("Configured data directory must be absolute.")
+    if data_dir.is_symlink():
+        raise RuntimeError("Configured data directory cannot be a symbolic link.")
     data_dir.mkdir(parents=True, exist_ok=True)
     logs_dir.mkdir(parents=True, exist_ok=True)
     key = _load_master_key(root)
     from sqlalchemy.engine import URL
     os.environ["MASOUD_STUDIO_DATABASE_URL"] = URL.create("sqlite", database=str(data_dir / "masoud_studio.db")).render_as_string(hide_password=False)
     os.environ["MASOUD_STUDIO_STORAGE_ROOT"] = str(data_dir / "storage")
+    os.environ["MASOUD_STUDIO_CREDENTIAL_KEY_FILE"] = str(root / "credential-key.dpapi")
     os.environ["MASOUD_STUDIO_CREDENTIAL_KEY"] = base64.urlsafe_b64encode(key).decode("ascii")
     os.environ["MASOUD_STUDIO_CREDENTIAL_KEY_VERSION"] = "1"
     os.environ["MASOUD_STUDIO_WORKER_ENABLED"] = "false"

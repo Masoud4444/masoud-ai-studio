@@ -267,3 +267,12 @@ Never infer one status from another.
 - Added a read-only runtime endpoint reporting backend version, live database connectivity, worker enabled/running state, worker ID and registered task handlers.
 - Worker status is derived from the actual lifespan task rather than only the environment flag. The UI explains that only registered handlers can be claimed and the built-in healthcheck is not a creative production handler.
 - No start/stop controls are exposed: the packaged launcher currently owns process lifecycle and the worker is disabled by default.
+
+
+## Desktop data safety utilities
+
+- A read-only integrity audit is available for SQLite and content-addressed asset storage.
+- An offline Windows data migration utility copies the complete data directory to a new destination, verifies SQLite and registered asset hashes, compares source/copy file digests, and atomically switches the active data-directory setting.
+- The source directory is never deleted by migration. The DPAPI credential key remains in the original per-user application profile, while database, storage, backups and studio preferences move together.
+- The launcher and offline restore utility both honor the configured data directory. The system diagnostics endpoint reports the fixed DPAPI key location separately from the relocated data directory.
+- Migration is offline-only and currently requires the app to be stopped and the destination path not to exist. Do not remove the source copy until the new location is confirmed and backed up.

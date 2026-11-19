@@ -21,7 +21,16 @@ def main() -> int:
             return 3
 
     app_data = Path(__import__("os").environ.get("LOCALAPPDATA", str(Path.home()))) / "Masoud AI Studio"
-    data_dir = app_data / "data"
+    settings_file = app_data / "desktop-settings.json"
+    if settings_file.is_symlink() or (settings_file.exists() and settings_file.stat().st_size > 16384):
+        print("Desktop data settings file is unsafe.")
+        return 2
+    import json
+    settings = json.loads(settings_file.read_text(encoding="utf-8")) if settings_file.exists() else {}
+    data_dir = Path(settings.get("data_directory", app_data / "data")).expanduser()
+    if not data_dir.is_absolute() or data_dir.is_symlink():
+        print("Configured data directory is invalid.")
+        return 2
     database_path = data_dir / "masoud_studio.db"
     storage_root = data_dir / "storage"
 
