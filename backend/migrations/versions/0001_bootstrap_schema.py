@@ -1,8 +1,8 @@
-"""Bootstrap missing tables without dropping existing local data.
+"""Bootstrap the original core schema without pre-creating later feature tables.
 
-This baseline supports installs that were previously initialized through
-SQLAlchemy create_all. Future schema changes must use explicit Alembic
-operations in new revisions.
+This baseline adopts databases initialized by the original SQLAlchemy schema.
+It deliberately creates only core tables that existed before feature revisions
+0002 onward. Later tables must be created by their own explicit revisions.
 """
 from alembic import op
 from backend.app.database import Base
@@ -13,11 +13,22 @@ down_revision = None
 branch_labels = None
 depends_on = None
 
+_CORE_TABLES = (
+    "projects",
+    "assets",
+    "project_assets",
+    "ai_providers",
+    "ai_requests",
+    "ai_usage",
+)
+
+
 def upgrade():
     bind = op.get_bind()
-    Base.metadata.create_all(bind=bind, checkfirst=True)
+    tables = [Base.metadata.tables[name] for name in _CORE_TABLES]
+    Base.metadata.create_all(bind=bind, tables=tables, checkfirst=True)
+
 
 def downgrade():
     # Intentionally non-destructive: this baseline may adopt an existing DB.
-    # A downgrade must never erase a user's projects or assets.
     pass
