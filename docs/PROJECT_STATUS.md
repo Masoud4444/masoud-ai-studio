@@ -187,3 +187,11 @@ Never infer one status from another.
 - API routes: GET/POST /api/v1/stories/{sid}/timeline/events, PATCH /events/{event_id}, GET/POST /relations and POST /analyze.
 - Migration 0016_timeline_events follows 0015_continuity_engine.
 - Backend API implementation is committed but not yet covered by a verified CI result or a Windows runtime check. Timeline UI and dedicated prop registry remain outstanding.
+
+
+### Timeline workspace UI — 2026-11-19
+
+- Added a dedicated Timeline navigation item and workspace.
+- The UI selects project/story, creates in-world events, optionally links events to screenplay scenes, records in-world time markers, sets explicit earlier/later constraints and displays the partial-order analysis.
+- The UI does not infer event chronology from screenplay scene order. Unrelated events remain unordered.
+- This UI increment is committed after the timeline backend increment; frontend build and browser interaction have not yet been verified for this commit.

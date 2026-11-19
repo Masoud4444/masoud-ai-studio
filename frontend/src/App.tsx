@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { AgentsPanel, AssetsPanel, ComingSoonPanel, ProductionPanel, ResearchPanel, StoryPanel } from "./WorkspacePanels";
 import { CharacterWorldPanel } from "./CharacterWorldPanel";
+import { TimelinePanel } from "./TimelinePanel";
 import {
-  Activity, ArrowUpRight, AudioLines, BookOpen, Check, ChevronDown,
+  Activity, ArrowUpRight, AudioLines, BookOpen, Check, ChevronDown, Clock,
   CircleHelp, Clapperboard, Command, FolderKanban, Gauge, Image, Layers3,
   Plus, Search, Settings2, ShieldCheck, Sparkles, Video, X
 } from "lucide-react";
@@ -20,6 +21,7 @@ const nav = [
   { label: "Research vault", icon: BookOpen },
   { label: "Story engine", icon: Sparkles },
   { label: "Characters & worlds", icon: Layers3 },
+  { label: "Timeline", icon: Clock },
   { label: "Assets", icon: Image },
   { label: "Video & audio", icon: AudioLines },
   { label: "AI agents", icon: Sparkles },
@@ -156,6 +158,7 @@ function App() {
           {active === "Research vault" && <ResearchPanel projects={projects}/>}
           {active === "Story engine" && <StoryPanel projects={projects}/>}
           {active === "Characters & worlds" && <CharacterWorldPanel projects={projects}/>}
+          {active === "Timeline" && <TimelinePanel projects={projects}/>}
           {active === "Video & audio" && <ComingSoonPanel title="Video & audio" description="Media generation, audio, subtitles, editing and compositing will be integrated incrementally through the production pipeline."/>}
           {active === "Compliance" && <ComingSoonPanel title="Compliance" description="Originality, rights, platform policy and publishing-readiness checks will be added as a dedicated review layer."/>}
           {active === "Settings" && <ComingSoonPanel title="Studio settings" description="Local storage, provider configuration, security and workspace preferences will be exposed here as their management interfaces are completed."/>}

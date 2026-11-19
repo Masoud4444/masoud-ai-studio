@@ -42,6 +42,7 @@ A public-code, private-by-design, local-first AI creative production studio for 
 - Research Vault workspace with source/evidence/claim management, search and document extraction.
 - Story Engine workspace for story dossiers, scenes and revision history.
 - Characters & Worlds workspace for character/location/world data and continuity review.
+- Timeline workspace for in-world events, explicit chronology constraints and cycle analysis.
 - Video & Audio, Compliance and some Settings capabilities remain staged; no incomplete module is represented as production-ready.
 
 ### Local Windows launch
