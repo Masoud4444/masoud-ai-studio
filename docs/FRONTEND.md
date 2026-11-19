@@ -1,45 +1,41 @@
 # Frontend workspace
 
-The current frontend is a React + TypeScript + Vite application designed to run locally and connect to the FastAPI backend on loopback.
+The studio frontend is a React + TypeScript + Vite application. Development mode uses the Vite server and proxies API requests to FastAPI. The local installation mode serves the compiled frontend from the same FastAPI process, so the normal user workflow needs only one local service.
 
 ## Implemented screens
 
-- Overview and Projects: project list, search, create project, API connection status.
-- Production room: list workflows and runs, create a preproduction run, pause/resume/cancel run controls, approval-gate visibility.
+- Overview and Projects: project listing, search, create project and API connection status.
+- Production room: list workflows and runs, create a preproduction run, pause/resume/cancel controls and approval-gate visibility.
 - AI agents: create draft agent profiles, list registry, enable/disable where provider configuration permits.
-- Assets: select a project, upload an asset, list attached assets, detach an asset without deleting the underlying content-addressed blob.
-- Research Vault: register source metadata, scope sources to projects, capture exact excerpts and locators, create project claims, link evidence as support/contradiction/context and review claims with evidence gates. The UI respects the backend's claim-evidence integrity rules. It can attach an existing project asset to a source; upload the file first in the Assets workspace.
-- Characters & Worlds, Video & Audio, Compliance and Settings show explicit staged-module states; they are not represented as completed features.
+- Assets: project selection, upload, list and detach without deleting the underlying content-addressed blob.
+- Research Vault: source metadata, project scoping, exact excerpts and locators, claims, evidence relationships, review gates, search and bounded local PDF/DOCX text extraction.
+- Story Engine: story dossiers, ordered scene outlines and immutable revision history.
+- Characters & Worlds: character and location dossiers, world rules, relationships, scene links, revision history and continuity fact/issue review.
+- Video & Audio, Compliance and Settings still contain staged areas; they are not represented as finished production tools.
 
-## Development
+## Standard Windows setup and launch
 
-Run npm install and npm run dev from the frontend directory.
+Requirements: Windows 10/11, Python 3.11 or newer, Node.js 20 or newer, and an internet connection for the initial dependency installation.
 
-The Vite dev server binds to 127.0.0.1:5173 and proxies /api and /health to 127.0.0.1:8000.
+1. Clone the repository and switch to the active implementation branch.
+2. Run scripts/setup-windows.bat once. It creates the Python virtual environment, installs backend dependencies, installs frontend dependencies, builds the frontend and applies all Alembic migrations.
+3. Run scripts/start-studio-windows.bat.
+4. The launcher starts the backend on loopback, waits for its health endpoint, and opens http://127.0.0.1:8000 in the default browser.
 
-Build with npm run build from the frontend directory.
+Keep the backend console window open while using the studio. Close that window or press Ctrl+C in it to stop the local service. The studio database and uploaded assets remain in the repository's local data/ and storage directories; these are ignored by Git.
 
-## Windows
+## Development mode
 
-1. Run scripts/setup-windows.bat once.
-2. Start scripts/start-backend-windows.bat.
-3. In a second terminal, start scripts/start-frontend-windows.bat.
-4. Open http://127.0.0.1:5173.
+For frontend development, run npm install and npm run dev from frontend/. Start the backend separately with scripts/start-backend-windows.bat. Vite binds to 127.0.0.1:5173 and proxies /api and /health to 127.0.0.1:8000.
 
-The API and Vite server are bound to loopback by default. Do not expose the backend to a public network: authentication and multi-user authorization are not implemented.
+Build the frontend with npm run build from frontend/.
 
 ## Safety notes
 
-- Creating an Agent from the UI creates a draft only. No provider call is made.
-- Agent enablement requires a configured, enabled provider and model.
-- Production run creation only queues the existing preproduction tasks; creative handlers are not yet registered with the Worker Supervisor.
+- API and frontend are bound to loopback by default. Do not expose the backend to a public network or untrusted LAN: authentication and multi-user authorization are not implemented.
+- Creating an Agent from the UI creates a draft only. Agent generation requires explicit provider/model/pricing configuration and activation.
+- Production run creation queues tasks; creative workflow handlers are not yet registered with the Worker Supervisor.
 - Human approval gates remain enforced by the backend.
-- No paid provider credentials are included in the repository.
-
-
-## Research Vault scope
-
-The first UI slice is a manual curation workspace. It does not fetch URLs, crawl sites, parse uploaded documents, run OCR/transcription or invoke AI extraction. URL records are metadata only. See RESEARCH_VAULT.md for the data contract and safety boundaries.
-
-
-- Backend HTTP integration tests exercise the Research Vault endpoints used by this workspace; browser-level Windows interaction remains to be verified locally.
+- No paid provider credentials are included and the default installation makes no paid provider calls.
+- Local PDF/DOCX extraction is bounded and runs in a subprocess, but that subprocess is not yet a complete OS-level sandbox.
+- The one-click launcher is a local browser-based install workflow, not yet a signed native Windows desktop installer. Tauri packaging, code signing, Windows credential protection and a native updater remain future installation milestones.

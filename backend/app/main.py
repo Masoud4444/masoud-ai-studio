@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
 import asyncio
 import os
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from .api import router
 from .character_world import router as character_world_router
@@ -55,3 +57,15 @@ app.include_router(continuity_router)
 @app.get("/health", tags=["system"])
 def health():
     return {"status": "ok", "service": "masoud-ai-studio"}
+
+
+# In a production-style local install, serve the compiled React app from the
+# same loopback-only FastAPI process. API routes are registered first so the
+# static mount cannot shadow /api or /health.
+_frontend_dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+if (_frontend_dist / "index.html").is_file():
+    app.mount(
+        "/",
+        StaticFiles(directory=str(_frontend_dist), html=True),
+        name="studio-ui",
+    )
