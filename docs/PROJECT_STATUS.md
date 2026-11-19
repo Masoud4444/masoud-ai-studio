@@ -65,3 +65,13 @@ Never infer one status from another.
 - This branch is intentionally separate from `main` pending review.
 - Tests have **not** been executed in this environment. CI results must be checked before marking this foundation tested.
 - Storage/asset ingestion, AI Gateway, agents, orchestration, frontend, desktop packaging, and companion clients are not yet implemented.
+
+## Fresh implementation branch — 2026-11-19
+
+- Branch: `implementation/bootstrap-001`
+- Initial code commit: `c202112705a48616e825297abad92cfe2a703509`
+- A new executable FastAPI backend foundation has been written independently of the uninspected Foundation 002 archive.
+- Included: SQLAlchemy project model, SQLite configuration, project create/list/read/update/archive/restore API, optimistic version checks, duplicate-slug conflict handling, pytest coverage, dependency manifests, and GitHub Actions test workflow.
+- The implementation branch retains the approved project documentation and is separate from `main` pending review.
+- Tests have **not** been executed in this environment. CI results must be checked before marking this foundation tested.
+- Storage/asset ingestion, AI Gateway, agents, orchestration, frontend, desktop packaging, and companion clients are not yet implemented.
