@@ -7,7 +7,7 @@ from sqlalchemy.pool import StaticPool
 from backend.app.database import Base
 from backend.app.models import StudioTask, ProductionStep, ProductionRun
 from backend.app.orchestrator import (create_production_run, get_production_run, list_workflows, pause_production_run, resume_production_run, cancel_production_run)
-from backend.app.task_manager import claim_task, complete_task, approve_task, fail_task, retry_task
+from backend.app.task_manager import claim_task, complete_task, approve_task, fail_task
 
 
 @pytest.fixture()
@@ -175,7 +175,7 @@ def test_retry_after_active_step_failure_remains_paused_until_run_resumes(db_ses
     assert claim_task(db_session, "worker-must-not-retry-paused") is None
 
     resumed = resume_production_run(db_session, run["id"])
-    assert resumed["status"] == "queued"
+    assert resumed["status"] == "waiting_approval"
     restored = db_session.get(StudioTask, active["id"])
     assert restored.status == "queued"
     assert restored.paused_from_status is None
