@@ -39,3 +39,17 @@ class ProjectAsset(Base):
     asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id", ondelete="RESTRICT"), index=True, nullable=False)
     original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class AIProvider(Base):
+    __tablename__ = "ai_providers"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    name: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
+    provider_type: Mapped[str] = mapped_column(String(40), default="openai_compatible", nullable=False)
+    base_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    encrypted_api_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    key_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    models_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    is_enabled: Mapped[bool] = mapped_column(default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
