@@ -34,8 +34,8 @@ Last updated: 2026-11-19
 
 ## Verification evidence
 
-- Backend run [44507323858](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44507323858), commit `e4ce157a5830cbc16194d70194c548e21af15855`: **72 passed, 1 warning**; fresh SQLite Alembic upgrade through head succeeded through migration 0011.
-- Frontend build run [44507106256](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44507106256), commit `588d05ce438e6d0eb97d8a404da5876262d63e7b`: successful.
+- Latest backend run [44508429782](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44508429782), commit `f1fe41cd2fbf4b605bec5a8e4742dc8a303e1251`: **75 passed, 1 warning**; fresh SQLite Alembic upgrade through head succeeded through migration 0011. Earlier baseline run [44507323858](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44507323858) passed 72 tests.
+- Latest frontend build run [44508429943](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44508429943), commit `f1fe41cd2fbf4b605bec5a8e4742dc8a303e1251`: successful. Baseline build run [44507106256](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44507106256) also passed.
 - These are Linux CI checks. Windows install/runtime, real browser workflows, provider interoperability, concurrency/load behavior and desktop packaging have not been verified.
 - CI mocks provider generation/model-list responses; no billable provider calls are made by CI.
 - One Starlette/httpx deprecation warning remains.

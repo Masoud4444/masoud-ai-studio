@@ -58,7 +58,7 @@ The backend listens on `127.0.0.1:8000`. The frontend dev server proxies `/api` 
 
 ## CI verification checkpoint
 
-- Backend GitHub Actions run [44507323858](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44507323858): **72 passed**, Alembic upgrade to head succeeded on a fresh SQLite database through migration 0011.
+- Latest backend run [44508429782](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44508429782): **75 passed, 1 warning**; Alembic upgrade to head succeeded on a fresh SQLite database through migration 0011.
 - Frontend build GitHub Actions run [44507106256](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44507106256): successful for the frontend tree at that commit.
 - CI ran on Linux. Windows installation, local browser interaction, provider interoperability and desktop packaging still require hands-on verification.
 
