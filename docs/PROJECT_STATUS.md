@@ -19,7 +19,7 @@ Last updated: 2026-11-19
 - The Foundation 002 archive has not yet been unpacked and imported into this repository during this work session.
 - Package 003 — Projects & Storage Foundation — is a designed milestone, not yet implemented or committed.
 
-## Next actions
+## Current execution note (2026-11-19)\n\n- Package 003 architecture and acceptance criteria have been committed at `docs/architecture/PACKAGE_003_PROJECTS_STORAGE.md`.\n- The Foundation 002 ZIP is present in the personal Library, but the Files service denied raw-byte materialization in this session. Therefore its source has not been inspected or imported, and Package 003 application code has not been started.\n- Required unblock: attach/upload `storyforge-ai-studio-foundation-002.zip` directly to this conversation so its exact bytes can be inspected and safely imported.\n\n## Next actions
 
 1. Inspect Foundation 002 contents and preserve its exact source baseline.
 2. Import the baseline into this repository without replacing unrelated files.
