@@ -10,6 +10,8 @@ from .task_manager import create_task, get_task, list_tasks, cancel_task, retry_
 from .task_schemas import TaskCreate, TaskRead
 from .orchestrator import (list_workflows, create_production_run, get_production_run, list_production_runs, pause_production_run, resume_production_run, cancel_production_run)
 from .orchestrator_schemas import ProductionRunCreate
+from .agent_manager import create_agent, get_agent, list_agents, update_agent, replace_agent_tools, enable_agent, disable_agent
+from .agent_schemas import AgentCreate, AgentUpdate, AgentToolsUpdate
 
 router = APIRouter(prefix="/api/v1", tags=["studio"])
 
@@ -221,3 +223,44 @@ def post_production_run_resume(run_id: str, db: Session = Depends(get_db)):
 @router.post("/production/runs/{run_id}/cancel")
 def post_production_run_cancel(run_id: str, db: Session = Depends(get_db)):
     return cancel_production_run(db, run_id)
+
+
+
+@router.post("/agents", status_code=201)
+def post_agent(payload: AgentCreate, db: Session = Depends(get_db)):
+    return create_agent(db, payload)
+
+
+@router.get("/agents")
+def get_agents(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    status: str | None = Query(None, pattern="^(draft|enabled|disabled)$"),
+    db: Session = Depends(get_db),
+):
+    return list_agents(db, limit=limit, offset=offset, status=status)
+
+
+@router.get("/agents/{agent_id}")
+def get_agent_route(agent_id: str, db: Session = Depends(get_db)):
+    return get_agent(db, agent_id)
+
+
+@router.patch("/agents/{agent_id}")
+def patch_agent(agent_id: str, payload: AgentUpdate, db: Session = Depends(get_db)):
+    return update_agent(db, agent_id, payload)
+
+
+@router.put("/agents/{agent_id}/tools")
+def put_agent_tools(agent_id: str, payload: AgentToolsUpdate, db: Session = Depends(get_db)):
+    return replace_agent_tools(db, agent_id, payload)
+
+
+@router.post("/agents/{agent_id}/enable")
+def post_agent_enable(agent_id: str, db: Session = Depends(get_db)):
+    return enable_agent(db, agent_id)
+
+
+@router.post("/agents/{agent_id}/disable")
+def post_agent_disable(agent_id: str, db: Session = Depends(get_db)):
+    return disable_agent(db, agent_id)
