@@ -1,63 +1,57 @@
-# Local Windows installation
+# Windows installation
 
-This guide describes the current installable local-browser workflow. It is intentionally separate from the future signed native Windows desktop package.
+Masoud AI Studio now has two Windows installation paths: a self-contained x64 installer built by GitHub Actions, and a source/developer setup for contributors.
 
-## Supported baseline
+## Self-contained Windows installer
 
-- Windows 10 or Windows 11 (64-bit recommended)
-- Python 3.11 or newer on PATH
-- Node.js 20 or newer on PATH
-- Internet access during first-time dependency installation
-- Enough free disk space for the Python environment, Node dependencies, local database, uploaded assets and generated media
+1. Open the [Windows installer workflow](https://github.com/Masoud4444/masoud-ai-studio/actions/workflows/windows-installer.yml).
+2. Select the latest successful run on branch `implementation/bootstrap-001`.
+3. Download the `Masoud-AI-Studio-Windows-x64` artifact and extract the setup executable.
+4. Run the installer. It installs the application for the current user; administrator rights are not required.
+5. Launch Masoud AI Studio from the Start menu (or the optional desktop shortcut).
 
-The current setup does not install Python or Node.js for you. Install these prerequisites first and enable their PATH options.
+The package includes the Python backend, compiled React frontend, runtime dependencies and Alembic migrations. Python and Node.js do not need to be installed separately on the target PC.
 
-## First-time setup
+At first launch, the application:
+- creates its private data directory under `%LOCALAPPDATA%\\Masoud AI Studio`;
+- creates a random 256-bit encryption key and protects it using Windows DPAPI for the current Windows user;
+- applies pending database migrations;
+- starts the backend bound only to `127.0.0.1:8000`;
+- opens the studio in the default browser and adds a system-tray icon.
 
-1. Download or clone the repository.
-2. Check out the implementation/bootstrap-001 branch.
-3. Open the repository folder in File Explorer.
-4. Double-click scripts/setup-windows.bat.
-5. Wait for dependency installation, frontend production build and database migrations to complete.
+Use the tray icon to reopen the studio or exit the backend. Logs are written to `%LOCALAPPDATA%\\Masoud AI Studio\\logs\\studio.log`.
 
-The setup script creates a local .venv folder, installs requirements from requirements.txt, creates a local .env file with a random 256-bit credential-encryption key if one does not already exist, runs npm install and npm run build in frontend/, creates the data directory and applies Alembic migrations through the current head. The application loads .env before initializing the database and AI Gateway. Keep this file private and include it in secure backups; losing it can make previously encrypted provider credentials unrecoverable.
+**Important:** The installer is not yet code-signed. Windows SmartScreen may show an unknown-publisher warning. The UI runs in the browser; a Tauri native window and signed auto-update channel are not part of this first package. The GitHub Actions artifact must be built successfully before a setup executable is available.
 
-## Daily launch
+## User data and backup
 
-1. Double-click scripts/start-studio-windows.bat.
-2. The launcher checks that setup completed and that frontend/dist/index.html exists.
-3. It applies any pending database migrations.
-4. It starts the FastAPI service on 127.0.0.1:8000 and waits for the service health response.
-5. It opens the studio in the default browser.
+- SQLite database: `%LOCALAPPDATA%\\Masoud AI Studio\\data\\masoud_studio.db`
+- Uploaded assets: `%LOCALAPPDATA%\\Masoud AI Studio\\data\\storage`
+- DPAPI-protected credential key: `%LOCALAPPDATA%\\Masoud AI Studio\\credential-key.dpapi`
+- Logs: `%LOCALAPPDATA%\\Masoud AI Studio\\logs`
 
-Keep the backend console window open. To stop the studio, focus that console and press Ctrl+C. Do not terminate the process while a file upload or other write operation is in progress.
+Uninstalling the application intentionally preserves the database, assets and credential key. Back up the entire `Masoud AI Studio` directory before moving to another Windows account or reinstalling Windows. The DPAPI-protected key is tied to the Windows user profile and cannot simply be copied to another Windows account. An in-app backup/restore and cross-device key migration workflow are not yet implemented.
 
-## Local data and recovery
+## Developer/source installation
 
-- Database: data/masoud_studio.db (default SQLite URL, relative to the repository working directory).
-- Uploaded files: local storage directory configured by the storage subsystem.
-- Virtual environment and frontend build: .venv/ and frontend/dist/.
-- Local data, storage, backups, logs and environment files are excluded from Git.
+Requirements: Windows 10/11 x64, Python 3.11+, Node.js 20+.
 
-Before moving the repository or reinstalling Windows, stop the studio and make a consistent backup of the database and the complete storage directory together. A supported in-app backup/restore and automated restore verification are not implemented yet. Do not copy only the database if uploaded assets are important.
+1. Clone the repository and check out `implementation/bootstrap-001`.
+2. Double-click `scripts/setup-windows.bat`.
+3. Launch with `scripts/start-studio-windows.bat`.
+
+The source setup creates a virtual environment, installs `requirements.txt`, builds the frontend and applies migrations. The source workflow stores data under the repository's local `data/` directory.
 
 ## Network and privacy
 
-- The service binds to 127.0.0.1 and is intended for use on the same computer.
-- Do not change the bind address to 0.0.0.0 or expose the service through router port forwarding.
+- The backend binds to loopback only. Do not expose it to the public internet or an untrusted LAN.
 - Authentication and multi-user authorization are not implemented.
-- Provider API credentials are not included. AI generation requires the user to configure a provider and pricing deliberately.
-- The default setup does not make paid AI requests.
+- No provider API credentials are bundled. AI requests require explicit provider configuration and may incur charges.
+- The background worker is disabled by default; production creative task handlers are not yet registered.
 
 ## Troubleshooting
 
-- If Python is not found, install Python 3.11+ and enable Add Python to PATH, then open a new terminal.
-- If Node is not found, install Node.js 20+ and reopen the terminal.
-- If setup fails during npm install or package installation, read the first reported error, restore network access and rerun setup after correcting the prerequisite.
-- If port 8000 is already in use, close the existing Masoud AI Studio backend window before launching another copy. Do not terminate an unknown process just to free the port.
-- If the launcher reports a missing frontend build, run setup again and confirm npm run build completes.
-- If database migration fails, preserve the data directory before attempting manual recovery and share the full sanitized error text.
-
-## Current installation boundary
-
-The one-click launcher is a browser-based local installation workflow. It is not yet a signed .msi/.exe desktop installer and does not bundle Python or Node.js. Native Tauri packaging, a self-contained backend runtime, Windows DPAPI credential storage, signed updates, backup/restore tooling and Windows acceptance verification are still required before calling the product a finished native desktop release.
+- If the installer does not start the UI, inspect `studio.log` under the local application data directory.
+- If port 8000 is already occupied, close the existing Masoud AI Studio instance and try again. The launcher will not attach to an unknown process.
+- If the credential key cannot be unprotected, run the app under the original Windows user account that installed it.
+- Preserve the complete data directory before attempting database recovery or reinstalling the application.

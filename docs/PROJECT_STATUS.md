@@ -217,3 +217,13 @@ Never infer one status from another.
 
 - Timeline analysis now returns topological layers, not only a flattened topological ordering. Events in the same layer have no implied order relative to each other.
 - This preserves non-linear story structure and avoids displaying unrelated events as if one necessarily happened first.
+
+
+## Self-contained Windows installer milestone — 2026-11-19
+
+- Added a Windows x64 packaging pipeline using PyInstaller and Inno Setup. The pipeline builds the React frontend, embeds the FastAPI application and Alembic migrations, and publishes an installer as a GitHub Actions artifact.
+- Added a Windows launcher that applies Alembic migrations, binds the service exclusively to 127.0.0.1, opens the local UI and exposes Open/Exit actions in the system tray.
+- User data is stored outside Program Files under %LOCALAPPDATA%\\Masoud AI Studio. The credential-encryption key is protected at rest using Windows DPAPI for the current Windows user.
+- Added a runtime-only dependency manifest so the installer does not bundle pytest and development-only HTTP test dependencies.
+- Backend test workflow now uses relevant path filters, avoiding automatic reruns for packaging-only or documentation-only changes. Existing passed tests are not manually rerun.
+- The installer has not yet been built or run on a Windows machine. The Windows Actions workflow must complete successfully before an installer artifact exists. The package is not code-signed; Tauri-native windowing, automatic updates, backup/restore, creative Agent Runtime/tool sandbox and complete production handlers remain future work.

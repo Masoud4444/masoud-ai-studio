@@ -67,6 +67,12 @@ Keep the backend console open while using the studio. See the Windows/frontend g
 
 Existing automated checks were run in prior Linux CI runs for earlier increments. They are historical evidence, not a verification of the latest branch head or of Windows installation. Windows setup, local browser interaction, provider interoperability, desktop packaging and code signing still require hands-on verification. Previously passing tests are not rerun solely for repetition.
 
+## Windows desktop installer
+
+A self-contained Windows x64 installer is now built by GitHub Actions. The packaged launcher embeds the Python backend and compiled frontend, applies database migrations on startup, stores the database and assets under `%LOCALAPPDATA%\\Masoud AI Studio`, protects the credential-encryption key with Windows DPAPI, and provides a system-tray Exit command. The installer is currently unsigned and is a first packaging milestone, not a signed commercial release.
+
+After the `Windows installer` workflow completes, download the `Masoud-AI-Studio-Windows-x64` artifact from [GitHub Actions](https://github.com/Masoud4444/masoud-ai-studio/actions/workflows/windows-installer.yml). See [Windows installation](docs/INSTALLATION.md).
+
 ## Development
 
 Backend:

@@ -24,6 +24,12 @@ Requirements: Windows 10/11, Python 3.11 or newer, Node.js 20 or newer, and an i
 
 Keep the backend console window open while using the studio. Close that window or press Ctrl+C in it to stop the local service. The studio database and uploaded assets remain in the repository's local data/ and storage directories; these are ignored by Git.
 
+## Packaged Windows desktop mode
+
+The Windows installer packages the compiled frontend and Python backend into a self-contained application directory. On launch it runs pending Alembic migrations, starts the API on loopback only, opens the browser UI and leaves a system-tray icon. Use the tray menu to reopen the studio or exit the local service. Database, uploads, logs and the DPAPI-protected credential key are stored under `%LOCALAPPDATA%\\Masoud AI Studio`; uninstalling the app does not remove the database or uploaded assets.
+
+The installer is currently unsigned. It is a self-contained Windows application package, but the UI is still rendered in the system browser rather than a Tauri native window.
+
 ## Development mode
 
 For frontend development, run npm install and npm run dev from frontend/. Start the backend separately with scripts/start-backend-windows.bat. Vite binds to 127.0.0.1:5173 and proxies /api and /health to 127.0.0.1:8000.
