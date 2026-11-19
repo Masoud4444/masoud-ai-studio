@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from backend.app.database import Base
-from backend.app.models import StudioTask, ProductionStep
+from backend.app.models import StudioTask, ProductionStep, ProductionRun
 from backend.app.orchestrator import create_production_run, get_production_run, list_workflows
 from backend.app.task_manager import claim_task, complete_task, approve_task
 
@@ -80,3 +80,19 @@ def test_unknown_workflow_rejected(db_session):
     with pytest.raises(HTTPException) as exc:
         create_production_run(db_session, "unknown.workflow", {}, "production-key-0003")
     assert exc.value.status_code == 422
+
+
+
+def test_run_status_is_projected_without_mutating_persisted_run(db_session):
+    run = create_production_run(
+        db_session, "creative.preproduction", {"brief": "Read-only"}, "production-key-readonly",
+    )
+    stored = db_session.get(ProductionRun, run["id"])
+    assert run["status"] == "waiting_approval"
+    assert stored.status == "queued"
+    assert not db_session.dirty
+
+    fetched = get_production_run(db_session, run["id"])
+    assert fetched["status"] == "waiting_approval"
+    assert stored.status == "queued"
+    assert not db_session.dirty
