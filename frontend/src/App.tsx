@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AgentsPanel, AssetsPanel, ComingSoonPanel, ProductionPanel } from "./WorkspacePanels";
+import { AgentsPanel, AssetsPanel, ComingSoonPanel, ProductionPanel, ResearchPanel } from "./WorkspacePanels";
 import {
   Activity, ArrowUpRight, AudioLines, BookOpen, Check, ChevronDown,
   CircleHelp, Clapperboard, Command, FolderKanban, Gauge, Image, Layers3,
@@ -151,7 +151,7 @@ function App() {
           {active === "Production room" && <ProductionPanel projects={projects}/>}
           {active === "AI agents" && <AgentsPanel/>}
           {active === "Assets" && <AssetsPanel projects={projects}/>}
-          {active === "Research vault" && <ComingSoonPanel title="Research vault" description="Multimodal source intake, evidence records, provenance, source comparison and research synthesis are part of the approved product vision. This module will be connected to the backend in a later implementation phase."/>}
+          {active === "Research vault" && <ResearchPanel projects={projects}/>}
           {active === "Characters & worlds" && <ComingSoonPanel title="Characters & worlds" description="Character Bible, World Bible, model sheets and continuity tools are planned as a connected creative-development workspace."/>}
           {active === "Video & audio" && <ComingSoonPanel title="Video & audio" description="Media generation, audio, subtitles, editing and compositing will be integrated incrementally through the production pipeline."/>}
           {active === "Compliance" && <ComingSoonPanel title="Compliance" description="Originality, rights, platform policy and publishing-readiness checks will be added as a dedicated review layer."/>}

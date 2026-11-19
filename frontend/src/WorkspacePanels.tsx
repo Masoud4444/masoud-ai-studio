@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Activity, Check, CirclePause, CirclePlay, FolderOpen, Plus, RefreshCw, ShieldCheck, Sparkles, Upload, X } from "lucide-react";
+import { Activity, BookOpen, Check, CirclePause, CirclePlay, FileText, FolderOpen, Link2, Plus, RefreshCw, ShieldCheck, Sparkles, Upload, X } from "lucide-react";
 type Project={id:string;name:string;slug:string};
 type Workflow={workflow_key:string;version:number;description:string;steps:Array<{key:string;approval_required:boolean}>};
 type Run={id:string;workflow_key:string;status:string;project_id:string|null;created_at:string;steps:Array<{step_key:string;status:string;approval_required:boolean;task_id:string;error_code:string|null}>};
@@ -35,3 +35,172 @@ export function AssetsPanel({projects}:{projects:Project[]}){
  return <section className="workspace-panel"><PanelHeader eyebrow="ASSET LIBRARY" title="Assets" description="Upload and organize project files in the local content-addressed storage layer." onRefresh={()=>void load()}/>{projects.length===0?<div className="empty-state">Create a project before adding assets.</div>:<><div className="asset-toolbar"><label className="field-label">Project<select value={projectId} onChange={e=>setProjectId(e.target.value)}>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label><form className="upload-form" onSubmit={upload}><input type="file" name="asset" required/><button className="primary-button" disabled={busy}><Upload size={14}/> Upload asset</button></form></div>{error&&<div className="connection-banner">{error}</div>}{notice&&<div className="notice">{notice}</div>}<div className="asset-list">{loading?"Loading assets…":assets.length?assets.map(asset=><div className="asset-row" key={asset.id}><div className="asset-icon"><FolderOpen size={17}/></div><div className="asset-main"><b>{asset.filename}</b><small>{asset.mime_type} · {(asset.size_bytes/1024).toFixed(1)} KB</small></div><button className="danger-button" disabled={busy} onClick={()=>void detach(asset.id)}>Detach</button></div>):<div className="empty-state">No assets attached to this project yet.</div>}</div></>}</section>;
 }
 export function ComingSoonPanel({title,description}:{title:string;description:string}){return <section className="workspace-panel"><div className="coming-soon"><div className="empty-icon"><Sparkles size={24}/></div><span className="eyebrow">STUDIO MODULE</span><h2>{title}</h2><p>{description}</p><span className="module-state">Planned module · implementation staged</span></div></section>}
+
+type ResearchSource={id:string;source_type:string;title:string;canonical_url:string|null;author:string|null;publisher:string|null;summary:string|null;project_ids:string[];created_at:string};
+type ResearchEvidence={id:string;source_id:string;evidence_type:string;excerpt:string;locator:string|null;relationship?:string;note?:string};
+type ResearchClaim={id:string;project_id:string;statement:string;claim_type:string;status:string;evidence:ResearchEvidence[]};
+
+export function ResearchPanel({projects}:{projects:Project[]}) {
+ const [projectId,setProjectId]=useState(projects[0]?.id??"");
+ const [sources,setSources]=useState<ResearchSource[]>([]);
+ const [claims,setClaims]=useState<ResearchClaim[]>([]);
+ const [sourceType,setSourceType]=useState("url");
+ const [title,setTitle]=useState(""),[url,setUrl]=useState(""),[author,setAuthor]=useState(""),[summary,setSummary]=useState("");
+ const [claimText,setClaimText]=useState(""),[claimType,setClaimType]=useState("factual");
+ const [expanded,setExpanded]=useState("");
+ const [evidenceBySource,setEvidenceBySource]=useState<Record<string,ResearchEvidence[]>>({});
+ const [excerpt,setExcerpt]=useState(""),[locator,setLocator]=useState(""),[evidenceType,setEvidenceType]=useState("quote");
+ const [selectedClaim,setSelectedClaim]=useState(""),[relationship,setRelationship]=useState("supports");
+ const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+
+ async function load(){
+  setLoading(true);setError("");
+  try{
+   const sourceQuery=projectId?"?limit=100&project_id="+encodeURIComponent(projectId):"?limit=100";
+   const sourcePage=await api<{items:ResearchSource[]}>("/api/v1/research/sources"+sourceQuery);
+   const claimPage=projectId?await api<{items:ResearchClaim[]}>("/api/v1/research/claims?project_id="+encodeURIComponent(projectId)+"&limit=100"):{items:[] as ResearchClaim[]};
+   setSources(sourcePage.items??[]);setClaims(claimPage.items??[]);
+   if(selectedClaim&&!claimPage.items.some(c=>c.id===selectedClaim))setSelectedClaim("");
+  }catch(e){setError(e instanceof Error?e.message:"Could not load Research Vault");}
+  finally{setLoading(false);}
+ }
+ useEffect(()=>{if(!projectId&&projects.length)setProjectId(projects[0].id);},[projects,projectId]);
+ useEffect(()=>{void load();},[projectId]);
+
+ async function createSource(e:FormEvent){
+  e.preventDefault();if(!title.trim())return;
+  if(sourceType==="url"&&!url.trim()){setError("A URL is required for this source type.");return;}
+  setBusy(true);setError("");setNotice("");
+  try{
+   await api("/api/v1/research/sources",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+    source_type:sourceType,title:title.trim(),canonical_url:sourceType==="url"?url.trim():null,
+    author:author.trim()||null,summary:summary.trim()||null,project_id:projectId||null
+   })});
+   setTitle("");setUrl("");setAuthor("");setSummary("");setNotice("Source saved with its provenance metadata.");await load();
+  }catch(e){setError(e instanceof Error?e.message:"Could not save source");}
+  finally{setBusy(false);}
+ }
+ async function toggleEvidence(sourceId:string){
+  if(expanded===sourceId){setExpanded("");return;}
+  setExpanded(sourceId);setError("");
+  try{
+   const page=await api<{items:ResearchEvidence[]}>("/api/v1/research/sources/"+sourceId+"/evidence?limit=100");
+   setEvidenceBySource(prev=>({...prev,[sourceId]:page.items??[]}));
+  }catch(e){setError(e instanceof Error?e.message:"Could not load evidence");}
+ }
+ async function addEvidence(e:FormEvent,sourceId:string){
+  e.preventDefault();if(!excerpt.trim())return;
+  setBusy(true);setError("");
+  try{
+   await api("/api/v1/research/sources/"+sourceId+"/evidence",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+    evidence_type:evidenceType,excerpt:excerpt.trim(),locator:locator.trim()||null
+   })});
+   setExcerpt("");setLocator("");
+   const page=await api<{items:ResearchEvidence[]}>("/api/v1/research/sources/"+sourceId+"/evidence?limit=100");
+   setEvidenceBySource(prev=>({...prev,[sourceId]:page.items??[]}));
+   setNotice("Evidence recorded. Its source and locator are preserved.");
+  }catch(e){setError(e instanceof Error?e.message:"Could not record evidence");}
+  finally{setBusy(false);}
+ }
+ async function createClaim(e:FormEvent){
+  e.preventDefault();if(!projectId||!claimText.trim())return;
+  setBusy(true);setError("");
+  try{
+   await api("/api/v1/research/claims",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+    project_id:projectId,statement:claimText.trim(),claim_type:claimType
+   })});
+   setClaimText("");setNotice("Draft claim created. Attach evidence before accepting it.");await load();
+  }catch(e){setError(e instanceof Error?e.message:"Could not create claim");}
+  finally{setBusy(false);}
+ }
+ async function attachEvidence(item:ResearchEvidence){
+  if(!selectedClaim)return;
+  setBusy(true);setError("");
+  try{
+   await api("/api/v1/research/claims/"+selectedClaim+"/evidence/"+item.id,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({relationship})});
+   setNotice("Evidence linked to the selected claim.");await load();
+  }catch(e){setError(e instanceof Error?e.message:"Could not link evidence");}
+  finally{setBusy(false);}
+ }
+ async function reviewClaim(claim:ResearchClaim,status:"accepted"|"rejected"|"reviewed"){
+  setBusy(true);setError("");
+  try{
+   await api("/api/v1/research/claims/"+claim.id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({status})});
+   setNotice(status==="accepted"?"Claim accepted with supporting evidence.":status==="rejected"?"Claim rejected with contradicting evidence.":"Claim marked as reviewed.");
+   await load();
+  }catch(e){setError(e instanceof Error?e.message:"Claim review failed");}
+  finally{setBusy(false);}
+ }
+ return <section className="workspace-panel">
+  <PanelHeader eyebrow="PROVENANCE & EVIDENCE" title="Research Vault" description="Curate sources, preserve exact evidence locations and connect claims to what supports or contradicts them." onRefresh={()=>void load()}/>
+  <div className="research-toolbar">
+   <label className="field-label">Project scope
+    <select value={projectId} onChange={e=>setProjectId(e.target.value)}>
+     <option value="">Universal vault · all sources</option>
+     {projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+    </select>
+   </label>
+   <span className="research-count"><BookOpen size={14}/>{sources.length} sources <i>·</i> {claims.length} claims</span>
+  </div>
+  <div className="research-layout">
+   <div className="research-main">
+    <form className="research-create" onSubmit={createSource}>
+     <div className="form-title"><Plus size={16}/> Register a source</div>
+     <div className="form-grid">
+      <label className="field-label">Source type
+       <select value={sourceType} onChange={e=>setSourceType(e.target.value)}>
+        <option value="url">Web URL</option><option value="document">Document</option><option value="note">Research note</option><option value="transcript">Transcript</option><option value="dataset">Dataset</option><option value="other">Other</option>
+       </select>
+      </label>
+      <label className="field-label">Title<input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Source title" maxLength={300} required/></label>
+     </div>
+     {sourceType==="url"&&<label className="field-label">Canonical URL<input type="url" value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://…" required/></label>}
+     <div className="form-grid">
+      <label className="field-label">Author / creator<input value={author} onChange={e=>setAuthor(e.target.value)} placeholder="Optional"/></label>
+      <label className="field-label">Short summary<input value={summary} onChange={e=>setSummary(e.target.value)} placeholder="Optional context"/></label>
+     </div>
+     <div className="form-foot"><span><ShieldCheck size={14}/> Metadata only · no background URL fetching</span><button className="primary-button" disabled={busy||!title.trim()}><Plus size={14}/> Save source</button></div>
+    </form>
+    {error&&<div className="connection-banner">{error}</div>}
+    {notice&&<div className="notice"><Check size={14}/>{notice}<button onClick={()=>setNotice("")}><X size={13}/></button></div>}
+    <div className="panel-list-heading"><b>Source library</b><span>{sources.length} records</span></div>
+    {loading?<div className="empty-state">Loading sources…</div>:sources.length===0?<div className="empty-state"><div className="empty-icon"><BookOpen size={22}/></div><b>No sources in this view</b><span>Register a URL, document or research note to begin building the evidence base.</span></div>:
+     <div className="research-source-list">{sources.map(source=><article className="research-source-card" key={source.id}>
+      <div className="research-source-top"><div className="research-source-icon"><FileText size={17}/></div><div className="research-source-title"><div><b>{source.title}</b><Status value={source.source_type}/></div><small>{source.author||source.publisher||"Creator not recorded"} · {new Date(source.created_at).toLocaleDateString()}</small></div></div>
+      {source.canonical_url&&<a className="research-source-url" href={source.canonical_url} target="_blank" rel="noreferrer">{source.canonical_url}</a>}
+      {source.summary&&<p>{source.summary}</p>}
+      <div className="research-source-actions"><button className="secondary-button" onClick={()=>void toggleEvidence(source.id)}><BookOpen size={14}/>{expanded===source.id?"Hide evidence":"Evidence & excerpts"}</button><span>{source.project_ids.length} project links</span></div>
+      {expanded===source.id&&<div className="research-evidence-area">
+       <form className="research-evidence-form" onSubmit={e=>void addEvidence(e,source.id)}>
+        <label className="field-label">Evidence type<select value={evidenceType} onChange={e=>setEvidenceType(e.target.value)}><option value="quote">Direct quote</option><option value="data">Data point</option><option value="observation">Observation</option><option value="transcript">Transcript excerpt</option><option value="other">Other</option></select></label>
+        <label className="field-label">Exact excerpt<textarea rows={3} value={excerpt} onChange={e=>setExcerpt(e.target.value)} placeholder="Paste the exact passage or data point…" required/></label>
+        <div className="form-foot"><label className="field-label locator-field">Locator<input value={locator} onChange={e=>setLocator(e.target.value)} placeholder="Page 4 · 00:32 · Table 2"/></label><button className="primary-button" disabled={busy||!excerpt.trim()}><Plus size={14}/> Add evidence</button></div>
+       </form>
+       {(evidenceBySource[source.id]??[]).map(item=><div className="research-evidence-item" key={item.id}><div><span>{item.evidence_type}</span>{item.locator&&<small>{item.locator}</small>}</div><p>{item.excerpt}</p><div className="research-evidence-link"><select value={selectedClaim} onChange={e=>setSelectedClaim(e.target.value)} disabled={!claims.length}><option value="">Select project claim…</option>{claims.map(claim=><option key={claim.id} value={claim.id}>{claim.statement.slice(0,80)}</option>)}</select><select value={relationship} onChange={e=>setRelationship(e.target.value)}><option value="supports">Supports</option><option value="contradicts">Contradicts</option><option value="contextualizes">Context</option></select><button className="secondary-button" disabled={busy||!selectedClaim} onClick={()=>void attachEvidence(item)}><Link2 size={13}/> Link</button></div></div>)}
+       {(evidenceBySource[source.id]??[]).length===0&&<small className="research-muted">No evidence excerpts recorded for this source yet.</small>}
+      </div>}
+     </article>)}</div>}
+   </div>
+   <aside className="research-claims">
+    <form className="research-create" onSubmit={createClaim}>
+     <div className="form-title"><Check size={16}/> Capture a research claim</div>
+     <label className="field-label">Claim statement<textarea rows={3} value={claimText} onChange={e=>setClaimText(e.target.value)} placeholder="State one testable or interpretable claim…" required disabled={!projectId}/></label>
+     <label className="field-label">Claim type<select value={claimType} onChange={e=>setClaimType(e.target.value)}><option value="factual">Factual</option><option value="interpretive">Interpretive</option><option value="forecast">Forecast</option><option value="creative">Creative premise</option><option value="other">Other</option></select></label>
+     <button className="primary-button" disabled={busy||!projectId||!claimText.trim()}><Plus size={14}/> Create draft claim</button>
+     {!projectId&&<small className="research-muted">Select a project to create claims.</small>}
+    </form>
+    <div className="panel-list-heading"><b>Claims & review</b><span>{claims.length}</span></div>
+    {claims.length===0?<div className="empty-state compact-empty">Claims are organized within a project.</div>:claims.map(claim=><article className="research-claim-card" key={claim.id}>
+     <div className="research-claim-top"><Status value={claim.status}/><span>{claim.claim_type}</span></div>
+     <p>{claim.statement}</p><small>{claim.evidence.length} linked evidence items</small>
+     {claim.evidence.length>0&&<div className="claim-evidence-summary">{claim.evidence.map(ev=><span key={ev.id}>{ev.relationship}</span>)}</div>}
+     <div className="claim-review-actions">
+      {claim.status!=="accepted"&&claim.evidence.some(ev=>ev.relationship==="supports")&&<button className="secondary-button" disabled={busy} onClick={()=>void reviewClaim(claim,"accepted")}>Accept</button>}
+      {claim.status!=="rejected"&&claim.evidence.some(ev=>ev.relationship==="contradicts")&&<button className="secondary-button" disabled={busy} onClick={()=>void reviewClaim(claim,"rejected")}>Reject</button>}
+      {claim.status==="draft"&&claim.evidence.length>0&&<button className="secondary-button" disabled={busy} onClick={()=>void reviewClaim(claim,"reviewed")}>Mark reviewed</button>}
+     </div>
+    </article>)}
+   </aside>
+  </div>
+ </section>;
+}
