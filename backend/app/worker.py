@@ -1,6 +1,6 @@
 """Single-process task worker primitives.
 
-The supervisor is opt-in and is not started by the API automatically.
+The supervisor is opt-in and is started by the API lifespan only when explicitly enabled.
 Handlers receive decoded task payloads and must not log prompts, secrets, or
 provider response bodies. A worker only claims task types it has registered.
 """
