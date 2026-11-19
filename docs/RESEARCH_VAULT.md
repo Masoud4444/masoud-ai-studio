@@ -22,7 +22,7 @@ The Research Vault is the studio's provenance-aware knowledge workspace. It sepa
 - No automatic scraping, browser access, PDF extraction, OCR, transcription, embeddings or AI claim extraction is enabled.
 - No source is automatically treated as authoritative. Trust assessment remains a future explicit review dimension.
 - Evidence excerpts preserve supplied text and locator; they are not silently paraphrased.
-- Removing a project link does not delete the source, evidence or underlying asset.
+- Removing a project link does not delete the source, evidence or underlying asset. A source cannot be detached from a project while one of that project's claims still cites its evidence.
 - The current API has no authentication. Keep it bound to localhost or a trusted private environment.
 
 ## API
@@ -48,7 +48,7 @@ All routes are under /api/v1:
 - Project-source links are unique and idempotent.
 - Evidence identity is scoped to a source and based on source ID, evidence type, excerpt and locator.
 - A claim can only cite evidence from a source linked to that claim's project.
-- Claim/evidence links are unique per pair; changing the relationship updates the existing link and appends an event.
+- Claim/evidence links are unique per pair; changing the relationship updates the existing link and appends an event. An accepted claim cannot lose its last supporting relation, and a rejected claim cannot lose its last contradicting relation.
 - Research events store entity IDs and action metadata, not full source excerpts or secrets.
 
 ## Later milestones

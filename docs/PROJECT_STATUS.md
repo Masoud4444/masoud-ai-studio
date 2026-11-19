@@ -36,8 +36,8 @@ Last updated: 2026-11-19
 
 ## Verification evidence
 
-- Latest backend run [44509841356](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44509841356), commit `270fc8cce654b19dfc99f5ce257c8df2bcf510da`: **81 passed, 1 warning**; fresh SQLite Alembic upgrade through head succeeded through migration 0012.
-- Latest frontend build [44509841316](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44509841316), same commit: successful.
+- Latest backend run [44510146431](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44510146431), commit `d7415d748f1b76d3253e01543ebbfc3807bd4060`: **83 passed, 1 warning**; fresh SQLite Alembic upgrade through head succeeded through migration 0012.
+- Latest frontend build [44509841316](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44509841316), commit `270fc8cce654b19dfc99f5ce257c8df2bcf510da`: successful.
 - These are Linux CI checks. Windows install/runtime, real browser workflows, provider interoperability, concurrency/load behavior and desktop packaging have not been verified.
 - CI mocks provider generation/model-list responses; no billable provider calls are made by CI.
 - One Starlette/httpx deprecation warning remains.
