@@ -13,7 +13,7 @@ Last updated: 2026-11-19
 
 ## Implemented backend
 
-- FastAPI application, SQLAlchemy 2 models, SQLite baseline and Alembic migrations 0001–0012.
+- FastAPI application, SQLAlchemy 2 models, SQLite baseline and Alembic migrations 0001–0013.
 - Project create/list/read/update/archive/restore API, optimistic version checks and duplicate-slug handling.
 - Content-addressed asset storage using SHA-256, streamed uploads, size limits, temporary staging, atomic placement, MIME sniffing, filename sanitization, project listing and detach.
 - AI Gateway provider registry, priority selection, OpenAI-compatible non-streaming completion, encrypted credentials and idempotent response storage (AES-256-GCM), SSRF-aware URL checks, DNS pinning, TLS verification, disabled redirects/proxies, sanitized errors, usage ledger and manually configured pricing history.
@@ -21,7 +21,7 @@ Last updated: 2026-11-19
 - Worker Supervisor: handler allowlist, lease heartbeat, bounded JSON results, sanitized handler errors and graceful shutdown. Disabled by default; only `system.healthcheck` is registered out of the box.
 - Production Orchestrator: code-defined `creative.preproduction` v1 workflow, persisted runs/steps, idempotent creation, approval gates, pause/resume/cancel.
 - Agent Manager: draft/enabled/disabled lifecycle, versioned config, provider/model checks, permissions/tool grants, approval requirements for write/execute grants, audit events and internal budget reservation ledger. A first text-only Agent Runtime is implemented at `POST /api/v1/agents/{agent_id}/run`, with explicit `ai.generate` permission, required model pricing, conservative pre-call budget reservation and Gateway idempotency.
-- Research Vault v0.2: source records, reusable project-source links, asset references, metadata-only URL records, bounded local PDF/DOCX extraction in a timed subprocess, exact evidence excerpts with page/paragraph locators, SHA-256 evidence deduplication, project claims, supporting/contradicting/contextualizing relationships, review gates, append-only provenance events and project-scoped full-text search across source metadata, evidence and claims. No migration required for search.
+- Story Engine v0.1: project-linked story dossiers (format, genre, audience, premise, logline, synopsis, creative intent and lifecycle status), ordered scene outline records (slugline, summary, dramatic purpose, setting, beats and script body), optimistic version checks and immutable full-story snapshots after every mutation. Revision history is read-only.\n- Research Vault v0.2: source records, reusable project-source links, asset references, metadata-only URL records, bounded local PDF/DOCX extraction in a timed subprocess, exact evidence excerpts with page/paragraph locators, SHA-256 evidence deduplication, project claims, supporting/contradicting/contextualizing relationships, review gates, append-only provenance events and project-scoped full-text search across source metadata, evidence and claims. No migration required for search.
 
 ## Implemented frontend
 
@@ -31,7 +31,7 @@ Last updated: 2026-11-19
 - AI agents: create draft profiles, view registry, enable/disable where provider/model requirements permit.
 - Assets: project selection, upload, list and detach. Detach does not delete the shared content-addressed blob.
 - Research Vault workspace: register sources, browse project-linked sources, capture exact evidence excerpts/locators, create project claims, link evidence as support/contradiction/context, accept/reject claims only when the required evidence relation exists, and search source metadata, excerpts, locators and claims with optional project scope. Existing project assets can be attached to source records, and the API verifies the asset is linked to the selected project. HTTP-level integration tests cover source creation, evidence capture, claim acceptance and safe refusal to detach referenced sources.
-- Characters & Worlds, Video & Audio, Compliance and Settings remain staged modules.
+- Story Engine workspace: create project stories, add/remove ordered scenes, change lifecycle status and inspect immutable revision history.\n- Characters & Worlds, Video & Audio, Compliance and Settings remain staged modules.
 - Windows setup/start scripts and frontend guide are present under `scripts/` and `docs/FRONTEND.md`. The setup script checks Python 3.11+/Node.js 20+, installs dependencies, builds the frontend, then applies migrations.
 
 ## Verification evidence
@@ -111,3 +111,14 @@ Never infer one status from another.
 - UI exposes an Extract text action only for document sources with an attached asset.
 - No OCR, scanned-PDF recognition, embedded media extraction, AI extraction or remote URL fetching.
 - Parser timeout is not a full OS sandbox; memory/CPU quotas and hardened process isolation remain required before processing untrusted files at scale.
+
+
+## Story Engine foundation v0.1
+
+- Added migration 0013 with project-linked story dossiers, ordered scenes and immutable version snapshots.
+- Story creation stores the initial full dossier/scene snapshot. Metadata changes and scene create/update/delete each increment the story version and append a full snapshot; revision history is read-only through the API.
+- Story and scene updates require expected versions and return HTTP 409 on stale edits. Scene updates also have their own optimistic version counter.
+- Added endpoints: POST/GET /api/v1/stories, GET/PATCH /api/v1/stories/{id}, POST /api/v1/stories/{id}/scenes, PATCH/DELETE /api/v1/stories/{id}/scenes/{scene_id}.
+- Added a Story Engine workspace for project-scoped story creation, ordered scene outline management, lifecycle status and revision history.
+- Dialogue editor, beat templates, character/world links, branching drafts, AI writing and series/season/episode hierarchy remain future increments.
+- No previously passed test suite was rerun during this implementation. CI may run automatically after the commit; no result is claimed here.
