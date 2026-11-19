@@ -33,7 +33,8 @@ Last updated: 2026-11-19
 - Provider registry API: create, list, disable, enable/disable update, and configurable priority (lower number is preferred).
 - OpenAI-compatible non-streaming chat completion endpoint.
 - AES-256-GCM encryption for provider credentials and stored idempotent responses; per-record key versioning and version-specific environment key support.
-- Provider URL validation at registration and again before outbound requests.\n- Explicit local OpenAI-compatible provider mode for localhost/127.0.0.1/::1 with a required port; non-loopback private/LAN destinations remain rejected.
+- Provider URL validation at registration and again before outbound requests.
+- Explicit local OpenAI-compatible provider mode for localhost/127.0.0.1/::1 with a required port; non-loopback private/LAN destinations remain rejected.
 - HTTPS-only, port 443, rejection of embedded credentials, query strings, fragments, localhost and non-public destinations.
 - DNS resolution at request time and a pinned resolver for the actual HTTPS connection; TLS hostname verification remains enabled. Redirects and environment proxies are disabled.
 - Structured, sanitized provider errors; provider response body is never copied into public error details.
