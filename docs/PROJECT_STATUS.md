@@ -54,7 +54,7 @@ Last updated: 2026-11-19
 - API routes: `POST /tasks`, `GET /tasks`, `GET /tasks/{task_id}`, `POST /tasks/{task_id}/cancel`, and `POST /tasks/{task_id}/retry`.
 - Worker claim/complete/fail functions remain internal only. A single-process Worker Supervisor, handler allowlist, lease recovery, result-size limit, sanitized failure persistence, and graceful shutdown are implemented. It is disabled by default and starts only with `MASOUD_STUDIO_WORKER_ENABLED=true`; only `system.healthcheck` is registered out of the box.
 - SQLite operation is currently single-worker only. Multi-process locking, PostgreSQL concurrency, cancellation signalling for running work, quotas, and worker supervision remain future hardening tasks.
-- Migrations 0007–0009 and Task Manager, Orchestrator, and Worker tests are implemented but have not yet passed CI.
+- Migrations 0007–0010 and Task Manager, Orchestrator, Worker, and Agent Manager tests are implemented but have not yet passed CI.
 
 See [Task Manager contract](TASK_MANAGER.md).
 
@@ -114,7 +114,7 @@ See [AI Gateway implementation guide](AI_GATEWAY.md) for setup, environment conf
 - Windows desktop UI and packaging (Tauri).
 - React/TypeScript frontend and Web/PWA.
 - Android companion client.
-- Agent Manager, agent permissions, tool sandbox and agent execution lifecycle.
+- Tool sandbox, runtime permission enforcement, budget reservation/enforcement, and agent execution lifecycle.
 - Remaining Production Orchestrator capabilities: database-managed workflow templates, parallel branch fan-in/fan-out, DLQ UI, and recovery dashboard. Run-level pause/resume/cancel is implemented.
 - Research Vault, multimodal intake, provenance and evidence graph.
 - Story Engine, Character Bible, World Bible, continuity and universe/series management.
@@ -129,7 +129,7 @@ See [AI Gateway implementation guide](AI_GATEWAY.md) for setup, environment conf
 1. Add integration tests for the outbound HTTP transport, DNS pinning, response sanitization, credential-key rotation, and concurrent idempotency.
 2. Complete AI Gateway operational controls: provider priority/routing, safe failure policy, budget controls, concurrency limits, circuit breaker, and optional streaming.
 3. Add Windows DPAPI-backed secret custody and Windows CI / packaging verification.
-4. Verify migrations 0007–0009 and Task Manager/Orchestrator/Worker tests; add hard execution timeouts/process isolation and multi-worker-safe claims before enabling creative handlers.
+4. Verify migrations 0007–0010 and Task Manager/Orchestrator/Worker/Agent Manager tests; add hard execution timeouts/process isolation and multi-worker-safe claims before enabling creative handlers.
 5. Add a versioned workflow registry, hard worker timeout/process isolation, and operator recovery tooling.
 6. Implement task handlers and proceed with Research/Intake, Story, Character/Universe, Visual, Video, Audio, QA/Compliance, Export, Analytics, and companion clients.
 
