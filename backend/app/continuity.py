@@ -157,7 +157,7 @@ def analyze_continuity(sid:str,db:Session=Depends(get_db)):
         if f.subject_type=="location" and (f.scene_id,f.subject_ref) not in location_links:
             details={"fact_id":f.id,"scene_id":f.scene_id,"scene_title":scene_by_id[f.scene_id].title,"location_id":f.subject_ref,"location":f.subject_label}
             add("location_not_linked_to_scene","low","Location missing scene link",f"{f.subject_label} has a continuity fact in {scene_by_id[f.scene_id].title} but is not linked to that scene.",details)
-    now=_now();open_ids=[]
+    now=_now();open_ids=[];current_fingerprints={item[0] for item in detected}
     for fp,code,severity,title,description,details in detected:
         issue=db.scalar(select(ContinuityIssue).where(ContinuityIssue.story_id==sid,ContinuityIssue.fingerprint==fp))
         if issue:
@@ -168,6 +168,11 @@ def analyze_continuity(sid:str,db:Session=Depends(get_db)):
             issue=ContinuityIssue(story_id=sid,fingerprint=fp,code=code,severity=severity,title=title,description=description,details_json=_json(details),first_seen=now,last_seen=now)
             db.add(issue);db.flush()
         if issue.status=="open":open_ids.append(issue.id)
+    # Open findings that no longer reproduce are closed as system-resolved; human-reviewed states are preserved.
+    stale=db.scalars(select(ContinuityIssue).where(ContinuityIssue.story_id==sid,ContinuityIssue.status=="open")).all()
+    for issue in stale:
+        if issue.fingerprint not in current_fingerprints:
+            issue.status="resolved";issue.reviewer_note="No longer reproduced by the latest continuity analysis.";issue.reviewed_at=now
     db.commit()
     all_open=db.scalars(select(ContinuityIssue).where(ContinuityIssue.story_id==sid,ContinuityIssue.status=="open")).all()
     return {"story_id":sid,"facts_analyzed":len(facts),"issues_detected":len(detected),"open_issues":len(all_open),"issues":[_issue_out(x) for x in all_open]}
