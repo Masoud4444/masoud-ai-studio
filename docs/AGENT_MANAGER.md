@@ -30,7 +30,7 @@ These are configuration and policy records only. Runtime enforcement must be per
 
 ## Budgets
 
-Each agent has a positive per-run USD ceiling and monthly USD budget. They are configuration ceilings, not yet an enforced spend ledger. Agent execution must remain disabled at runtime until budget reservation, usage reconciliation, and concurrency-safe budget enforcement are implemented.
+Each agent has a positive per-run USD ceiling and monthly USD budget. The internal budget ledger now supports idempotent reservations, monthly ceiling checks, transition to running, settlement against actual cost, and release before execution. Reservation amounts must be conservative upper bounds; settlement rejects actual cost above the reserved amount. The ledger is not yet connected to an Agent Runtime or provider usage reconciliation, so it does not by itself authorize or execute a model call. The database row lock serializes reservations on databases that support row-level locking; SQLite deployments remain single-worker only.
 
 ## Audit
 
@@ -50,3 +50,14 @@ All routes are under `/api/v1`:
 ## Security boundary
 
 The API currently has no authentication or authorization. Keep it on localhost or a trusted private network. Do not expose it publicly. Agent configuration and tool grants do not make unauthenticated endpoints safe.
+
+
+## Internal budget ledger operations
+
+The Agent Manager service exposes internal operations for runtime integration:
+- `reserve_agent_budget(...)` reserves a caller-supplied conservative cost ceiling using an idempotency key and request hash.
+- `start_agent_budget_reservation(...)` marks the reservation running before a provider call.
+- `settle_agent_budget_reservation(...)` records actual cost and success/failure, refusing settlement above the reservation.
+- `release_agent_budget_reservation(...)` releases a reservation only if execution has not started.
+
+The ledger uses UTC calendar-month periods. Released reservations do not count against the monthly budget; active reservations count at their reserved amount; settled executions count at actual cost (or conservatively at the reservation if no actual cost is supplied). Runtime must reserve the maximum expected exposure before provider execution and settle from verified usage data.
