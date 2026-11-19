@@ -117,3 +117,15 @@ def test_naive_sqlite_lease_timestamp_is_accepted_for_failure(db_session):
     db_session.commit()
     failed = fail_task(db_session, task["id"], "worker-naive-fail", "test_error", "expected", 0)
     assert failed["status"] == "failed"
+
+
+
+def test_worker_lease_renewal_requires_live_owner(db_session):
+    from backend.app.task_manager import renew_task_lease
+    task = create(db_session, "task-lease-renewal")
+    claimed = claim_task(db_session, "worker-renewal", lease_seconds=10)
+    assert claimed["id"] == task["id"]
+    assert renew_task_lease(db_session, task["id"], "another-worker", 10) is False
+    assert renew_task_lease(db_session, task["id"], "worker-renewal", 10) is True
+    row = db_session.get(StudioTask, task["id"])
+    assert row.lease_expires_at > datetime.now(timezone.utc)
