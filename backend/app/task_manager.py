@@ -179,16 +179,23 @@ def retry_task(db: Session, task_id: str) -> dict:
     return serialize_task(task)
 
 
-def claim_task(db: Session, worker_id: str, lease_seconds: int = 120) -> dict | None:
+def claim_task(db: Session, worker_id: str, lease_seconds: int = 120,
+               task_types: list[str] | None = None) -> dict | None:
     """Claim one eligible task. SQLite deployments should run a single worker process."""
     if not worker_id or len(worker_id) > 120 or not 10 <= lease_seconds <= 3600:
         raise HTTPException(status_code=422, detail={"code": "invalid_worker_claim"})
     now = _now()
+    candidate_query = select(StudioTask).where(
+        StudioTask.status == "queued", StudioTask.available_at <= now,
+        StudioTask.attempt_count < StudioTask.max_attempts,
+    )
+    if task_types is not None:
+        if not task_types:
+            return None
+        candidate_query = candidate_query.where(StudioTask.task_type.in_(task_types))
     candidates = db.scalars(
-        select(StudioTask).where(
-            StudioTask.status == "queued", StudioTask.available_at <= now,
-            StudioTask.attempt_count < StudioTask.max_attempts,
-        ).order_by(StudioTask.priority.asc(), StudioTask.created_at.asc()).limit(100).with_for_update(skip_locked=True)
+        candidate_query.order_by(StudioTask.priority.asc(), StudioTask.created_at.asc())
+        .limit(100).with_for_update(skip_locked=True)
     ).all()
     for task in candidates:
         dependencies = db.scalars(
