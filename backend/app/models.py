@@ -76,3 +76,18 @@ class AIUsage(Base):
     completion_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+class AIModelCapability(Base):
+    __tablename__ = "ai_model_capabilities"
+    __table_args__ = (UniqueConstraint("provider_id", "model_id", name="uq_provider_model"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    provider_id: Mapped[str] = mapped_column(ForeignKey("ai_providers.id", ondelete="RESTRICT"), index=True, nullable=False)
+    model_id: Mapped[str] = mapped_column(String(160), nullable=False)
+    capabilities_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    verification_status: Mapped[str] = mapped_column(String(20), default="declared", nullable=False)
+    context_window: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    supports_streaming: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    supports_tools: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    supports_vision: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
