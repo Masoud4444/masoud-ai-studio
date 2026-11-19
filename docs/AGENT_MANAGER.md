@@ -61,3 +61,30 @@ The Agent Manager service exposes internal operations for runtime integration:
 - `release_agent_budget_reservation(...)` releases a reservation only if execution has not started.
 
 The ledger uses UTC calendar-month periods. Released reservations do not count against the monthly budget; active reservations count at their reserved amount; settled executions count at actual cost (or conservatively at the reservation if no actual cost is supplied). Runtime must reserve the maximum expected exposure before provider execution and settle from verified usage data.
+
+
+## Agent Runtime v0.1
+
+The first runtime slice is available at `POST /api/v1/agents/{agent_id}/run`.
+It performs text-only model generation through the existing AI Gateway. It does
+not execute tools, read project assets, publish content, or perform external
+write operations.
+
+Execution gates:
+- Agent must be enabled and hold the explicit `ai.generate` permission.
+- Provider/model must remain enabled and registered.
+- Explicit model pricing is mandatory; unpriced models are rejected before execution.
+- A conservative upper-bound reservation is created before the provider call.
+  The estimate counts UTF-8 input bytes as an upper-bound token proxy and reserves
+  the configured maximum output tokens.
+- Per-run and monthly budget ceilings are enforced by the Budget Ledger.
+- Gateway idempotency stores the response encrypted; replay returns the stored
+  output without a second provider call.
+- Ambiguous provider failures settle the reservation at its full reserved
+  upper bound rather than assuming the call was free.
+- No tool grants are invoked by this runtime slice.
+
+This endpoint inherits the current API's localhost/trusted-network-only
+deployment constraint because authentication and authorization are not yet
+implemented. Do not expose it publicly. Provider credentials and billable
+execution remain unconfigured until the owner explicitly configures them.
