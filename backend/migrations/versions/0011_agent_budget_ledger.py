@@ -21,7 +21,6 @@ def upgrade():
         sa.Column("status", sa.String(length=20), nullable=False, server_default="reserved"),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.UniqueConstraint("idempotency_hash", name="uq_agent_budget_idempotency"),
     )
     op.create_index("ix_agent_budget_reservations_agent_id", "agent_budget_reservations", ["agent_id"])
     op.create_index("ix_agent_budget_reservations_idempotency_hash", "agent_budget_reservations", ["idempotency_hash"], unique=True)
