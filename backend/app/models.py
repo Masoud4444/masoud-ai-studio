@@ -327,3 +327,51 @@ class ResearchEvent(Base):
     event_type: Mapped[str] = mapped_column(String(48), nullable=False)
     detail_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True, nullable=False)
+
+
+class Story(Base):
+    __tablename__ = "stories"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="RESTRICT"), index=True, nullable=False)
+    title: Mapped[str] = mapped_column(String(240), nullable=False)
+    format: Mapped[str] = mapped_column(String(40), default="short_film", nullable=False)
+    genre: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    target_audience: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    premise: Mapped[str | None] = mapped_column(Text, nullable=True)
+    logline: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    synopsis: Mapped[str | None] = mapped_column(Text, nullable=True)
+    creative_intent: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(24), default="development", index=True, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+
+class StoryRevision(Base):
+    __tablename__ = "story_revisions"
+    __table_args__ = (UniqueConstraint("story_id", "version", name="uq_story_revision_version"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    story_id: Mapped[str] = mapped_column(ForeignKey("stories.id", ondelete="RESTRICT"), index=True, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    snapshot_json: Mapped[str] = mapped_column(Text, nullable=False)
+    change_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class StoryScene(Base):
+    __tablename__ = "story_scenes"
+    __table_args__ = (UniqueConstraint("story_id", "position", name="uq_story_scene_position"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    story_id: Mapped[str] = mapped_column(ForeignKey("stories.id", ondelete="RESTRICT"), index=True, nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str] = mapped_column(String(240), nullable=False)
+    slugline: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    dramatic_purpose: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    location: Mapped[str | None] = mapped_column(String(240), nullable=True)
+    time_of_day: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    beats_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)

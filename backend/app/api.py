@@ -20,6 +20,8 @@ from .research_vault import (
     detach_source_from_project, create_evidence, list_evidence,
     create_claim, list_claims, get_claim, link_evidence_to_claim, update_claim,
 )
+from .story_engine import create_story, list_stories, get_story, update_story, create_scene, update_scene, delete_scene
+from .story_schemas import StoryCreate, StoryUpdate, StorySceneCreate, StorySceneUpdate
 from .research_schemas import (
     ResearchSourceCreate, ResearchEvidenceCreate, ResearchClaimCreate,
     ResearchClaimEvidenceCreate, ResearchClaimUpdate,
@@ -389,3 +391,33 @@ async def post_agent_run(
     db: Session = Depends(get_db),
 ):
     return await run_agent(db, agent_id, payload.message, idempotency_key)
+
+
+# Story Engine: versioned story dossiers and ordered scene development.
+@router.post("/stories", status_code=201)
+def post_story(payload: StoryCreate, db: Session = Depends(get_db)):
+    return create_story(db, payload)
+
+@router.get("/stories")
+def get_stories(project_id: str | None = Query(None, min_length=36, max_length=36), limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0), db: Session = Depends(get_db)):
+    return list_stories(db, project_id=project_id, limit=limit, offset=offset)
+
+@router.get("/stories/{story_id}")
+def get_story_route(story_id: str, db: Session = Depends(get_db)):
+    return get_story(db, story_id)
+
+@router.patch("/stories/{story_id}")
+def patch_story(story_id: str, payload: StoryUpdate, db: Session = Depends(get_db)):
+    return update_story(db, story_id, payload)
+
+@router.post("/stories/{story_id}/scenes", status_code=201)
+def post_story_scene(story_id: str, payload: StorySceneCreate, db: Session = Depends(get_db)):
+    return create_scene(db, story_id, payload)
+
+@router.patch("/stories/{story_id}/scenes/{scene_id}")
+def patch_story_scene(story_id: str, scene_id: str, payload: StorySceneUpdate, db: Session = Depends(get_db)):
+    return update_scene(db, story_id, scene_id, payload)
+
+@router.delete("/stories/{story_id}/scenes/{scene_id}")
+def delete_story_scene(story_id: str, scene_id: str, db: Session = Depends(get_db)):
+    return delete_scene(db, story_id, scene_id)
