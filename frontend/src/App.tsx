@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Activity, Archive, ArrowUpRight, AudioLines, BookOpen, Check, ChevronDown,
+  Activity, ArrowUpRight, AudioLines, BookOpen, Check, ChevronDown,
   CircleHelp, Clapperboard, Command, FolderKanban, Gauge, Image, Layers3,
   Plus, Search, Settings2, ShieldCheck, Sparkles, Video, X
 } from "lucide-react";
