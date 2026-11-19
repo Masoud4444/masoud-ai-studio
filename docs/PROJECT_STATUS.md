@@ -85,3 +85,5 @@ Never infer one status from another.
 - Added storage API routes and automated tests for hashing, MIME detection, unsafe filename normalization, listing, detach safety, and empty uploads.
 - Tests are committed but have not been executed locally. GitHub Actions status was queried and returned no status entries at the time of this update; CI is not yet verified.
 - Storage schema currently uses create_all bootstrap. A versioned Alembic migration is still required before treating schema evolution as production-ready.
+- Follow-up code review corrected binary magic-byte literals for MIME sniffing and the PNG test fixture, and corrected Windows backslash filename normalization. These fixes are committed on the implementation branch.
+- Latest queried commit status: no status checks or workflow runs were returned by the connected GitHub endpoints; test execution remains unverified.
