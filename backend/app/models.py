@@ -193,3 +193,46 @@ class ProductionStep(Base):
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     approval_required: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class StudioAgent(Base):
+    __tablename__ = "studio_agents"
+    __table_args__ = (UniqueConstraint("slug", name="uq_studio_agent_slug"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    slug: Mapped[str] = mapped_column(String(120), unique=True, index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    purpose: Mapped[str] = mapped_column(String(500), nullable=False)
+    system_prompt: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="draft", index=True, nullable=False)
+    provider_id: Mapped[str | None] = mapped_column(ForeignKey("ai_providers.id", ondelete="RESTRICT"), nullable=True)
+    model_id: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    temperature: Mapped[float] = mapped_column(Numeric(4, 3), default=0.2, nullable=False)
+    max_output_tokens: Mapped[int] = mapped_column(Integer, default=4096, nullable=False)
+    max_cost_per_run_usd: Mapped[float] = mapped_column(Numeric(18, 8), default=0.25, nullable=False)
+    monthly_budget_usd: Mapped[float] = mapped_column(Numeric(18, 8), default=10, nullable=False)
+    permissions_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+
+class AgentToolGrant(Base):
+    __tablename__ = "agent_tool_grants"
+    __table_args__ = (UniqueConstraint("agent_id", "tool_name", name="uq_agent_tool_grant"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    agent_id: Mapped[str] = mapped_column(ForeignKey("studio_agents.id", ondelete="RESTRICT"), index=True, nullable=False)
+    tool_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    permission: Mapped[str] = mapped_column(String(20), nullable=False)
+    approval_required: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class AgentEvent(Base):
+    __tablename__ = "agent_events"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    agent_id: Mapped[str] = mapped_column(ForeignKey("studio_agents.id", ondelete="RESTRICT"), index=True, nullable=False)
+    event_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    detail_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
