@@ -7,6 +7,7 @@ class ProviderCreate(BaseModel):
     base_url: str = Field(min_length=10, max_length=500)
     api_key: SecretStr | None = None
     models: list[str] = Field(default_factory=list, max_length=100)
+    priority: int = Field(default=100, ge=1, le=1000)
 
     @field_validator("models")
     @classmethod
@@ -28,6 +29,7 @@ class ProviderRead(BaseModel):
     base_url: str
     models: list[str]
     is_enabled: bool
+    priority: int
     created_at: datetime
     updated_at: datetime
 
@@ -71,3 +73,13 @@ class ModelPricingUpdate(BaseModel):
     input_usd_per_million: float = Field(ge=0, le=100000)
     output_usd_per_million: float = Field(ge=0, le=100000)
     source_note: str | None = Field(default=None, max_length=500)
+
+class ProviderUpdate(BaseModel):
+    priority: int | None = Field(default=None, ge=1, le=1000)
+    is_enabled: bool | None = None
+
+    @model_validator(mode="after")
+    def require_change(self):
+        if self.priority is None and self.is_enabled is None:
+            raise ValueError("At least one provider setting must be supplied")
+        return self
