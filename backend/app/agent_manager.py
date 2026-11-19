@@ -3,15 +3,20 @@
 This module configures agents only. It does not execute tools or call model providers.
 """
 import json
+import hashlib
+import math
+import re
+from decimal import Decimal
+from datetime import date
 from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .models import AIProvider, AgentEvent, AgentToolGrant, StudioAgent
+from .models import AIProvider, AgentEvent, AgentToolGrant, AgentBudgetReservation, StudioAgent
 from .agent_schemas import AgentCreate, AgentUpdate, AgentToolsUpdate
 
 
@@ -195,3 +200,142 @@ def disable_agent(db: Session, agent_id: str) -> dict:
         db.commit()
         db.refresh(agent)
     return _serialize(agent, db)
+
+
+
+def _money(value) -> Decimal:
+    try:
+        amount = Decimal(str(value))
+    except Exception:
+        raise HTTPException(status_code=422, detail={"code": "invalid_budget_amount"})
+    if not amount.is_finite() or amount < 0:
+        raise HTTPException(status_code=422, detail={"code": "invalid_budget_amount"})
+    return amount.quantize(Decimal("0.00000001"))
+
+
+def _reservation_payload(row: AgentBudgetReservation, replayed: bool = False) -> dict:
+    return {
+        "id": row.id, "agent_id": row.agent_id,
+        "period_start": row.period_start.isoformat(),
+        "reserved_usd": float(row.reserved_usd),
+        "actual_cost_usd": float(row.actual_cost_usd) if row.actual_cost_usd is not None else None,
+        "status": row.status, "replayed": replayed,
+        "created_at": row.created_at, "updated_at": row.updated_at,
+    }
+
+
+def reserve_agent_budget(db: Session, agent_id: str, idempotency_key: str,
+                         request_hash: str, estimated_cost_usd) -> dict:
+    """Reserve a conservative upper bound before any provider call is attempted."""
+    if not idempotency_key or not 8 <= len(idempotency_key) <= 200:
+        raise HTTPException(status_code=422, detail={"code": "invalid_idempotency_key"})
+    if not re.fullmatch(r"[0-9a-f]{64}", request_hash or ""):
+        raise HTTPException(status_code=422, detail={"code": "invalid_request_hash"})
+    amount = _money(estimated_cost_usd)
+    if amount <= 0:
+        raise HTTPException(status_code=422, detail={"code": "invalid_budget_amount"})
+    key_hash = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
+    existing = db.scalar(select(AgentBudgetReservation).where(
+        AgentBudgetReservation.idempotency_hash == key_hash
+    ))
+    if existing:
+        if existing.request_hash != request_hash:
+            raise HTTPException(status_code=409, detail={"code": "idempotency_key_conflict"})
+        return _reservation_payload(existing, replayed=True)
+
+    agent = db.scalar(select(StudioAgent).where(StudioAgent.id == agent_id).with_for_update())
+    if agent is None:
+        raise HTTPException(status_code=404, detail={"code": "agent_not_found"})
+    if agent.status != "enabled":
+        raise HTTPException(status_code=409, detail={"code": "agent_not_enabled"})
+    if amount > Decimal(str(agent.max_cost_per_run_usd)):
+        raise HTTPException(status_code=409, detail={"code": "agent_per_run_budget_exceeded"})
+    provider = db.get(AIProvider, agent.provider_id) if agent.provider_id else None
+    if provider is None or not provider.is_enabled or agent.model_id not in json.loads(provider.models_json):
+        raise HTTPException(status_code=409, detail={"code": "agent_provider_model_unavailable"})
+
+    now = _now()
+    period = date(now.year, now.month, 1)
+    usage_expr = case(
+        (AgentBudgetReservation.status.in_(["reserved", "running"]), AgentBudgetReservation.reserved_usd),
+        (AgentBudgetReservation.status.in_(["succeeded", "failed"]),
+         func.coalesce(AgentBudgetReservation.actual_cost_usd, AgentBudgetReservation.reserved_usd)),
+        else_=0,
+    )
+    used = db.scalar(select(func.coalesce(func.sum(usage_expr), 0)).where(
+        AgentBudgetReservation.agent_id == agent_id,
+        AgentBudgetReservation.period_start == period,
+    )) or Decimal("0")
+    if Decimal(str(used)) + amount > Decimal(str(agent.monthly_budget_usd)):
+        raise HTTPException(status_code=409, detail={"code": "agent_monthly_budget_exceeded"})
+
+    row = AgentBudgetReservation(
+        id=str(uuid4()), agent_id=agent_id, idempotency_hash=key_hash,
+        request_hash=request_hash, period_start=period, reserved_usd=amount,
+        actual_cost_usd=None, status="reserved", created_at=now, updated_at=now,
+    )
+    db.add(row)
+    try:
+        db.flush()
+        _event(db, agent_id, "budget_reserved", {"reservation_id": row.id, "reserved_usd": str(amount)})
+        db.commit()
+        db.refresh(row)
+    except IntegrityError:
+        db.rollback()
+        raced = db.scalar(select(AgentBudgetReservation).where(
+            AgentBudgetReservation.idempotency_hash == key_hash
+        ))
+        if raced and raced.request_hash == request_hash:
+            return _reservation_payload(raced, replayed=True)
+        raise HTTPException(status_code=409, detail={"code": "agent_budget_reservation_conflict"})
+    return _reservation_payload(row)
+
+
+def start_agent_budget_reservation(db: Session, reservation_id: str) -> dict:
+    row = db.get(AgentBudgetReservation, reservation_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail={"code": "agent_budget_reservation_not_found"})
+    if row.status != "reserved":
+        raise HTTPException(status_code=409, detail={"code": "agent_budget_reservation_not_startable"})
+    row.status = "running"
+    row.updated_at = _now()
+    _event(db, row.agent_id, "budget_execution_started", {"reservation_id": row.id})
+    db.commit()
+    db.refresh(row)
+    return _reservation_payload(row)
+
+
+def settle_agent_budget_reservation(db: Session, reservation_id: str,
+                                    actual_cost_usd, succeeded: bool = True) -> dict:
+    row = db.get(AgentBudgetReservation, reservation_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail={"code": "agent_budget_reservation_not_found"})
+    if row.status not in {"reserved", "running"}:
+        raise HTTPException(status_code=409, detail={"code": "agent_budget_reservation_not_settleable"})
+    actual = _money(actual_cost_usd)
+    if actual > Decimal(str(row.reserved_usd)):
+        raise HTTPException(status_code=409, detail={"code": "actual_cost_exceeds_reserved_budget"})
+    row.actual_cost_usd = actual
+    row.status = "succeeded" if succeeded else "failed"
+    row.updated_at = _now()
+    _event(db, row.agent_id, "budget_settled", {
+        "reservation_id": row.id, "actual_cost_usd": str(actual), "status": row.status,
+    })
+    db.commit()
+    db.refresh(row)
+    return _reservation_payload(row)
+
+
+def release_agent_budget_reservation(db: Session, reservation_id: str) -> dict:
+    row = db.get(AgentBudgetReservation, reservation_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail={"code": "agent_budget_reservation_not_found"})
+    if row.status != "reserved":
+        raise HTTPException(status_code=409, detail={"code": "agent_budget_reservation_not_releasable"})
+    row.status = "released"
+    row.actual_cost_usd = Decimal("0")
+    row.updated_at = _now()
+    _event(db, row.agent_id, "budget_released", {"reservation_id": row.id})
+    db.commit()
+    db.refresh(row)
+    return _reservation_payload(row)
