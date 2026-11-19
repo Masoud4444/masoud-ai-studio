@@ -16,6 +16,15 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _lease_is_valid(task: StudioTask) -> bool:
+    expires = task.lease_expires_at
+    if expires is None:
+        return False
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    return expires > _now()
+
+
 def _event(db: Session, task_id: str, event_type: str, before: str | None,
            after: str | None, detail: dict | None = None) -> None:
     db.add(TaskEvent(
@@ -216,7 +225,7 @@ def complete_task(db: Session, task_id: str, worker_id: str, result: dict) -> di
     task = db.get(StudioTask, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail={"code": "task_not_found"})
-    if task.status != "running" or task.locked_by != worker_id or not task.lease_expires_at or task.lease_expires_at <= _now():
+    if task.status != "running" or task.locked_by != worker_id or not _lease_is_valid(task):
         raise HTTPException(status_code=409, detail={"code": "task_lease_not_owned"})
     before = task.status
     task.status = "succeeded"
