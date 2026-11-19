@@ -84,7 +84,7 @@ def _configure_environment() -> Path:
     os.environ["MASOUD_STUDIO_STORAGE_ROOT"] = str(data_dir / "storage")
     os.environ["MASOUD_STUDIO_CREDENTIAL_KEY"] = base64.urlsafe_b64encode(key).decode("ascii")
     os.environ["MASOUD_STUDIO_CREDENTIAL_KEY_VERSION"] = "1"
-    os.environ["MASOUD_STUDIO_WORKER_ENABLED"] = "false"
+    os.environ["MASOUD_STUDIO_WORKER_ENABLED"] = "false"\n    os.environ["MASOUD_STUDIO_DESKTOP_MODE"] = "true"\n    os.environ["MASOUD_STUDIO_PORT"] = "8000"
     os.environ["MASOUD_STUDIO_SCHEMA_MODE"] = "migrate"
     return root
 

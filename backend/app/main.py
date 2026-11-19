@@ -55,6 +55,35 @@ app = FastAPI(
     description="Private, local-first creative production studio",
     lifespan=lifespan,
 )
+# Packaged desktop mode rejects DNS-rebinding Host headers and cross-origin browser
+# requests to the loopback API. CLI clients without an Origin header remain supported.
+from urllib.parse import urlsplit
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+
+@app.middleware("http")
+async def protect_local_desktop_api(request: Request, call_next):
+    if os.getenv("MASOUD_STUDIO_DESKTOP_MODE", "false").lower() != "true":
+        return await call_next(request)
+
+    expected_port = int(os.getenv("MASOUD_STUDIO_PORT", "8000"))
+    host = request.url.hostname
+    port = request.url.port or (443 if request.url.scheme == "https" else 80)
+    if host not in {"127.0.0.1", "localhost"} or port != expected_port:
+        return JSONResponse({"detail": "Invalid local Host header"}, status_code=421)
+
+    origin = request.headers.get("origin")
+    if origin:
+        parsed = urlsplit(origin)
+        origin_port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        if (parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost"}
+                or origin_port != expected_port or parsed.username or parsed.password):
+            return JSONResponse({"detail": "Cross-origin requests are not allowed"}, status_code=403)
+
+    return await call_next(request)
+
+
 app.include_router(router)
 app.include_router(character_world_router)
 app.include_router(continuity_router)

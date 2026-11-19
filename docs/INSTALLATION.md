@@ -44,7 +44,7 @@ The source setup creates a virtual environment, installs `requirements.txt`, bui
 
 ## Network and privacy
 
-- The backend binds to loopback only. Do not expose it to the public internet or an untrusted LAN.
+- The backend binds to loopback only. Packaged desktop mode also validates the Host header and rejects cross-origin browser requests (including DNS-rebinding Host values). Origin-less local CLI clients remain supported. Do not expose it to the public internet or an untrusted LAN.
 - Authentication and multi-user authorization are not implemented.
 - No provider API credentials are bundled. AI requests require explicit provider configuration and may incur charges.
 - The background worker is disabled by default; production creative task handlers are not yet registered.
