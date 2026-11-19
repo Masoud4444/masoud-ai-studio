@@ -129,3 +129,21 @@ def test_idempotency_key_cannot_be_reused_for_different_payload(monkeypatch):
         assert exc.value.status_code == 409
         assert exc.value.detail["code"] == "idempotency_key_conflict"
     engine.dispose()
+
+
+def test_model_capabilities_are_marked_as_declared_not_verified():
+    from backend.app.ai_gateway import update_model_capability, list_model_capabilities
+    from backend.app.gateway_schemas import ModelCapabilityUpdate
+    engine, Session = gateway_db()
+    with Session() as db:
+        provider = AIProvider(name="Capability Provider", base_url="https://api.example/v1", models_json='["vision-model"]')
+        db.add(provider)
+        db.commit()
+        result = update_model_capability(
+            db, provider.id, "vision-model",
+            ModelCapabilityUpdate(capabilities=["chat", "vision"], context_window=64000, supports_vision=True),
+        )
+        assert result["verification_status"] == "declared"
+        assert result["context_window"] == 64000
+        assert list_model_capabilities(db)[0]["capabilities"] == ["chat", "vision"]
+    engine.dispose()
