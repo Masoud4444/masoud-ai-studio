@@ -2,88 +2,68 @@
 
 Last updated: 2026-11-19
 
-## Verified repository state
+## Repository and branch
 
-- Repository: `Masoud4444/masoud-ai-studio`
-- Default branch: `main`
-- Visibility: private
-- Initial repository state before bootstrap: empty
-- The repository currently contains project documentation and ignore rules; no Foundation source code has been imported in this work session.
+- Repository: `Masoud4444/masoud-ai-studio` (private).
+- Active implementation branch: `implementation/bootstrap-001`.
+- The implementation branch is intentionally separate from `main`; no merge has been performed.
+- The Foundation 002 archive has not been inspected or imported into this implementation branch. The backend work below is a fresh implementation and must not be described as an import.
 
-## Existing implementation artifacts outside this repository
+## Implemented code
 
-- Foundation 001 archive exists in the project file library.
-- Foundation 002 archive exists in the project file library (42,344 bytes).
-- Foundation 002 was previously reported as 76 files with 8/8 tests passing on Linux.
-- Windows execution has not been verified.
-- Foundation 002 has not yet been unpacked, inspected, or imported into this repository during this work session.
+### Backend foundation
+- FastAPI application and versioned API router.
+- SQLAlchemy 2 models and SQLite default configuration.
+- Project create, list, read, update, archive, and restore endpoints.
+- Optimistic project version checks and duplicate-slug conflict handling.
 
-## Committed design artifacts
+### Storage and asset management
+- Asset and ProjectAsset relational models using SHA-256 content identity.
+- Streamed upload ingestion in 1 MiB chunks, configurable 100 MiB default size limit, temporary staging, SHA-256 hashing, atomic blob placement, MIME signature sniffing, and filename sanitization.
+- Project-scoped asset listing and detachment.
+- Detachment deliberately retains blob bytes. Garbage collection is deferred until a recovery-safe reference audit exists.
 
-- `README.md`
-- `.gitignore`
-- `docs/ARCHITECTURE.md`
-- `docs/architecture/PACKAGE_003_PROJECTS_STORAGE.md`
+### AI Gateway — first implementation slice
+- Provider registry model and API routes to create, list, and delete OpenAI-compatible provider configurations.
+- Provider URL validation requires HTTPS, rejects embedded credentials, query strings, fragments, localhost/private/link-local/reserved destinations, and resolves DNS names to reject any non-global address.
+- API credentials are encrypted with AES-256-GCM before database persistence. The encryption key is supplied out-of-band through environment configuration; plaintext credentials are never returned by provider API responses.
+- Credential key version is stored with each provider record; version-specific environment keys are supported for future controlled rotation.
+- Provider models are stored as declared model identifiers. Capability verification, model routing, generation adapter, outbound request enforcement, retries/fallback, idempotency, cost accounting, and structured provider health checks are not implemented yet.
+- Important security boundary: URL validation currently occurs at provider registration. The outbound adapter must repeat DNS/IP validation immediately before each connection and defend against DNS rebinding before any provider request feature is enabled.
 
-Package 003 is **designed and documented**, but its application code has not been implemented.
+## Testing and verification
 
-## Current execution note (2026-11-19)
+- Pytest coverage exists for project and storage behavior, and new tests cover AI Gateway credential encryption and provider URL rejection.
+- Tests have **not** been executed in this environment. No claim is made that the branch currently passes.
+- GitHub Actions must be checked after the latest commit; absence of reported status is not a passing result.
+- Schema creation still uses SQLAlchemy `create_all` during app startup. Alembic migrations are required before production use.
+- Windows-specific behavior has not been verified.
 
-- Package 003 architecture and acceptance criteria are committed.
-- The Foundation 002 ZIP is present in the personal Library, but raw-byte access was unavailable in this session. Its source has not been inspected or imported.
-- Foundation 002 has now been attached directly to the conversation (`/mnt/data/storyforge-ai-studio-foundation-002.zip`). The attachment is present, but archive inspection and source import remain pending because the data-analysis capability is temporarily unavailable.
-- No new application tests have been run in this session.
-- The attached ZIP has not yet been opened, extracted, or verified; no claims are made about its current integrity or contents.
+## Required configuration
 
-## Next actions
+Before creating a provider with an API key, set a 32-byte URL-safe-base64 key in `MASOUD_STUDIO_CREDENTIAL_KEY` (or a versioned variable such as `MASOUD_STUDIO_CREDENTIAL_KEY_V1`). Do not commit this key, place it in frontend code, or send it through chat. Use a dedicated secret store or OS-protected secret mechanism for deployment. If the key is missing or invalid, credential encryption fails closed.
 
-1. When data analysis is available, inspect the attached Foundation 002 archive and preserve its exact source baseline.
-2. Import the baseline into this repository without replacing unrelated files.
-3. Run the existing test suite and record actual results.
-4. Reconcile Package 003 with the imported models, routes, settings, migrations, and task infrastructure.
-5. Implement projects, lifecycle, local storage, asset metadata, relationships, safe ingestion, and recovery in small commits.
-6. Verify Windows behavior before declaring Windows support tested.
-7. Continue through the approved product roadmap: AI Gateway, research, story, visual, production, audio, quality/compliance, creator analytics, and companion clients.
+## Not implemented yet
+
+- Alembic migrations and schema upgrade/recovery workflow.
+- AI model capability registry and provider connection test.
+- Outbound model adapter with per-request SSRF/DNS-rebinding defense.
+- Model routing, timeout/retry/fallback, request idempotency, cost/usage ledger, and sanitized provider error mapping.
+- Agent Manager, Production Orchestrator, central Task Manager, frontend, Windows desktop packaging, Android, and Web/PWA clients.
+
+## Next implementation sequence
+
+1. Add Alembic migrations and replace startup-only `create_all` for managed schemas.
+2. Complete AI Gateway outbound adapter, DNS/IP pinning protections, capability registry, request hashing/idempotency, retries/fallback, sanitized errors, and cost tracking.
+3. Add mocked integration tests and execute the full backend suite in CI.
+4. Continue with Research/Intake, Studio OS, Story, Character/Universe, Visual, Video, Audio, QA/Compliance, Export, Analytics, and companion clients.
 
 ## Status vocabulary
 
 - **Designed:** requirements and contracts have been specified.
-- **Imported:** source files are present in this repository.
 - **Implemented:** application code exists.
 - **Tested:** tests were actually executed and results recorded.
 - **Verified:** behavior was checked against acceptance criteria.
 - **Released:** a versioned build or release artifact exists.
 
 Never infer one status from another.
-
-## Fresh implementation branch — 2026-11-19
-
-- Branch: `implementation/bootstrap-001`
-- Commit: `c202112705a48616e825297abad92cfe2a703509`
-- A new executable FastAPI backend foundation has been written independently of the uninspected Foundation 002 archive.
-- Included: SQLAlchemy project model, SQLite configuration, project CRUD/list/read/update/archive/restore API, optimistic version checks, duplicate-slug conflict handling, pytest coverage, dependency manifests, and GitHub Actions test workflow.
-- This branch is intentionally separate from `main` pending review.
-- Tests have **not** been executed in this environment. CI results must be checked before marking this foundation tested.
-- Storage/asset ingestion, AI Gateway, agents, orchestration, frontend, desktop packaging, and companion clients are not yet implemented.
-
-## Fresh implementation branch — 2026-11-19
-
-- Branch: `implementation/bootstrap-001`
-- Initial code commit: `c202112705a48616e825297abad92cfe2a703509`
-- A new executable FastAPI backend foundation has been written independently of the uninspected Foundation 002 archive.
-- Included: SQLAlchemy project model, SQLite configuration, project create/list/read/update/archive/restore API, optimistic version checks, duplicate-slug conflict handling, pytest coverage, dependency manifests, and GitHub Actions test workflow.
-- The implementation branch retains the approved project documentation and is separate from `main` pending review.
-- Tests have **not** been executed in this environment. CI results must be checked before marking this foundation tested.
-- Storage/asset ingestion, AI Gateway, agents, orchestration, frontend, desktop packaging, and companion clients are not yet implemented.
-
-
-## Storage & Asset implementation — 2026-11-19
-
-- Implemented Asset and ProjectAsset relational models with SHA-256 content identity.
-- Added streamed upload ingestion in 1 MiB chunks, a configurable 100 MiB default limit, temporary staging, SHA-256 hashing, atomic blob placement, MIME signature sniffing, filename sanitization, and project-scoped asset listing/detachment.
-- Project detachment intentionally does not delete blob bytes; safe garbage collection is deferred until a reference audit/recovery mechanism exists.
-- Added storage API routes and automated tests for hashing, MIME detection, unsafe filename normalization, listing, detach safety, and empty uploads.
-- Tests are committed but have not been executed locally. GitHub Actions status was queried and returned no status entries at the time of this update; CI is not yet verified.
-- Storage schema currently uses create_all bootstrap. A versioned Alembic migration is still required before treating schema evolution as production-ready.
-- Follow-up code review corrected binary magic-byte literals for MIME sniffing and the PNG test fixture, and corrected Windows backslash filename normalization. These fixes are committed on the implementation branch.
-- Latest queried commit status: no status checks or workflow runs were returned by the connected GitHub endpoints; test execution remains unverified.
