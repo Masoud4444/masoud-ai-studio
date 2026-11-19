@@ -115,7 +115,7 @@ See [AI Gateway implementation guide](AI_GATEWAY.md) for setup, environment conf
 - React/TypeScript frontend and Web/PWA.
 - Android companion client.
 - Agent Manager, agent permissions, tool sandbox and agent execution lifecycle.
-- Full Production Orchestrator capabilities: database-managed workflow templates, parallel branch fan-in/fan-out, run-level pause/resume/cancel, worker supervisor, DLQ UI, and recovery dashboard.
+- Full Production Orchestrator capabilities: database-managed workflow templates, parallel branch fan-in/fan-out, run-level pause/resume/cancel, DLQ UI, and recovery dashboard.
 - Research Vault, multimodal intake, provenance and evidence graph.
 - Story Engine, Character Bible, World Bible, continuity and universe/series management.
 - Visual Style Engine, Character/Cinematography/Visual Continuity pipeline.
@@ -129,8 +129,8 @@ See [AI Gateway implementation guide](AI_GATEWAY.md) for setup, environment conf
 1. Add integration tests for the outbound HTTP transport, DNS pinning, response sanitization, credential-key rotation, and concurrent idempotency.
 2. Complete AI Gateway operational controls: provider priority/routing, safe failure policy, budget controls, concurrency limits, circuit breaker, and optional streaming.
 3. Add Windows DPAPI-backed secret custody and Windows CI / packaging verification.
-4. Verify migrations 0007–0008 and Task Manager/Orchestrator tests; harden lease ownership and multi-worker claiming before enabling workers.
-5. Add run-level controls, versioned workflow registry, worker supervision, and operator recovery tooling.
+4. Verify migrations 0007–0008 and Task Manager/Orchestrator/Worker tests; add lease renewal, bounded execution and multi-worker-safe claims before enabling creative handlers.
+5. Add run-level controls, versioned workflow registry, worker heartbeat/timeout supervision, and operator recovery tooling.
 6. Implement task handlers and proceed with Research/Intake, Story, Character/Universe, Visual, Video, Audio, QA/Compliance, Export, Analytics, and companion clients.
 
 ## Status vocabulary
