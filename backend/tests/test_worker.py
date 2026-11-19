@@ -98,3 +98,28 @@ def test_worker_renews_lease_for_long_running_handler(session_factory):
         assert len(events) >= 1
     finally:
         db.close()
+
+
+
+def test_worker_rejects_non_finite_json_numbers(session_factory):
+    task = add_task(session_factory, "system.invalid_json", "worker-invalid-json")
+    registry = TaskHandlerRegistry()
+    registry.register("system.invalid_json", lambda _payload: {"score": float("nan")})
+    worker = WorkerSupervisor(session_factory, "worker-invalid-json", registry)
+    assert worker.run_once() is True
+    result = read_task(session_factory, task["id"])
+    assert result["status"] == "queued"
+    assert result["error_code"] == "handler_invalid_result"
+
+
+def test_worker_rejects_oversized_results(session_factory):
+    task = add_task(session_factory, "system.large_result", "worker-large-result")
+    registry = TaskHandlerRegistry()
+    registry.register("system.large_result", lambda _payload: {"content": "x" * 3000})
+    worker = WorkerSupervisor(
+        session_factory, "worker-large-result", registry, max_result_bytes=1024,
+    )
+    assert worker.run_once() is True
+    result = read_task(session_factory, task["id"])
+    assert result["status"] == "queued"
+    assert result["error_code"] == "result_too_large"
