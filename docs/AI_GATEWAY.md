@@ -48,6 +48,20 @@ Provider credentials and idempotent response payloads are AES-GCM encrypted in t
 
 ## Register a provider
 
+Remote providers use HTTPS on port 443 and public DNS destinations. Local-first providers such as a local OpenAI-compatible inference server can be registered with `connection_type: "local"`, for example `http://127.0.0.1:11434/v1` for an Ollama-compatible endpoint. Local mode accepts only explicit loopback targets (`localhost`, `127.0.0.1`, or `::1`) with an explicit port; it rejects private LAN addresses, link-local metadata addresses, and arbitrary hostnames. DNS for `localhost` must resolve exclusively to loopback addresses. The connector pins the loopback result and disables redirects/proxies just as it does for remote providers.
+
+Example local provider body:
+
+```json
+{
+  "name": "Local Ollama",
+  "connection_type": "local",
+  "base_url": "http://127.0.0.1:11434/v1",
+  "models": ["your-local-model"]
+}
+```
+
+
 Example request body (send directly to the local API; never paste a real API key into a public issue or source file):
 
 ```json
