@@ -6,6 +6,8 @@ type Workflow={workflow_key:string;version:number;description:string;steps:Array
 type Run={id:string;workflow_key:string;status:string;project_id:string|null;created_at:string;steps:Array<{step_key:string;status:string;approval_required:boolean;task_id:string;error_code:string|null}>};
 type Agent={id:string;slug:string;name:string;purpose:string;status:string;version:number;provider_id:string|null;model_id:string|null;tools:Array<{tool_name:string;permission:string;approval_required:boolean;is_enabled:boolean}>};
 type Asset={id:string;asset_id:string;filename:string;mime_type:string;size_bytes:number;created_at:string};
+type ResearchSearchResult={id:string;kind:"source"|"evidence"|"claim";title:string;excerpt:string;source_type?:string;claim_type?:string;status?:string;locator?:string;source_id?:string;project_id?:string;project_ids?:string[]};
+type ResearchSearchResponse={query:string;totals:{sources:number;evidence:number;claims:number};sources:ResearchSearchResult[];evidence:ResearchSearchResult[];claims:ResearchSearchResult[]};
 async function api<T>(path:string,init?:RequestInit):Promise<T>{const response=await fetch(path,init);const body=await response.json().catch(()=>null);if(!response.ok)throw new Error(body?.detail?.code??body?.detail??`Request failed (${response.status})`);return body as T;}
 function PanelHeader({eyebrow,title,description,onRefresh}:{eyebrow:string;title:string;description:string;onRefresh:()=>void}){return <div className="panel-header"><div><span className="eyebrow">{eyebrow}</span><h2>{title}</h2><p>{description}</p></div><button className="secondary-button" onClick={onRefresh}><RefreshCw size={14}/> Refresh</button></div>}
 function Status({value}:{value:string}){return <span className={`status-pill status-${value.replaceAll("_","-")}`}>{value.replaceAll("_"," ")}</span>}
@@ -53,6 +55,7 @@ export function ResearchPanel({projects}:{projects:Project[]}) {
  const [evidenceBySource,setEvidenceBySource]=useState<Record<string,ResearchEvidence[]>>({});
  const [excerpt,setExcerpt]=useState(""),[locator,setLocator]=useState(""),[evidenceType,setEvidenceType]=useState("quote");
  const [selectedClaim,setSelectedClaim]=useState(""),[relationship,setRelationship]=useState("supports");
+ const [searchText,setSearchText]=useState(""),[searchResults,setSearchResults]=useState<ResearchSearchResponse|null>(null),[searchBusy,setSearchBusy]=useState(false);
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
 
  async function load(){
@@ -76,6 +79,17 @@ export function ResearchPanel({projects}:{projects:Project[]}) {
  },[projectId]);
  useEffect(()=>{void load();},[projectId]);
 
+ async function searchVault(e:FormEvent){
+  e.preventDefault();if(searchText.trim().length<2)return;
+  setSearchBusy(true);setError("");
+  try{
+   const params=new URLSearchParams({q:searchText.trim(),limit:"20"});
+   if(projectId)params.set("project_id",projectId);
+   setSearchResults(await api<ResearchSearchResponse>("/api/v1/research/search?"+params.toString()));
+  }catch(e){setError(e instanceof Error?e.message:"Research search failed");}
+  finally{setSearchBusy(false);}
+ }
+ function clearSearch(){setSearchText("");setSearchResults(null);}
  async function createSource(e:FormEvent){
   e.preventDefault();if(!title.trim())return;
   if(sourceType==="url"&&!url.trim()){setError("A URL is required for this source type.");return;}
@@ -152,6 +166,22 @@ export function ResearchPanel({projects}:{projects:Project[]}) {
    </label>
    <span className="research-count"><BookOpen size={14}/>{sources.length} sources <i>·</i> {claims.length} claims</span>
   </div>
+  <form className="research-search" onSubmit={searchVault}>
+   <div><b>Search the knowledge vault</b><small>Search source metadata, exact excerpts, locators and project claims.</small></div>
+   <input value={searchText} onChange={e=>setSearchText(e.target.value)} placeholder="Search a phrase, name, evidence or claim…" maxLength={200}/>
+   <button className="primary-button" disabled={searchBusy||searchText.trim().length<2}><BookOpen size={14}/>{searchBusy?"Searching…":"Search"}</button>
+   {searchResults&&<button type="button" className="secondary-button" onClick={clearSearch}>Clear</button>}
+  </form>
+  {searchResults&&<div className="research-search-results">
+   <div className="panel-list-heading"><b>Search results for “{searchResults.query}”</b><span>{searchResults.totals.sources+searchResults.totals.evidence+searchResults.totals.claims} matches</span></div>
+   {searchResults.totals.sources+searchResults.totals.evidence+searchResults.totals.claims===0?<div className="research-muted">No matching records in this scope.</div>:<>
+    {[...searchResults.sources,...searchResults.evidence,...searchResults.claims].map(item=><article className="research-search-hit" key={item.kind+item.id}>
+     <div><Status value={item.kind}/><b>{item.title}</b></div>
+     {item.excerpt&&<p>{item.excerpt}</p>}
+     <small>{item.kind==="evidence"?(item.locator||"Evidence excerpt"):item.kind==="claim"?(item.claim_type+" · "+item.status):(item.source_type||"Source record")}</small>
+    </article>)}
+   </>}
+  </div>}
   <div className="research-layout">
    <div className="research-main">
     <form className="research-create" onSubmit={createSource}>

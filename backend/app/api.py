@@ -13,6 +13,7 @@ from .orchestrator_schemas import ProductionRunCreate
 from .agent_manager import create_agent, get_agent, list_agents, update_agent, replace_agent_tools, enable_agent, disable_agent
 from .agent_runtime import run_agent
 from .agent_schemas import AgentCreate, AgentUpdate, AgentToolsUpdate, AgentRunRequest
+from .research_search import search_research
 from .research_vault import (
     create_source, get_source, list_sources, link_source_to_project,
     detach_source_from_project, create_evidence, list_evidence,
@@ -237,6 +238,16 @@ def post_production_run_cancel(run_id: str, db: Session = Depends(get_db)):
 
 
 # Research Vault: manually curated source provenance, evidence and project claims.
+
+@router.get("/research/search")
+def get_research_search(
+    q: str = Query(..., min_length=2, max_length=200),
+    project_id: str | None = Query(None, min_length=36, max_length=36),
+    limit: int = Query(25, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    return search_research(db, q, project_id=project_id, limit=limit)
+
 @router.post("/research/sources", status_code=201)
 def post_research_source(payload: ResearchSourceCreate, db: Session = Depends(get_db)):
     return create_source(db, payload)
