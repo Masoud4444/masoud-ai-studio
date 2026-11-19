@@ -3,7 +3,9 @@ from sqlalchemy.orm import Session
 from .database import get_db
 from .projects import create_project, get_project, list_projects, serialize, set_archived, update_project
 from .schemas import ProjectCreate, ProjectPage, ProjectRead, ProjectUpdate
-from .storage import detach_project_asset, ingest_upload, list_project_assets\nfrom .ai_gateway import create_provider, list_providers, delete_provider\nfrom .gateway_schemas import ProviderCreate, ProviderRead
+from .storage import detach_project_asset, ingest_upload, list_project_assets
+from .ai_gateway import create_provider, list_providers, delete_provider
+from .gateway_schemas import ProviderCreate, ProviderRead
 
 router = APIRouter(prefix="/api/v1", tags=["studio"])
 
