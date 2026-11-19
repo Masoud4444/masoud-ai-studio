@@ -290,3 +290,39 @@ def recover_expired_leases(db: Session) -> int:
     if recovered:
         db.commit()
     return recovered
+
+
+
+def approve_task(db: Session, task_id: str, reviewer: str = "local_owner") -> dict:
+    task = db.get(StudioTask, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail={"code": "task_not_found"})
+    if task.status != "waiting_approval":
+        raise HTTPException(status_code=409, detail={"code": "task_not_waiting_for_approval", "status": task.status})
+    before = task.status
+    task.status = "queued"
+    task.updated_at = _now()
+    task.error_code = None
+    task.error_message = None
+    _event(db, task.id, "human_approved", before, "queued", {"reviewer": reviewer[:120]})
+    db.commit()
+    db.refresh(task)
+    return serialize_task(task)
+
+
+def reject_task_approval(db: Session, task_id: str, reason: str = "Human approval rejected") -> dict:
+    task = db.get(StudioTask, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail={"code": "task_not_found"})
+    if task.status != "waiting_approval":
+        raise HTTPException(status_code=409, detail={"code": "task_not_waiting_for_approval", "status": task.status})
+    before = task.status
+    task.status = "cancelled"
+    task.finished_at = _now()
+    task.updated_at = _now()
+    task.error_code = "approval_rejected"
+    task.error_message = (reason or "Human approval rejected")[:500]
+    _event(db, task.id, "human_rejected", before, "cancelled", {"reason": task.error_message})
+    db.commit()
+    db.refresh(task)
+    return serialize_task(task)
