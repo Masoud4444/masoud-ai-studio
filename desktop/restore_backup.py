@@ -1,9 +1,46 @@
 from __future__ import annotations
 
 import argparse
+import json
+import os
 from pathlib import Path
 import socket
 import sys
+
+
+def _contains_symlink(path: Path) -> bool:
+    current = path
+    while True:
+        if current.is_symlink():
+            return True
+        if current.parent == current:
+            return False
+        current = current.parent
+
+
+def _configured_data_directory(app_data: Path) -> Path:
+    settings_file = app_data / "desktop-settings.json"
+    if _contains_symlink(app_data) or _contains_symlink(settings_file):
+        raise ValueError("Desktop data settings path is unsafe.")
+    if not settings_file.exists():
+        return app_data / "data"
+    if not settings_file.is_file() or settings_file.stat().st_size > 16384:
+        raise ValueError("Desktop data settings file is invalid or too large.")
+    try:
+        settings = json.loads(settings_file.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError("Desktop data settings file cannot be read.") from exc
+    if not isinstance(settings, dict):
+        raise ValueError("Desktop data settings file must contain an object.")
+    configured = settings.get("data_directory")
+    if configured is None:
+        return app_data / "data"
+    if not isinstance(configured, str) or not configured.strip():
+        raise ValueError("Configured data directory must be a non-empty path.")
+    data_dir = Path(configured).expanduser()
+    if not data_dir.is_absolute() or _contains_symlink(data_dir):
+        raise ValueError("Configured data directory must be absolute and contain no symbolic links.")
+    return data_dir
 
 
 def main() -> int:
@@ -20,19 +57,18 @@ def main() -> int:
             print("Masoud AI Studio appears to be running. Exit it from the system tray before restoring.")
             return 3
 
-    app_data = Path(__import__("os").environ.get("LOCALAPPDATA", str(Path.home()))) / "Masoud AI Studio"
-    settings_file = app_data / "desktop-settings.json"
-    if settings_file.is_symlink() or (settings_file.exists() and settings_file.stat().st_size > 16384):
-        print("Desktop data settings file is unsafe.")
+    app_data = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Masoud AI Studio"
+    try:
+        data_dir = _configured_data_directory(app_data)
+    except (OSError, ValueError) as exc:
+        print(f"Restore configuration rejected: {exc}")
         return 2
-    import json
-    settings = json.loads(settings_file.read_text(encoding="utf-8")) if settings_file.exists() else {}
-    data_dir = Path(settings.get("data_directory", app_data / "data")).expanduser()
-    if not data_dir.is_absolute() or data_dir.is_symlink():
-        print("Configured data directory is invalid.")
-        return 2
+
     database_path = data_dir / "masoud_studio.db"
     storage_root = data_dir / "storage"
+    if _contains_symlink(database_path) or _contains_symlink(storage_root):
+        print("Configured database or storage path contains a symbolic link.")
+        return 2
 
     from backend.app.backup import restore_backup, verify_backup
     try:
