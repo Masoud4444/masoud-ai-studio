@@ -8,8 +8,8 @@ Last updated: 2026-11-19
 - Active implementation branch: `implementation/bootstrap-001`.
 - The implementation branch is intentionally separate from `main`; no merge has been performed.
 - The Foundation 002 archive has not been inspected or imported into this implementation branch. The backend work below is a fresh implementation and must not be described as an import.
-- Last fully verified implementation commit: `cf24526ff43c85ba6bcde6fcc8a9757dc20b485d` (21 tests passed; migrations 0001–0005). Provider priority routing and migration 0006 have been added after that commit and are awaiting CI verification.
-- Later commits added provider priority, local-provider support, migration 0006, CI timeout protection, and the Task Manager foundation. These changes are awaiting CI verification.
+- Latest verified backend checkpoint: `70e66918dff40bb02d22e1fc38e6c1807ac7e57e` — 72 tests passed and Alembic upgraded the fresh CI SQLite database through head (migration 0011). A later frontend-only commit is undergoing a separate UI build check.
+- Active branch HEAD: `d1318f1917dc3513b3690bcf66754ccce0416d44`. `main` remains untouched.
 
 ## Implemented code
 
@@ -54,9 +54,23 @@ Last updated: 2026-11-19
 - API routes: `POST /tasks`, `GET /tasks`, `GET /tasks/{task_id}`, `POST /tasks/{task_id}/cancel`, and `POST /tasks/{task_id}/retry`.
 - Worker claim/complete/fail functions remain internal only. A single-process Worker Supervisor, handler allowlist, lease recovery, result-size limit, sanitized failure persistence, and graceful shutdown are implemented. It is disabled by default and starts only with `MASOUD_STUDIO_WORKER_ENABLED=true`; only `system.healthcheck` is registered out of the box.
 - SQLite operation is currently single-worker only. Multi-process locking, PostgreSQL concurrency, cancellation signalling for running work, quotas, and worker supervision remain future hardening tasks.
-- Migrations 0007–0011 and Task Manager, Orchestrator, Worker, and Agent Manager tests are implemented but have not yet passed CI.
+- Migrations 0007–0011 and Task Manager, Orchestrator, Worker, and Agent Manager tests are implemented; the verified backend checkpoint passed 72 tests.
 
 See [Task Manager contract](TASK_MANAGER.md).
+
+## Frontend workspace
+
+- React + TypeScript + Vite frontend added under frontend/.
+- Overview/Projects screen: project list, search, create project and backend connection feedback.
+- Production room: workflow/run listing, preproduction run creation, run pause/resume/cancel controls and human approval gate visibility.
+- AI Agents: create draft profiles, view registry, enable/disable only when provider/model prerequisites are satisfied.
+- Assets: project selection, upload, list and detach; detach retains the content-addressed blob.
+- Research Vault, Characters & Worlds, Video & Audio, Compliance and Settings are visible as staged modules, not falsely presented as implemented.
+- Frontend build passed on commit 588d05ce438e6d0eb97d8a404da5876262d63e7b.
+- Windows setup/start scripts added: scripts/setup-windows.bat, scripts/start-backend-windows.bat, scripts/start-frontend-windows.bat.
+- Vite binds to loopback and proxies to FastAPI at 127.0.0.1:8000. External Google Fonts were removed to keep the UI offline-friendly.
+
+See [Frontend guide](FRONTEND.md).
 
 ## Production Orchestrator
 
@@ -67,7 +81,7 @@ See [Task Manager contract](TASK_MANAGER.md).
 - Human approval checkpoints are represented by tasks in `waiting_approval`; approval releases the task to the Task Manager queue, while rejection cancels it.
 - API routes expose workflow registry, run creation/list/detail, and task approval/rejection.
 - Creative workflow handlers are not implemented; the generic opt-in Worker Supervisor exists. Database-managed workflow templates and authenticated approvals are not implemented.
-- Migration 0008 and orchestrator tests are implemented but await CI verification.
+- Migration 0008 and orchestrator tests are included in the verified 72-test backend checkpoint.
 
 See [Production Orchestrator contract](PRODUCTION_ORCHESTRATOR.md).
 
@@ -90,10 +104,11 @@ See [AI Gateway implementation guide](AI_GATEWAY.md) for setup, environment conf
 
 ## Testing and verification
 
-- GitHub Actions workflow run `44445452582` completed successfully for commit `cf24526ff43c85ba6bcde6fcc8a9757dc20b485d`.
-- Result: **21 passed, 1 warning** on Python 3.11 / Ubuntu runner.
-- The same CI run successfully executed Alembic upgrades through revisions 0001–0005 on a fresh SQLite database.
-- Provider priority, migration 0006, local loopback providers, and the newest concurrency-test adjustment were added afterward; those changes must not be treated as verified until their own CI run completes.
+- GitHub Actions backend run `44506650266` passed for commit `70e66918dff40bb02d22e1fc38e6c1807ac7e57e`.
+- Result: **72 passed, 1 warning** on Python 3.11 / Ubuntu runner.
+- Alembic upgrade to head completed on a fresh SQLite database through migration 0011.
+- Frontend build run `44507106256` passed for commit `588d05ce438e6d0eb97d8a404da5876262d63e7b`.
+- The current branch includes later docs/setup scripts; backend code is unchanged from the verified backend checkpoint. A newer backend CI run may still be pending.
 - Earlier failing CI runs exposed implementation defects; those were corrected and the successful run above is the verified result.
 - This is Linux CI verification only. Windows behavior, real provider interoperability, DNS/TLS behavior against external providers, load/concurrency behavior, and recovery on actual desktop storage have not yet been verified.
 - The CI tests mock provider generation and provider model-list responses; they do not make billable requests to a real AI provider.
@@ -111,10 +126,9 @@ See [AI Gateway implementation guide](AI_GATEWAY.md) for setup, environment conf
 
 ## Not implemented yet
 
-- Windows desktop UI and packaging (Tauri).
-- React/TypeScript frontend and Web/PWA.
-- Android companion client.
-- Tool sandbox, runtime permission enforcement, integration of the Agent budget ledger into execution, and agent execution lifecycle.
+- Windows desktop shell and packaging (Tauri).
+- Web/PWA hardening and Android companion client.
+- Tool sandbox and process isolation; execution permission enforcement; deeper Agent runtime lifecycle and budget reconciliation.
 - Remaining Production Orchestrator capabilities: database-managed workflow templates, parallel branch fan-in/fan-out, DLQ UI, and recovery dashboard. Run-level pause/resume/cancel is implemented.
 - Research Vault, multimodal intake, provenance and evidence graph.
 - Story Engine, Character Bible, World Bible, continuity and universe/series management.
