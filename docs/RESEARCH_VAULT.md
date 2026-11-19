@@ -79,3 +79,13 @@ The workspace now provides one read-only search across source title/URL/author/p
 
 - Backend CI run [44515790910](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44515790910): 88 tests passed, 1 warning; migration to head succeeded.
 - Frontend build run [44515790960](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44515790960): successful.
+
+
+## Local document extraction v0.3
+
+- PDF and DOCX extraction is explicit and user-triggered through `POST /research/sources/{source_id}/extract`.
+- The source must be a document record linked to an existing content-addressed asset. The API checks stored MIME and file signature; supported formats are PDF and DOCX only.
+- Parsing runs in a short-lived subprocess with a 30-second wall-clock timeout. Parsing size is capped at 20 MiB; PDF pages, DOCX archive expansion and chunk count are bounded; extracted text is capped at 2 million characters.
+- Text is stored as exact evidence excerpts with PDF page or DOCX paragraph-range locators. Existing content-hash deduplication makes repeat extraction idempotent.
+- No OCR, macros, embedded media extraction, remote URL fetching or AI extraction. Scanned PDFs may produce no text.
+- A subprocess timeout is not a complete OS sandbox or memory/CPU quota. Keep the API local/private; stronger isolation remains required before processing untrusted files at scale.

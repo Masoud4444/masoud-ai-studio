@@ -38,7 +38,7 @@ export function AssetsPanel({projects}:{projects:Project[]}){
 }
 export function ComingSoonPanel({title,description}:{title:string;description:string}){return <section className="workspace-panel"><div className="coming-soon"><div className="empty-icon"><Sparkles size={24}/></div><span className="eyebrow">STUDIO MODULE</span><h2>{title}</h2><p>{description}</p><span className="module-state">Planned module · implementation staged</span></div></section>}
 
-type ResearchSource={id:string;source_type:string;title:string;canonical_url:string|null;author:string|null;publisher:string|null;summary:string|null;project_ids:string[];created_at:string};
+type ResearchSource={id:string;source_type:string;title:string;asset_id?:string|null;canonical_url:string|null;author:string|null;publisher:string|null;summary:string|null;project_ids:string[];created_at:string};
 type ResearchEvidence={id:string;source_id:string;evidence_type:string;excerpt:string;locator:string|null;relationship?:string;note?:string};
 type ResearchClaim={id:string;project_id:string;statement:string;claim_type:string;status:string;evidence:ResearchEvidence[]};
 
@@ -102,6 +102,16 @@ export function ResearchPanel({projects}:{projects:Project[]}) {
    })});
    setTitle("");setUrl("");setAuthor("");setSummary("");setNotice("Source saved with its provenance metadata.");await load();
   }catch(e){setError(e instanceof Error?e.message:"Could not save source");}
+  finally{setBusy(false);}
+ }
+ async function extractDocument(sourceId:string){
+  setBusy(true);setError("");setNotice("");
+  try{
+   const result=await api<{evidence_created:number;already_present_or_empty:number;format:string}>("/api/v1/research/sources/"+sourceId+"/extract",{method:"POST"});
+   setNotice(result.evidence_created+" evidence segments extracted from "+result.format.toUpperCase()+". "+result.already_present_or_empty+" were empty or already present.");
+   const page=await api<{items:ResearchEvidence[]}>("/api/v1/research/sources/"+sourceId+"/evidence?limit=100");
+   setEvidenceBySource(prev=>({...prev,[sourceId]:page.items??[]}));setExpanded(sourceId);
+  }catch(e){setError(e instanceof Error?e.message:"Document extraction failed");}
   finally{setBusy(false);}
  }
  async function toggleEvidence(sourceId:string){
@@ -215,7 +225,7 @@ export function ResearchPanel({projects}:{projects:Project[]}) {
       <div className="research-source-top"><div className="research-source-icon"><FileText size={17}/></div><div className="research-source-title"><div><b>{source.title}</b><Status value={source.source_type}/></div><small>{source.author||source.publisher||"Creator not recorded"} · {new Date(source.created_at).toLocaleDateString()}</small></div></div>
       {source.canonical_url&&<a className="research-source-url" href={source.canonical_url} target="_blank" rel="noreferrer">{source.canonical_url}</a>}
       {source.summary&&<p>{source.summary}</p>}
-      <div className="research-source-actions"><button className="secondary-button" onClick={()=>void toggleEvidence(source.id)}><BookOpen size={14}/>{expanded===source.id?"Hide evidence":"Evidence & excerpts"}</button><span>{source.project_ids.length} project links</span></div>
+      <div className="research-source-actions">{source.source_type==="document"&&source.asset_id&&<button className="secondary-button" disabled={busy} onClick={()=>void extractDocument(source.id)}><FileText size={14}/> Extract text</button>}<button className="secondary-button" onClick={()=>void toggleEvidence(source.id)}><BookOpen size={14}/>{expanded===source.id?"Hide evidence":"Evidence & excerpts"}</button><span>{source.project_ids.length} project links</span></div>
       {expanded===source.id&&<div className="research-evidence-area">
        <form className="research-evidence-form" onSubmit={e=>void addEvidence(e,source.id)}>
         <label className="field-label">Evidence type<select value={evidenceType} onChange={e=>setEvidenceType(e.target.value)}><option value="quote">Direct quote</option><option value="data">Data point</option><option value="observation">Observation</option><option value="transcript">Transcript excerpt</option><option value="other">Other</option></select></label>

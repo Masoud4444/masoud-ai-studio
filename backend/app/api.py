@@ -14,6 +14,7 @@ from .agent_manager import create_agent, get_agent, list_agents, update_agent, r
 from .agent_runtime import run_agent
 from .agent_schemas import AgentCreate, AgentUpdate, AgentToolsUpdate, AgentRunRequest
 from .research_search import search_research
+from .document_ingestion import extract_document
 from .research_vault import (
     create_source, get_source, list_sources, link_source_to_project,
     detach_source_from_project, create_evidence, list_evidence,
@@ -247,6 +248,11 @@ def get_research_search(
     db: Session = Depends(get_db),
 ):
     return search_research(db, q, project_id=project_id, limit=limit)
+
+@router.post("/research/sources/{source_id}/extract")
+def post_research_document_extract(source_id: str, db: Session = Depends(get_db)):
+    return extract_document(db, source_id)
+
 
 @router.post("/research/sources", status_code=201)
 def post_research_source(payload: ResearchSourceCreate, db: Session = Depends(get_db)):

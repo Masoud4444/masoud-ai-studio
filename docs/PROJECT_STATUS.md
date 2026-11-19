@@ -21,7 +21,7 @@ Last updated: 2026-11-19
 - Worker Supervisor: handler allowlist, lease heartbeat, bounded JSON results, sanitized handler errors and graceful shutdown. Disabled by default; only `system.healthcheck` is registered out of the box.
 - Production Orchestrator: code-defined `creative.preproduction` v1 workflow, persisted runs/steps, idempotent creation, approval gates, pause/resume/cancel.
 - Agent Manager: draft/enabled/disabled lifecycle, versioned config, provider/model checks, permissions/tool grants, approval requirements for write/execute grants, audit events and internal budget reservation ledger. A first text-only Agent Runtime is implemented at `POST /api/v1/agents/{agent_id}/run`, with explicit `ai.generate` permission, required model pricing, conservative pre-call budget reservation and Gateway idempotency.
-- Research Vault v0.2: source records, reusable project-source links, asset references, metadata-only URL records, exact evidence excerpts with locators, SHA-256 evidence deduplication, project claims, supporting/contradicting/contextualizing relationships, review gates, append-only provenance events and project-scoped full-text search across source metadata, evidence and claims. No migration required for search.
+- Research Vault v0.2: source records, reusable project-source links, asset references, metadata-only URL records, bounded local PDF/DOCX extraction in a timed subprocess, exact evidence excerpts with page/paragraph locators, SHA-256 evidence deduplication, project claims, supporting/contradicting/contextualizing relationships, review gates, append-only provenance events and project-scoped full-text search across source metadata, evidence and claims. No migration required for search.
 
 ## Implemented frontend
 
@@ -68,7 +68,7 @@ Last updated: 2026-11-19
 ## Next implementation sequence
 
 1. Run the Windows setup script on the target PC; verify Python/Node versions, migrations through 0012, backend health and browser workflows. Record and fix any local runtime issues.
-2. Add safe local document ingestion to Research Vault using the existing content-addressed storage layer, MIME allowlists, quarantine and parser isolation. Do not add background URL fetching until an SSRF-safe fetch subsystem exists.
+2. Expand Research Vault extraction with OCR/transcription behind explicit local processing controls, stronger OS-level parser sandboxing and richer provenance. Do not add background URL fetching until an SSRF-safe fetch subsystem exists.
 3. Add end-to-end integration tests for project, asset, Research Vault, production and Agent screens.
 4. Harden local deployment: configuration validation, safe telemetry, Windows DPAPI credential storage, backup/restore and startup/shutdown behavior.
 5. Implement hard worker execution isolation and multi-worker-safe claims before registering creative handlers; then extend Agent Runtime/Tool Broker with explicit permission checks, approval enforcement, budget reconciliation and sandboxing.
@@ -101,3 +101,13 @@ Never infer one status from another.
 - Supports optional project scope, case-insensitive matching, escaped SQL LIKE wildcards, bounded query length and independent bounded result sets/counts.
 - Added regression tests for cross-entity matches, project isolation, wildcard escaping and query validation.
 - Added a Research Vault search interface with grouped result cards; search does not modify provenance or trigger network/AI activity.
+
+
+## Research Vault local document extraction v0.3
+
+- Added explicit `POST /api/v1/research/sources/{source_id}/extract` for attached PDF and DOCX assets.
+- Parser executes in a short-lived subprocess with a 30-second timeout; file size, PDF page count, DOCX archive expansion, chunk count and total extracted text are bounded.
+- Extracted text is preserved as evidence excerpts with PDF page or DOCX paragraph-range locators and extraction metadata; evidence hash deduplication makes repeat extraction safe.
+- UI exposes an Extract text action only for document sources with an attached asset.
+- No OCR, scanned-PDF recognition, embedded media extraction, AI extraction or remote URL fetching.
+- Parser timeout is not a full OS sandbox; memory/CPU quotas and hardened process isolation remain required before processing untrusted files at scale.
