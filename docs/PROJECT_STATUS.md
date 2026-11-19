@@ -34,6 +34,17 @@ Last updated: 2026-11-19
 - Story Engine workspace: create project stories, add/remove ordered scenes, change lifecycle status and inspect immutable revision history.\n- Characters & Worlds: character/world profiles, relationships, locations, world rules, scene links, continuity facts/issues and registered prop management.\n- Timeline workspace: in-world event creation, scene references, explicit chronology relations and partial-order analysis.\n- Video & Audio, Compliance and Settings remain staged modules.
 - Windows setup/start scripts and frontend guide are present under `scripts/` and `docs/FRONTEND.md`. The setup script checks Python 3.11+/Node.js 20+, installs dependencies, builds the frontend, then applies migrations.
 
+
+
+## Backup and restore v0.1
+
+- Added SQLite-consistent snapshots using SQLite's online backup API, avoiding unsafe live database file copies.
+- Archives include the database and content-addressed asset storage, with a versioned manifest, per-file SHA-256/size records, atomic finalization and integrity verification.
+- Verification rejects path traversal, duplicate paths, symbolic links, unsupported formats, excessive archive expansion and file/hash mismatches; the extracted database is checked with SQLite integrity_check.
+- Added local API endpoints to create/list/verify backups. Restore is deliberately offline-only through a Windows utility and batch launcher; it refuses while the desktop API port is active and preserves timestamped rollback copies.
+- DPAPI credential key is excluded by design. Encrypted provider credentials remain recoverable only with the original key under the same Windows user context; otherwise credentials must be re-entered.
+- Targeted regression tests are isolated in the Backup service workflow; prior suites are not rerun.
+
 ## Verification evidence
 
 - Latest backend run [44515790910](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44515790910), commit `48166b4d72792e4e261e44f5eadde42eb7bc3538`: **88 passed, 1 warning**; fresh SQLite Alembic upgrade through head succeeded through migration 0012, including Research Vault search tests.

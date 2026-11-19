@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Depends, File, Header, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Header, Query, UploadFile, HTTPException
 from sqlalchemy.orm import Session
-from .database import get_db
+from .database import get_db, engine
+from .storage import STORAGE_ROOT
+from .backup import BackupError, create_backup, verify_backup
 from .projects import create_project, get_project, list_projects, serialize, set_archived, update_project
 from .schemas import ProjectCreate, ProjectPage, ProjectRead, ProjectUpdate
 from .storage import detach_project_asset, ingest_upload, list_project_assets
@@ -238,6 +240,52 @@ def post_production_run_resume(run_id: str, db: Session = Depends(get_db)):
 def post_production_run_cancel(run_id: str, db: Session = Depends(get_db)):
     return cancel_production_run(db, run_id)
 
+
+
+# Local backup management. Restore is deliberately offline-only.
+def _backup_locations():
+    database_name = engine.url.database
+    if not database_name or database_name == ":memory:":
+        raise HTTPException(409, detail={"code": "backup_requires_file_database"})
+    database_path = __import__("pathlib").Path(database_name).expanduser().resolve()
+    backup_dir = database_path.parent / "backups"
+    return database_path, backup_dir
+
+
+@router.post("/backups", status_code=201)
+def post_backup():
+    database_path, backup_dir = _backup_locations()
+    try:
+        return create_backup(database_path, STORAGE_ROOT, backup_dir)
+    except BackupError as exc:
+        raise HTTPException(409, detail={"code": "backup_failed", "message": str(exc)})
+
+
+@router.get("/backups")
+def get_backups():
+    _database_path, backup_dir = _backup_locations()
+    if not backup_dir.exists():
+        return []
+    return [
+        {"id": item.name, "size_bytes": item.stat().st_size, "modified_at": item.stat().st_mtime}
+        for item in sorted(backup_dir.glob("masoud-studio-*.zip"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if item.is_file() and not item.is_symlink()
+    ]
+
+
+@router.post("/backups/{backup_id}/verify")
+def post_backup_verify(backup_id: str):
+    from pathlib import Path
+    if not backup_id.startswith("masoud-studio-") or not backup_id.endswith(".zip") or Path(backup_id).name != backup_id:
+        raise HTTPException(400, detail={"code": "invalid_backup_id"})
+    _database_path, backup_dir = _backup_locations()
+    target = (backup_dir / backup_id).resolve()
+    if target.parent != backup_dir.resolve() or not target.is_file():
+        raise HTTPException(404, detail={"code": "backup_not_found"})
+    try:
+        return verify_backup(target)
+    except BackupError as exc:
+        raise HTTPException(422, detail={"code": "backup_invalid", "message": str(exc)})
 
 
 # Research Vault: manually curated source provenance, evidence and project claims.

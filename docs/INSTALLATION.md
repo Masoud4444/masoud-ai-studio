@@ -56,3 +56,12 @@ The source setup creates a virtual environment, installs `requirements.txt`, bui
 - If the credential key cannot be unprotected, run the app under the original Windows user account that installed it.
 - Preserve the complete data directory before attempting database recovery or reinstalling the application.
 \n\n### Preview artifact integrity\n\n- Actions artifact: `Masoud-AI-Studio-Windows-x64` from [successful Windows installer run](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44526720876).\n- ZIP SHA-256: `c5e5b99033c2c3074d5fe261a0b37c8839c77a07423543599446db7ab6d532c1`.\n- Setup EXE SHA-256: `6cb4f1ab87d9334ec93da47d7941e6f5d00927d607ecdb591d7ff35a2c4290e3`.\n- The installer is unsigned and is a preview build; perform normal security checks before using it with important data.\n
+
+## Backup and restore (Windows desktop)
+
+- In the local studio API, create a backup with `POST /api/v1/backups`, list archives with `GET /api/v1/backups`, and verify an archive with `POST /api/v1/backups/{backup_id}/verify`.
+- Archives are written under `%LOCALAPPDATA%\\Masoud AI Studio\\data\\backups` and contain a SQLite online-backup snapshot plus the content-addressed asset storage. Each archive includes a manifest with file sizes and SHA-256 digests; verification also runs SQLite `PRAGMA integrity_check`.
+- Restore is intentionally offline-only. Exit Masoud AI Studio from the system tray, then run `scripts\\restore-backup-windows.bat "C:\\path\\to\\masoud-studio-....zip"` from the installed application folder. Add `--verify` to verify without restoring.
+- The restore utility refuses to run while port 8000 is accepting connections. Existing database and storage directories are retained as timestamped `.pre-restore-...` rollback copies.
+- The Windows DPAPI credential key is never included in a backup. To decrypt previously saved provider credentials after restore, use the same Windows account and original installation data (including `credential-key.dpapi`). A restore to another Windows account/device will not recover those encrypted credentials; re-enter provider credentials instead.
+- Backups do not include logs, temporary files, installer files, or the DPAPI key. Keep backup archives in a private location.
