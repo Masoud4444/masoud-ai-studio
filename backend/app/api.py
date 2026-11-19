@@ -6,8 +6,10 @@ from .schemas import ProjectCreate, ProjectPage, ProjectRead, ProjectUpdate
 from .storage import detach_project_asset, ingest_upload, list_project_assets
 from .ai_gateway import create_provider, list_providers, delete_provider, update_provider, generate_chat_completion, list_model_capabilities, update_model_capability, test_provider_connection, set_model_pricing, get_usage_summary, list_model_pricing_history
 from .gateway_schemas import ProviderCreate, ProviderRead, ProviderUpdate, ChatCompletionRequest, ChatCompletionRead, ModelCapabilityUpdate, ModelPricingUpdate
-from .task_manager import create_task, get_task, list_tasks, cancel_task, retry_task
+from .task_manager import create_task, get_task, list_tasks, cancel_task, retry_task, approve_task, reject_task_approval
 from .task_schemas import TaskCreate, TaskRead
+from .orchestrator import list_workflows, create_production_run, get_production_run, list_production_runs
+from .orchestrator_schemas import ProductionRunCreate
 
 router = APIRouter(prefix="/api/v1", tags=["studio"])
 
@@ -160,3 +162,46 @@ def post_task_cancel(task_id: str, db: Session = Depends(get_db)):
 @router.post("/tasks/{task_id}/retry")
 def post_task_retry(task_id: str, db: Session = Depends(get_db)):
     return retry_task(db, task_id)
+
+
+@router.post("/tasks/{task_id}/approve")
+def post_task_approval(task_id: str, db: Session = Depends(get_db)):
+    return approve_task(db, task_id)
+
+
+@router.post("/tasks/{task_id}/reject")
+def post_task_rejection(task_id: str, reason: str = Query("Human approval rejected", max_length=500),
+                        db: Session = Depends(get_db)):
+    return reject_task_approval(db, task_id, reason)
+
+
+@router.get("/production/workflows")
+def get_production_workflows():
+    return list_workflows()
+
+
+@router.post("/production/runs", status_code=201)
+def post_production_run(
+    payload: ProductionRunCreate,
+    idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=8, max_length=200),
+    db: Session = Depends(get_db),
+):
+    return create_production_run(
+        db, workflow_key=payload.workflow_key, inputs=payload.inputs,
+        idempotency_key=idempotency_key, project_id=payload.project_id,
+    )
+
+
+@router.get("/production/runs")
+def get_production_runs(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    project_id: str | None = Query(None, min_length=36, max_length=36),
+    db: Session = Depends(get_db),
+):
+    return list_production_runs(db, limit=limit, offset=offset, project_id=project_id)
+
+
+@router.get("/production/runs/{run_id}")
+def get_production_run_route(run_id: str, db: Session = Depends(get_db)):
+    return get_production_run(db, run_id)
