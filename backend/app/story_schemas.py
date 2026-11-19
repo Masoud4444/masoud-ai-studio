@@ -64,3 +64,8 @@ class StorySceneUpdate(BaseModel):
         if "title" in self.model_fields_set and self.title is None:
             raise ValueError("title cannot be null")
         return self
+
+
+class StorySceneReorder(BaseModel):
+    expected_story_version: int = Field(ge=1)
+    scene_ids: list[str] = Field(min_length=1, max_length=500)

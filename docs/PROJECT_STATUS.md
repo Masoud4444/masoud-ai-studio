@@ -120,5 +120,14 @@ Never infer one status from another.
 - Story and scene updates require expected versions and return HTTP 409 on stale edits. Scene updates also have their own optimistic version counter.
 - Added endpoints: POST/GET /api/v1/stories, GET/PATCH /api/v1/stories/{id}, POST /api/v1/stories/{id}/scenes, PATCH/DELETE /api/v1/stories/{id}/scenes/{scene_id}.
 - Added a Story Engine workspace for project-scoped story creation, ordered scene outline management, lifecycle status and revision history.
-- Dialogue editor, beat templates, character/world links, branching drafts, AI writing and series/season/episode hierarchy remain future increments.
+- Scene script editor, scene reordering, sluglines, dramatic purpose, setting and beat lists are now implemented. Character/world links, dedicated dialogue/character cue structures, beat templates, branching drafts, AI writing and series/season/episode hierarchy remain future increments.
 - No previously passed test suite was rerun during this implementation. CI may run automatically after the commit; no result is claimed here.
+
+
+## Story Engine scene editing v0.2
+
+- Added full scene editing for slugline, location, time of day, summary, dramatic purpose, ordered beat list and screenplay body.
+- Added scene reordering endpoint with strict permutation validation: the request must include every scene exactly once, and it uses story-level optimistic version checks.
+- Scene edits and reorder operations create a new immutable full-story revision. Each edited scene also increments its own version.
+- Workspace exposes edit, save, discard, move up/down and remove actions.
+- No prior successful test suites were rerun. New commits may trigger normal automatic CI; results are only reported when observed.

@@ -20,8 +20,8 @@ from .research_vault import (
     detach_source_from_project, create_evidence, list_evidence,
     create_claim, list_claims, get_claim, link_evidence_to_claim, update_claim,
 )
-from .story_engine import create_story, list_stories, get_story, update_story, create_scene, update_scene, delete_scene
-from .story_schemas import StoryCreate, StoryUpdate, StorySceneCreate, StorySceneUpdate
+from .story_engine import create_story, list_stories, get_story, update_story, create_scene, update_scene, delete_scene, reorder_scenes
+from .story_schemas import StoryCreate, StoryUpdate, StorySceneCreate, StorySceneUpdate, StorySceneReorder
 from .research_schemas import (
     ResearchSourceCreate, ResearchEvidenceCreate, ResearchClaimCreate,
     ResearchClaimEvidenceCreate, ResearchClaimUpdate,
@@ -421,3 +421,8 @@ def patch_story_scene(story_id: str, scene_id: str, payload: StorySceneUpdate, d
 @router.delete("/stories/{story_id}/scenes/{scene_id}")
 def delete_story_scene(story_id: str, scene_id: str, db: Session = Depends(get_db)):
     return delete_scene(db, story_id, scene_id)
+
+
+@router.post("/stories/{story_id}/scenes/reorder")
+def post_story_scene_reorder(story_id: str, payload: StorySceneReorder, db: Session = Depends(get_db)):
+    return reorder_scenes(db, story_id, payload.expected_story_version, payload.scene_ids)

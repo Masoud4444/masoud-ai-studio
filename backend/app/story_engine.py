@@ -91,3 +91,25 @@ def delete_scene(db:Session,story_id:str,scene_id:str):
     for i,item in enumerate(remaining,1): item.position=i
     _bump(db,story,f"Scene {deleted_position} deleted");db.commit()
     return _payload(db,story,True)
+
+
+def reorder_scenes(db: Session, story_id: str, expected_story_version: int, scene_ids: list[str]):
+    story = _get(db, story_id)
+    if story.version != expected_story_version:
+        raise HTTPException(status_code=409, detail={"code": "story_version_conflict", "current_version": story.version})
+    scenes = db.scalars(select(StoryScene).where(StoryScene.story_id == story_id).order_by(StoryScene.position)).all()
+    current_ids = {scene.id for scene in scenes}
+    requested_ids = set(scene_ids)
+    if len(scene_ids) != len(requested_ids) or requested_ids != current_ids:
+        raise HTTPException(status_code=422, detail={"code": "scene_order_must_contain_each_scene_once"})
+    by_id = {scene.id: scene for scene in scenes}
+    # Move through unique negative positions to avoid transient unique-index collisions.
+    for index, scene_id in enumerate(scene_ids, 1):
+        by_id[scene_id].position = -index
+    db.flush()
+    for index, scene_id in enumerate(scene_ids, 1):
+        by_id[scene_id].position = index
+    _bump(db, story, "Scene order changed")
+    db.commit()
+    db.refresh(story)
+    return _payload(db, story, True)
