@@ -1,4 +1,5 @@
 import pytest
+import time
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -71,3 +72,29 @@ def test_worker_sanitizes_handler_exceptions(session_factory):
     assert result["status"] == "queued"
     assert result["error_code"] == "handler_error"
     assert "secret" not in result["error_message"]
+
+
+
+def test_worker_renews_lease_for_long_running_handler(session_factory):
+    task = add_task(session_factory, "system.slow", "worker-slow")
+    registry = TaskHandlerRegistry()
+
+    def slow_handler(_payload):
+        time.sleep(4.2)
+        return {"completed": True}
+
+    registry.register("system.slow", slow_handler)
+    worker = WorkerSupervisor(
+        session_factory, "worker-slow", registry,
+        lease_seconds=10, poll_interval_seconds=0.1,
+    )
+    assert worker.run_once() is True
+    assert read_task(session_factory, task["id"])["status"] == "succeeded"
+
+    db = session_factory()
+    try:
+        from backend.app.models import TaskEvent
+        events = db.query(TaskEvent).filter_by(task_id=task["id"], event_type="lease_renewed").all()
+        assert len(events) >= 1
+    finally:
+        db.close()
