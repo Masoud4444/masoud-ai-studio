@@ -10,7 +10,9 @@ from backend.app.models import AIProvider, AgentEvent, StudioAgent
 from backend.app.agent_schemas import AgentCreate, AgentUpdate, AgentToolsUpdate
 from backend.app.agent_manager import (
     create_agent, get_agent, list_agents, replace_agent_tools,
-    enable_agent, disable_agent, update_agent,
+    enable_agent, disable_agent, update_agent, reserve_agent_budget,
+    start_agent_budget_reservation, settle_agent_budget_reservation,
+    release_agent_budget_reservation,
 )
 
 
@@ -126,3 +128,67 @@ def test_agent_patch_rejects_null_for_non_nullable_configuration():
 def test_agent_patch_rejects_unknown_permissions():
     with pytest.raises(ValidationError):
         AgentUpdate(permissions=["admin.root"])
+
+
+
+def enabled_agent(db_session, monthly_budget=2, per_run=1):
+    p = provider(db_session)
+    draft = create_agent(db_session, AgentCreate(
+        slug="budget-agent", name="Budget Agent",
+        purpose="Run budget controlled AI tasks",
+        system_prompt="Follow the assigned task and permission boundaries.",
+        provider_id=p.id, model_id="model-a",
+        monthly_budget_usd=monthly_budget, max_cost_per_run_usd=per_run,
+    ))
+    enable_agent(db_session, draft["id"])
+    return draft["id"]
+
+
+def test_agent_budget_reservation_is_idempotent_and_settles_actual_cost(db_session):
+    agent_id = enabled_agent(db_session)
+    request_hash = "a" * 64
+    reserved = reserve_agent_budget(db_session, agent_id, "budget-request-0001", request_hash, 1)
+    replay = reserve_agent_budget(db_session, agent_id, "budget-request-0001", request_hash, 1)
+    assert reserved["status"] == "reserved"
+    assert replay["id"] == reserved["id"]
+    assert replay["replayed"] is True
+
+    started = start_agent_budget_reservation(db_session, reserved["id"])
+    assert started["status"] == "running"
+    settled = settle_agent_budget_reservation(db_session, reserved["id"], 0.35)
+    assert settled["status"] == "succeeded"
+    assert settled["actual_cost_usd"] == 0.35
+
+
+def test_agent_budget_rejects_key_reuse_and_monthly_overspend(db_session):
+    agent_id = enabled_agent(db_session, monthly_budget=1, per_run=1)
+    reserve_agent_budget(db_session, agent_id, "budget-request-0002", "b" * 64, 0.8)
+    with pytest.raises(HTTPException) as conflict:
+        reserve_agent_budget(db_session, agent_id, "budget-request-0002", "c" * 64, 0.8)
+    assert conflict.value.detail["code"] == "idempotency_key_conflict"
+
+    with pytest.raises(HTTPException) as over:
+        reserve_agent_budget(db_session, agent_id, "budget-request-0003", "d" * 64, 0.3)
+    assert over.value.detail["code"] == "agent_monthly_budget_exceeded"
+
+
+def test_agent_budget_reservation_enforces_per_run_ceiling_and_release(db_session):
+    agent_id = enabled_agent(db_session, monthly_budget=5, per_run=0.5)
+    with pytest.raises(HTTPException) as over:
+        reserve_agent_budget(db_session, agent_id, "budget-request-0004", "e" * 64, 0.6)
+    assert over.value.detail["code"] == "agent_per_run_budget_exceeded"
+
+    reservation = reserve_agent_budget(db_session, agent_id, "budget-request-0005", "f" * 64, 0.4)
+    released = release_agent_budget_reservation(db_session, reservation["id"])
+    assert released["status"] == "released"
+    with pytest.raises(HTTPException) as invalid:
+        settle_agent_budget_reservation(db_session, reservation["id"], 0.1)
+    assert invalid.value.detail["code"] == "agent_budget_reservation_not_settleable"
+
+
+def test_agent_budget_cannot_settle_above_reserved_amount(db_session):
+    agent_id = enabled_agent(db_session)
+    reservation = reserve_agent_budget(db_session, agent_id, "budget-request-0006", "1" * 64, 0.5)
+    with pytest.raises(HTTPException) as over:
+        settle_agent_budget_reservation(db_session, reservation["id"], 0.6)
+    assert over.value.detail["code"] == "actual_cost_exceeds_reserved_budget"
