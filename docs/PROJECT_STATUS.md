@@ -13,7 +13,7 @@ Last updated: 2026-11-19
 
 ## Implemented backend
 
-- FastAPI application, SQLAlchemy 2 models, SQLite baseline and Alembic migrations 0001–0013.
+- FastAPI application, SQLAlchemy 2 models, SQLite baseline and Alembic migrations 0001–0014.
 - Project create/list/read/update/archive/restore API, optimistic version checks and duplicate-slug handling.
 - Content-addressed asset storage using SHA-256, streamed uploads, size limits, temporary staging, atomic placement, MIME sniffing, filename sanitization, project listing and detach.
 - AI Gateway provider registry, priority selection, OpenAI-compatible non-streaming completion, encrypted credentials and idempotent response storage (AES-256-GCM), SSRF-aware URL checks, DNS pinning, TLS verification, disabled redirects/proxies, sanitized errors, usage ledger and manually configured pricing history.
@@ -131,3 +131,13 @@ Never infer one status from another.
 - Scene edits and reorder operations create a new immutable full-story revision. Each edited scene also increments its own version.
 - Workspace exposes edit, save, discard, move up/down and remove actions.
 - No prior successful test suites were rerun. New commits may trigger normal automatic CI; results are only reported when observed.
+
+
+## Character Bible and World Bible v0.1
+- Story-scoped character profiles include role, age, structured appearance/psychology, backstory, goals, conflict, character arc and voice notes.
+- Character relationship records validate both endpoints against the same story and reject self-links and duplicates.
+- World locations contain structured geography and culture fields; categorized world rules are stored separately.
+- Scenes can reference characters with presence type and world locations. Cross-story links are rejected.
+- Character and location edits use optimistic version checks. Every Bible mutation stores an append-only full snapshot; history metadata is read-only.
+- API routes: GET /api/v1/stories/{story_id}/bible; POST/PATCH character and location routes; relationship/rule creation; scene character/location links.
+- Automated continuity inference, prop tracking, model sheets and a dedicated visual editor remain future increments. Prior passing test suites were not rerun.

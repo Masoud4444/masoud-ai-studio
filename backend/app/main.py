@@ -5,6 +5,7 @@ import os
 from fastapi import FastAPI
 
 from .api import router
+from .character_world import router as character_world_router
 from .database import Base, SessionLocal, engine
 from .worker import TaskHandlerRegistry, WorkerSupervisor
 
@@ -46,6 +47,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.include_router(router)
+app.include_router(character_world_router)
 
 
 @app.get("/health", tags=["system"])
