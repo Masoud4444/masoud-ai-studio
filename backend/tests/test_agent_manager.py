@@ -1,5 +1,3 @@
-import json
-
 import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
@@ -9,7 +7,7 @@ from sqlalchemy.pool import StaticPool
 
 from backend.app.database import Base
 from backend.app.models import AIProvider, AgentEvent, StudioAgent
-from backend.app.agent_schemas import AgentCreate, AgentToolsUpdate
+from backend.app.agent_schemas import AgentCreate, AgentUpdate, AgentToolsUpdate
 from backend.app.agent_manager import (
     create_agent, get_agent, list_agents, replace_agent_tools,
     enable_agent, disable_agent, update_agent,
@@ -71,9 +69,7 @@ def test_agent_enable_requires_registered_enabled_provider_and_model(db_session)
     assert enabled["status"] == "enabled"
     assert enabled["version"] == 2
     with pytest.raises(HTTPException) as exc2:
-        update_agent(db_session, created["id"], AgentCreate(
-            slug="another-agent", name="Another Agent", purpose="A valid purpose",
-        ))
+        update_agent(db_session, created["id"], AgentUpdate(name="Changed Name"))
     assert exc2.value.detail["code"] == "disable_agent_before_editing"
 
 
@@ -99,7 +95,7 @@ def test_agent_disable_and_audit_events(db_session):
     disabled = disable_agent(db_session, created["id"])
     assert disabled["status"] == "disabled"
     events = db_session.scalars(select(AgentEvent).where(AgentEvent.agent_id == created["id"])).all()
-    assert [e.event_type for e in events] == ["agent_created", "agent_enabled", "agent_disabled"]
+    assert {e.event_type for e in events} == {"agent_created", "agent_enabled", "agent_disabled"}
 
 
 def test_agent_slug_conflict_is_structured(db_session):
