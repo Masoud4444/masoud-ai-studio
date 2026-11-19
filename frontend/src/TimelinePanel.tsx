@@ -11,7 +11,7 @@ type EventItem = {
   chronology_note: string | null; active: boolean; version: number;
 };
 type Relation = { id: string; before_event_id: string; after_event_id: string; note: string | null };
-type Analysis = { is_consistent: boolean; ordered_event_ids: string[]; cycle_event_ids: string[]; relations_count: number; note: string };
+type Analysis = { is_consistent: boolean; ordered_event_ids: string[]; ordered_layers: string[][]; cycle_event_ids: string[]; relations_count: number; note: string };
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
