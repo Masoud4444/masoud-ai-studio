@@ -17,8 +17,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .models import AIProvider, AIRequest, AIUsage
-from .gateway_schemas import ProviderCreate, ChatCompletionRequest
+from .models import AIProvider, AIRequest, AIUsage, AIModelCapability
+from .gateway_schemas import ProviderCreate, ChatCompletionRequest, ModelCapabilityUpdate
 
 KEY_ENV = "MASOUD_STUDIO_CREDENTIAL_KEY"
 KEY_VERSION = int(os.getenv("MASOUD_STUDIO_CREDENTIAL_KEY_VERSION", "1"))
@@ -149,6 +149,8 @@ def create_provider(db: Session, payload: ProviderCreate) -> dict:
         models_json=json.dumps(payload.models), is_enabled=True,
     )
     db.add(provider)
+    for model_id in payload.models:
+        db.add(AIModelCapability(id=str(uuid4()), provider_id=provider.id, model_id=model_id))
     try:
         db.commit()
     except IntegrityError:
@@ -183,7 +185,7 @@ def _select_provider(db: Session, request: ChatCompletionRequest) -> AIProvider:
 
 
 def _request_hash(request: ChatCompletionRequest) -> str:
-    payload = request.model_dump(mode="json", exclude={"provider_id"})
+    payload = request.model_dump(mode="json")
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -309,3 +311,56 @@ async def generate_chat_completion(db: Session, payload: ChatCompletionRequest, 
             failed.status = "failed"
             db.commit()
         raise
+
+
+def list_model_capabilities(db: Session) -> list[dict]:
+    rows = db.scalars(
+        select(AIModelCapability, AIProvider)
+        .join(AIProvider, AIProvider.id == AIModelCapability.provider_id)
+        .order_by(AIProvider.name.asc(), AIModelCapability.model_id.asc())
+    ).all()
+    return [{
+        "provider_id": provider.id,
+        "provider_name": provider.name,
+        "model_id": row.model_id,
+        "capabilities": json.loads(row.capabilities_json),
+        "verification_status": row.verification_status,
+        "context_window": row.context_window,
+        "max_output_tokens": row.max_output_tokens,
+        "supports_streaming": row.supports_streaming,
+        "supports_tools": row.supports_tools,
+        "supports_vision": row.supports_vision,
+    } for row, provider in rows]
+
+
+def update_model_capability(db: Session, provider_id: str, model_id: str, payload: ModelCapabilityUpdate) -> dict:
+    provider = db.get(AIProvider, provider_id)
+    if provider is None:
+        raise HTTPException(status_code=404, detail={"code": "provider_not_found"})
+    if model_id not in json.loads(provider.models_json):
+        raise HTTPException(status_code=404, detail={"code": "provider_model_not_found"})
+    row = db.scalar(select(AIModelCapability).where(
+        AIModelCapability.provider_id == provider_id,
+        AIModelCapability.model_id == model_id,
+    ))
+    if row is None:
+        row = AIModelCapability(id=str(uuid4()), provider_id=provider_id, model_id=model_id)
+        db.add(row)
+    row.capabilities_json = json.dumps(sorted(set(payload.capabilities)))
+    row.context_window = payload.context_window
+    row.max_output_tokens = payload.max_output_tokens
+    row.supports_streaming = payload.supports_streaming
+    row.supports_tools = payload.supports_tools
+    row.supports_vision = payload.supports_vision
+    # User declarations are not provider-verified facts.
+    row.verification_status = "declared"
+    db.commit()
+    db.refresh(row)
+    return {
+        "provider_id": provider.id, "provider_name": provider.name,
+        "model_id": row.model_id, "capabilities": json.loads(row.capabilities_json),
+        "verification_status": row.verification_status,
+        "context_window": row.context_window, "max_output_tokens": row.max_output_tokens,
+        "supports_streaming": row.supports_streaming, "supports_tools": row.supports_tools,
+        "supports_vision": row.supports_vision,
+    }
