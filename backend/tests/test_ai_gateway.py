@@ -51,7 +51,7 @@ def test_provider_url_rejects_private_dns(monkeypatch):
 
 def test_provider_create_never_returns_credential(monkeypatch):
     set_key(monkeypatch)
-    monkeypatch.setattr("backend.app.ai_gateway.validate_provider_url", lambda value: "https://api.example/v1")
+    monkeypatch.setattr("backend.app.ai_gateway.validate_provider_url", lambda value, allow_local=False: "https://api.example/v1")
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine, expire_on_commit=False)
@@ -294,3 +294,23 @@ def test_model_router_prefers_lower_priority_enabled_provider():
         request = ChatCompletionRequest(model="same-model", messages=[{"role":"user","content":"route"}])
         assert _select_provider(db, request).id == preferred.id
     engine.dispose()
+
+
+@pytest.mark.parametrize("url", [
+    "http://127.0.0.1:11434/v1",
+    "http://localhost:1234/v1",
+    "https://[::1]:8443/v1",
+])
+def test_explicit_local_provider_accepts_loopback_only(url):
+    assert validate_provider_url(url, allow_local=True) == url.rstrip("/")
+
+
+@pytest.mark.parametrize("url", [
+    "http://192.168.1.10:11434/v1",
+    "http://10.0.0.5:8080/v1",
+    "http://169.254.169.254:80/latest",
+    "http://evil.example:11434/v1",
+])
+def test_local_provider_rejects_non_loopback_targets(url):
+    with pytest.raises(HTTPException):
+        validate_provider_url(url, allow_local=True)
