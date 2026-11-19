@@ -52,9 +52,9 @@ Last updated: 2026-11-19
 - Idempotent task creation with request-hash conflict detection.
 - Priority ordering, prerequisite gating, bounded attempt budgets, lease claims, completion/failure transitions, retry scheduling, manual retry, queued/blocked cancellation, and expired-lease recovery implemented as service primitives.
 - API routes: `POST /tasks`, `GET /tasks`, `GET /tasks/{task_id}`, `POST /tasks/{task_id}/cancel`, and `POST /tasks/{task_id}/retry`.
-- Worker claim/complete/fail functions are internal only; no public worker endpoints or background worker process have been enabled. This avoids exposing unauthenticated execution controls.
+- Worker claim/complete/fail functions remain internal only. A single-process Worker Supervisor, handler allowlist, lease recovery, result-size limit, sanitized failure persistence, and graceful shutdown are implemented. It is disabled by default and starts only with `MASOUD_STUDIO_WORKER_ENABLED=true`; only `system.healthcheck` is registered out of the box.
 - SQLite operation is currently single-worker only. Multi-process locking, PostgreSQL concurrency, cancellation signalling for running work, quotas, and worker supervision remain future hardening tasks.
-- Migration 0007 and Task Manager tests are implemented but have not yet passed CI.
+- Migrations 0007–0008 and Task Manager, Orchestrator, and Worker tests are implemented but have not yet passed CI.
 
 See [Task Manager contract](TASK_MANAGER.md).
 
@@ -142,3 +142,13 @@ See [AI Gateway implementation guide](AI_GATEWAY.md) for setup, environment conf
 - **Released:** a versioned build or release artifact exists.
 
 Never infer one status from another.
+
+
+### Worker Supervisor foundation (new)
+- Added a single-process sequential worker loop with a registered-handler allowlist; tasks without a registered handler are not claimed.
+- Each claim, completion, failure, and lease-recovery operation uses a short-lived database session.
+- Handler exceptions are persisted as generic sanitized errors; exception messages are never copied into task records.
+- Results are JSON-serialized and bounded by a configurable in-process limit (default 4 MiB).
+- Worker starts only when `MASOUD_STUDIO_WORKER_ENABLED=true`; default is disabled. Graceful shutdown waits for the current synchronous handler to finish.
+- Only `system.healthcheck` is built in. Creative workflow task types intentionally remain queued until their actual modules register handlers.
+- Known limits: synchronous handlers cannot be forcibly interrupted; lease heartbeat/renewal, per-handler execution timeout, process isolation, multi-worker SQLite coordination, and operator telemetry remain future work.
