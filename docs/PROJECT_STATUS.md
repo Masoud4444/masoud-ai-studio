@@ -13,7 +13,7 @@ Last updated: 2026-11-19
 
 ## Implemented backend
 
-- FastAPI application, SQLAlchemy 2 models, SQLite baseline and Alembic migrations 0001–0014.
+- FastAPI application, SQLAlchemy 2 models, SQLite baseline and Alembic migrations 0001–0017.
 - Project create/list/read/update/archive/restore API, optimistic version checks and duplicate-slug handling.
 - Content-addressed asset storage using SHA-256, streamed uploads, size limits, temporary staging, atomic placement, MIME sniffing, filename sanitization, project listing and detach.
 - AI Gateway provider registry, priority selection, OpenAI-compatible non-streaming completion, encrypted credentials and idempotent response storage (AES-256-GCM), SSRF-aware URL checks, DNS pinning, TLS verification, disabled redirects/proxies, sanitized errors, usage ledger and manually configured pricing history.
@@ -21,7 +21,7 @@ Last updated: 2026-11-19
 - Worker Supervisor: handler allowlist, lease heartbeat, bounded JSON results, sanitized handler errors and graceful shutdown. Disabled by default; only `system.healthcheck` is registered out of the box.
 - Production Orchestrator: code-defined `creative.preproduction` v1 workflow, persisted runs/steps, idempotent creation, approval gates, pause/resume/cancel.
 - Agent Manager: draft/enabled/disabled lifecycle, versioned config, provider/model checks, permissions/tool grants, approval requirements for write/execute grants, audit events and internal budget reservation ledger. A first text-only Agent Runtime is implemented at `POST /api/v1/agents/{agent_id}/run`, with explicit `ai.generate` permission, required model pricing, conservative pre-call budget reservation and Gateway idempotency.
-- Story Engine v0.1: project-linked story dossiers (format, genre, audience, premise, logline, synopsis, creative intent and lifecycle status), ordered scene outline records (slugline, summary, dramatic purpose, setting, beats and script body), optimistic version checks and immutable full-story snapshots after every mutation. Revision history is read-only.\n- Research Vault v0.2: source records, reusable project-source links, asset references, metadata-only URL records, bounded local PDF/DOCX extraction in a timed subprocess, exact evidence excerpts with page/paragraph locators, SHA-256 evidence deduplication, project claims, supporting/contradicting/contextualizing relationships, review gates, append-only provenance events and project-scoped full-text search across source metadata, evidence and claims. No migration required for search.
+- Story Engine v0.1: project-linked story dossiers (format, genre, audience, premise, logline, synopsis, creative intent and lifecycle status), ordered scene outline records (slugline, summary, dramatic purpose, setting, beats and script body), optimistic version checks and immutable full-story snapshots after every mutation. Revision history is read-only.\n- Timeline & Event Continuity: story-scoped in-world events, explicit before/after constraints, cycle prevention and deterministic topological-layer analysis. Screenplay scene order is not treated as in-world chronology.\n- Story Prop Registry: canonical story-scoped props with ownership checks, lifecycle status, holder links and optimistic versioning; continuity facts resolve registered prop IDs.\n- Research Vault v0.2: source records, reusable project-source links, asset references, metadata-only URL records, bounded local PDF/DOCX extraction in a timed subprocess, exact evidence excerpts with page/paragraph locators, SHA-256 evidence deduplication, project claims, supporting/contradicting/contextualizing relationships, review gates, append-only provenance events and project-scoped full-text search across source metadata, evidence and claims. No migration required for search.
 
 ## Implemented frontend
 
@@ -31,14 +31,14 @@ Last updated: 2026-11-19
 - AI agents: create draft profiles, view registry, enable/disable where provider/model requirements permit.
 - Assets: project selection, upload, list and detach. Detach does not delete the shared content-addressed blob.
 - Research Vault workspace: register sources, browse project-linked sources, capture exact evidence excerpts/locators, create project claims, link evidence as support/contradiction/context, accept/reject claims only when the required evidence relation exists, and search source metadata, excerpts, locators and claims with optional project scope. Existing project assets can be attached to source records, and the API verifies the asset is linked to the selected project. HTTP-level integration tests cover source creation, evidence capture, claim acceptance and safe refusal to detach referenced sources.
-- Story Engine workspace: create project stories, add/remove ordered scenes, change lifecycle status and inspect immutable revision history.\n- Characters & Worlds, Video & Audio, Compliance and Settings remain staged modules.
+- Story Engine workspace: create project stories, add/remove ordered scenes, change lifecycle status and inspect immutable revision history.\n- Characters & Worlds: character/world profiles, relationships, locations, world rules, scene links, continuity facts/issues and registered prop management.\n- Timeline workspace: in-world event creation, scene references, explicit chronology relations and partial-order analysis.\n- Video & Audio, Compliance and Settings remain staged modules.
 - Windows setup/start scripts and frontend guide are present under `scripts/` and `docs/FRONTEND.md`. The setup script checks Python 3.11+/Node.js 20+, installs dependencies, builds the frontend, then applies migrations.
 
 ## Verification evidence
 
 - Latest backend run [44515790910](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44515790910), commit `48166b4d72792e4e261e44f5eadde42eb7bc3538`: **88 passed, 1 warning**; fresh SQLite Alembic upgrade through head succeeded through migration 0012, including Research Vault search tests.
 - Latest frontend build [44515790960](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44515790960), commit `48166b4d72792e4e261e44f5eadde42eb7bc3538`: successful.
-- These are Linux CI checks. Windows install/runtime, real browser workflows, provider interoperability, concurrency/load behavior and desktop packaging have not been verified.
+- Windows packaging was verified on a GitHub-hosted Windows runner, including packaged startup and migrations. This is not equivalent to an end-user installation test on the target PC; real Windows account/SmartScreen/browser interaction, provider interoperability, concurrency/load behavior and data backup/restore still need acceptance checks.
 - CI mocks provider generation/model-list responses; no billable provider calls are made by CI.
 - One Starlette/httpx deprecation warning remains.
 
@@ -56,7 +56,7 @@ Last updated: 2026-11-19
 
 ## Not implemented yet
 
-- Windows desktop shell/packaging (Tauri), Android companion and hardened Web/PWA.
+- Native Tauri desktop window, Android companion and hardened Web/PWA. A self-contained Windows x64 installer now exists, but it opens the local studio in the default browser rather than a native app window.
 - Multimodal Research Vault intake, safe document parsing, OCR/transcription, source credibility scoring, semantic search and AI-assisted evidence extraction. The manual source/evidence/claim foundation is implemented.
 - Story Engine expansion: full script editor, dialogue, beat/act structures, scene reorder and richer scene editing, character/world links, Character Bible, World Bible, continuity and universe/series/season/episode management. The dossier, ordered scene outline and immutable revision foundation are implemented.
 - Visual Style Engine, character model sheets, cinematography, shot planning, storyboard/animatic completion.
@@ -67,9 +67,9 @@ Last updated: 2026-11-19
 
 ## Next implementation sequence
 
-1. Run the Windows setup script on the target PC; verify Python/Node versions, migrations through 0012, backend health and browser workflows. Record and fix any local runtime issues.
+1. Install the current Windows x64 preview on the target PC; verify first launch, DPAPI key persistence, migrations through 0017, backend health, tray exit/reopen and browser workflows. Record and fix any local runtime issues.
 2. Expand Research Vault extraction with OCR/transcription behind explicit local processing controls, stronger OS-level parser sandboxing and richer provenance. Do not add background URL fetching until an SSRF-safe fetch subsystem exists.
-3. Add end-to-end integration tests for project, asset, Research Vault, production and Agent screens.
+3. Add end-to-end integration tests for project, asset, Research Vault, Story/Character/World, Timeline, production and Agent screens.
 4. Harden local deployment: configuration validation, safe telemetry, Windows DPAPI credential storage, backup/restore and startup/shutdown behavior.
 5. Implement hard worker execution isolation and multi-worker-safe claims before registering creative handlers; then extend Agent Runtime/Tool Broker with explicit permission checks, approval enforcement, budget reconciliation and sandboxing.
 6. Expand Story Engine into script/beat/dialogue editing and series hierarchy; then implement Character/World continuity, Visual/Cinematography, production media tools, QA/compliance, export and companion clients.
@@ -234,3 +234,4 @@ Never infer one status from another.
 - The packaged Windows application now invokes a dedicated one-file `MasoudDocumentParser.exe` helper for PDF/DOCX extraction, preserving the existing bounded subprocess boundary when the main application is frozen.
 - The Windows installer workflow builds the helper separately and includes a DOCX extraction smoke check before packaging the installer.
 - The parser subprocess receives only a small environment allowlist and is launched without opening a console window.
+\n\n## Windows installer verification detail\n\n- Built installer: `Masoud-AI-Studio-Setup-0.3.0-x64.exe` inside the `Masoud-AI-Studio-Windows-x64` Actions artifact.\n- Source commit: `1f7680f86cec7a8d34bad06dc5ac28f5ece7e6b8`.\n- Artifact ZIP SHA-256: `c5e5b99033c2c3074d5fe261a0b37c8839c77a07423543599446db7ab6d532c1`.\n- Installer EXE SHA-256: `6cb4f1ab87d9334ec93da47d7941e6f5d00927d607ecdb591d7ff35a2c4290e3`.\n- This is an unsigned preview installer. The successful runner smoke test does not prove installation acceptance on the user's own Windows device.\n

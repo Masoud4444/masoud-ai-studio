@@ -10,7 +10,7 @@ Masoud AI Studio now has two Windows installation paths: a self-contained x64 in
 4. Run the installer. It installs the application for the current user; administrator rights are not required.
 5. Launch Masoud AI Studio from the Start menu (or the optional desktop shortcut).
 
-The package includes the Python backend, compiled React frontend, runtime dependencies, Alembic migrations and a separate bounded PDF/DOCX parser helper. Python and Node.js do not need to be installed separately on the target PC.
+The package includes the Python backend, compiled React frontend, runtime dependencies, Alembic migrations through 0017 and a separate bounded PDF/DOCX parser helper. The Windows CI run successfully smoke-tested the packaged executable startup, database migration and DOCX parser before producing the installer. Python and Node.js do not need to be installed separately on the target PC.
 
 At first launch, the application:
 - creates its private data directory under `%LOCALAPPDATA%\\Masoud AI Studio`;
@@ -55,3 +55,4 @@ The source setup creates a virtual environment, installs `requirements.txt`, bui
 - If port 8000 is already occupied, close the existing Masoud AI Studio instance and try again. The launcher will not attach to an unknown process.
 - If the credential key cannot be unprotected, run the app under the original Windows user account that installed it.
 - Preserve the complete data directory before attempting database recovery or reinstalling the application.
+\n\n### Preview artifact integrity\n\n- Actions artifact: `Masoud-AI-Studio-Windows-x64` from [successful Windows installer run](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44526720876).\n- ZIP SHA-256: `c5e5b99033c2c3074d5fe261a0b37c8839c77a07423543599446db7ab6d532c1`.\n- Setup EXE SHA-256: `6cb4f1ab87d9334ec93da47d7941e6f5d00927d607ecdb591d7ff35a2c4290e3`.\n- The installer is unsigned and is a preview build; perform normal security checks before using it with important data.\n

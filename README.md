@@ -22,7 +22,7 @@ A public-code, private-by-design, local-first AI creative production studio for 
 ## Current implementation
 
 ### Backend
-- FastAPI, SQLAlchemy 2, SQLite and Alembic migrations through 0015.
+- FastAPI, SQLAlchemy 2, SQLite and Alembic migrations through 0017.
 - Project lifecycle API with optimistic version checks.
 - Content-addressed local storage and project asset linking.
 - AI Provider registry, encrypted credentials, SSRF-aware URL validation and OpenAI-compatible non-streaming gateway.
