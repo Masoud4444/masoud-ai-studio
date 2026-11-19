@@ -6,58 +6,97 @@ A public-code, private-by-design, local-first AI creative production studio for 
 
 - **Full Vision, Simplified Architecture, Incremental Implementation**
 - Windows desktop is the primary platform; Android and Web/PWA are companion clients.
-- Local-first and offline-first by default; cloud-ready without requiring a distributed architecture.
-- Modular monolith: one backend, one primary database, one storage layer, one AI Gateway, one Agent Manager, and one Production Orchestrator.
-- Human approval is required for consequential creative and publishing decisions.
+- Local-first and offline-first by default; cloud-ready without requiring distributed infrastructure.
+- Modular monolith: one backend, one primary database, one storage layer, one AI Gateway, one Agent Manager, one Production Orchestrator, and a central Task Manager.
+- Human approval for consequential creative and publishing decisions.
 - Preserve provenance, version history, continuity, privacy, recoverability, and cost visibility.
-- The product is a private owner-operated studio, not a multi-tenant SaaS.
+- Private owner-operated studio, not a multi-tenant SaaS.
 
-## Technology baseline
+## Repository
 
-- Frontend: React, TypeScript, Vite (initial dashboard and project creation implemented)
-- Backend: Python, FastAPI, SQLAlchemy 2, Pydantic, Alembic
-- Initial database: SQLite
-- Desktop shell: Tauri (not implemented yet)
-- Companion clients: Android and Web/PWA (not implemented yet)
+- Public source repository: `Masoud4444/masoud-ai-studio`.
+- Active implementation branch: `implementation/bootstrap-001`.
+- `main` is intentionally untouched; no merge has been performed.
+- Studio data, credentials, and generated assets are intended to remain local/private. Do not commit secrets or personal project data.
 
-## Repository and branch
+## Current implementation
 
-- Public repository: `Masoud4444/masoud-ai-studio` (source code is public; the intended studio workspace and user data remain local/private).
-- Current implementation branch: `implementation/bootstrap-001`.
-- This branch is intentionally separate from `main`; no merge has been performed.
-- The implementation below is a fresh code path. Foundation 002 has not been imported or inspected in this branch.
-
-## Implemented backend slices
-
+### Backend
+- FastAPI, SQLAlchemy 2, SQLite and Alembic migrations through 0011.
 - Project lifecycle API with optimistic version checks.
-- Content-addressed storage and project asset linking.
-- AI Provider registry with encrypted credentials and SSRF-aware URL validation.
-- OpenAI-compatible non-streaming chat completion gateway with pinned DNS resolution, response encryption and idempotency.
-- Model capability declarations and provider model-ID verification.
-- Token usage ledger, manually configured model pricing, estimated cost tracking, and immutable pricing history.
-- Alembic schema migration baseline and follow-up migrations.
+- Content-addressed local storage and project asset linking.
+- AI Provider registry, encrypted credentials, SSRF-aware URL validation and OpenAI-compatible non-streaming gateway.
+- Model registry, usage ledger, manually configured pricing and cost estimates.
+- Central Task Manager with dependencies, idempotency, leases, retries and append-only events.
+- Production Orchestrator with preproduction workflow, approval gates and run pause/resume/cancel.
+- Worker Supervisor with handler allowlist, lease heartbeat, bounded JSON results and sanitized failures; disabled by default.
+- Agent Manager with lifecycle governance, tool grants and internal budget reservation ledger. Agent Runtime and Tool Broker are not implemented.
 
-See [Project Status](docs/PROJECT_STATUS.md), [Architecture](docs/ARCHITECTURE.md), and [AI Gateway Guide](docs/AI_GATEWAY.md).
+### Frontend
+- React, TypeScript, Vite and responsive dark studio shell.
+- Overview and Projects: project listing, search and project creation.
+- Production room: create and inspect preproduction runs; pause, resume and cancel controls.
+- AI agents: create draft profiles and view/configure registry state.
+- Assets: upload, list and detach project assets.
+- Research Vault, Characters & Worlds, Video & Audio, Compliance and Settings are staged modules, not completed tools.
 
-## Development setup
+### Desktop and companion clients
+- Windows setup/start scripts are provided.
+- Tauri desktop packaging, Android companion and hardened PWA are not implemented yet.
+
+## Windows quick start
+
+Requirements: Python 3.11+ and Node.js 20+ available on PATH.
+
+1. Clone the repository and switch to `implementation/bootstrap-001`.
+2. Run `scripts\\setup-windows.bat` once.
+3. Run `scripts\\start-backend-windows.bat`.
+4. In a second terminal, run `scripts\\start-frontend-windows.bat`.
+5. Open `http://127.0.0.1:5173`.
+
+The backend listens on `127.0.0.1:8000`. The frontend dev server proxies `/api` and `/health` to it. See [Windows/frontend guide](docs/FRONTEND.md).
+
+## CI verification checkpoint
+
+- Backend GitHub Actions run [44507323858](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44507323858): **72 passed**, Alembic upgrade to head succeeded on a fresh SQLite database through migration 0011.
+- Frontend build GitHub Actions run [44507106256](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44507106256): successful for the frontend tree at that commit.
+- CI ran on Linux. Windows installation, local browser interaction, provider interoperability and desktop packaging still require hands-on verification.
+
+## Development
+
+Backend:
 
 ```bash
 python -m pip install -r requirements.txt
-mkdir -p data
 alembic upgrade head
-uvicorn backend.app.main:app --reload
+python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
 ```
 
-Set `MASOUD_STUDIO_DATABASE_URL` if using a different database. Managed application startup expects migrations to have been applied. `MASOUD_STUDIO_SCHEMA_MODE=create` enables development-only metadata bootstrap.
+Frontend, in a second terminal:
 
-## Frontend development\n\n```bash\ncd frontend\nnpm install\nnpm run dev\n```\n\nThe Vite development server proxies `/api` and `/health` to the local FastAPI service at `127.0.0.1:8000`. Build with `npm run build`. The current UI slice supports project listing, search, and project creation; other studio areas are staged for incremental implementation.\n\n## Project asset endpoints
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-- `POST /api/v1/projects/{project_id}/assets` (multipart field: `file`)
-- `GET /api/v1/projects/{project_id}/assets`
-- `DELETE /api/v1/projects/{project_id}/assets/{link_id}` (detaches the project link; it does not delete shared blob bytes)
+Build frontend with `npm run build`.
 
-Blobs are stored locally under `data/storage/blobs/<sha256-prefix>/<sha256>` by default. Configure with `MASOUD_STUDIO_STORAGE_ROOT`; configure the upload limit with `MASOUD_STUDIO_MAX_UPLOAD_BYTES`.
+## Security boundaries
 
-## Important security boundary
+- Authentication and authorization are not implemented. Keep the backend bound to localhost; never expose it to the public internet or an untrusted LAN.
+- Do not commit provider API keys, encryption keys, database files, generated assets or personal data.
+- No paid provider credentials are included. No billable provider calls are made by the default setup.
+- Worker is disabled by default. Creative task handlers are not registered.
+- Agent profiles start as drafts. Agent Runtime, Tool Broker, execution sandbox and runtime budget enforcement are not complete.
+- Windows credential protection via DPAPI/OS keychain, hard worker process isolation, multi-worker coordination, backup/restore verification and independent security review remain required.
 
-The backend does not yet implement user authentication/authorization. Keep it bound to localhost or a trusted private environment. Do not expose it to the public internet. Windows deployment and recovery behavior still require verification.
+## Project documentation
+
+- [Project status and roadmap](docs/PROJECT_STATUS.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Frontend and Windows setup](docs/FRONTEND.md)
+- [Task Manager](docs/TASK_MANAGER.md)
+- [Production Orchestrator](docs/PRODUCTION_ORCHESTRATOR.md)
+- [AI Gateway](docs/AI_GATEWAY.md)
+- [Agent Manager](docs/AGENT_MANAGER.md)
