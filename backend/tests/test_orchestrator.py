@@ -7,7 +7,7 @@ from sqlalchemy.pool import StaticPool
 from backend.app.database import Base
 from backend.app.models import StudioTask, ProductionStep, ProductionRun
 from backend.app.orchestrator import (create_production_run, get_production_run, list_workflows, pause_production_run, resume_production_run, cancel_production_run)
-from backend.app.task_manager import claim_task, complete_task, approve_task
+from backend.app.task_manager import claim_task, complete_task, approve_task, fail_task, retry_task
 
 
 @pytest.fixture()
@@ -155,3 +155,27 @@ def test_pause_waits_for_active_step_then_resumes_pending_steps(db_session):
     resumed = resume_production_run(db_session, run["id"])
     assert resumed["status"] == "waiting_approval"
     assert next(step for step in resumed["steps"] if step["task_id"] == active["id"])["status"] == "succeeded"
+
+
+
+def test_retry_after_active_step_failure_remains_paused_until_run_resumes(db_session):
+    run = create_production_run(
+        db_session, "creative.preproduction", {"brief": "Pause then fail"}, "production-key-pause-fail-01",
+    )
+    active = claim_task(db_session, "worker-pause-fail")
+    assert active is not None
+    pause_production_run(db_session, run["id"])
+
+    failed = fail_task(
+        db_session, active["id"], "worker-pause-fail",
+        "temporary_failure", "safe failure", retry_delay_seconds=0,
+    )
+    assert failed["status"] == "paused"
+    assert db_session.get(StudioTask, active["id"]).paused_from_status == "queued"
+    assert claim_task(db_session, "worker-must-not-retry-paused") is None
+
+    resumed = resume_production_run(db_session, run["id"])
+    assert resumed["status"] == "queued"
+    restored = db_session.get(StudioTask, active["id"])
+    assert restored.status == "queued"
+    assert restored.paused_from_status is None
