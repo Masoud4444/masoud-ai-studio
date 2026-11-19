@@ -20,7 +20,7 @@ def test_system_settings_reports_local_paths_and_storage_without_secrets(tmp_pat
     monkeypatch.setattr(api_module, "STORAGE_ROOT", storage)
     monkeypatch.setenv("MASOUD_STUDIO_MAX_UPLOAD_BYTES", "4096")
     monkeypatch.setenv("MASOUD_STUDIO_DESKTOP_MODE", "true")
-    response = TestClient(app).get("/api/v1/settings/system")
+    response = TestClient(app).get("/api/v1/settings/system", headers={"host": "127.0.0.1:8000"})
     assert response.status_code == 200
     body = response.json()
     assert body["database_path"] == str(database.resolve())
