@@ -189,6 +189,7 @@ def test_agent_budget_reservation_enforces_per_run_ceiling_and_release(db_sessio
 def test_agent_budget_cannot_settle_above_reserved_amount(db_session):
     agent_id = enabled_agent(db_session)
     reservation = reserve_agent_budget(db_session, agent_id, "budget-request-0006", "1" * 64, 0.5)
+    start_agent_budget_reservation(db_session, reservation["id"])
     with pytest.raises(HTTPException) as over:
         settle_agent_budget_reservation(db_session, reservation["id"], 0.6)
     assert over.value.detail["code"] == "actual_cost_exceeds_reserved_budget"
