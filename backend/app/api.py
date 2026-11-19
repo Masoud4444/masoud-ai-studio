@@ -4,8 +4,8 @@ from .database import get_db
 from .projects import create_project, get_project, list_projects, serialize, set_archived, update_project
 from .schemas import ProjectCreate, ProjectPage, ProjectRead, ProjectUpdate
 from .storage import detach_project_asset, ingest_upload, list_project_assets
-from .ai_gateway import create_provider, list_providers, delete_provider, generate_chat_completion
-from .gateway_schemas import ProviderCreate, ProviderRead, ChatCompletionRequest, ChatCompletionRead
+from .ai_gateway import create_provider, list_providers, delete_provider, generate_chat_completion, list_model_capabilities, update_model_capability
+from .gateway_schemas import ProviderCreate, ProviderRead, ChatCompletionRequest, ChatCompletionRead, ModelCapabilityUpdate
 
 router = APIRouter(prefix="/api/v1", tags=["studio"])
 
@@ -73,3 +73,18 @@ async def post_ai_chat_completion(
     db: Session = Depends(get_db),
 ):
     return await generate_chat_completion(db, payload, idempotency_key)
+
+
+@router.get("/ai/models")
+def get_ai_models(db: Session = Depends(get_db)):
+    return list_model_capabilities(db)
+
+
+@router.patch("/ai/providers/{provider_id}/models/{model_id}")
+def patch_ai_model_capability(
+    provider_id: str,
+    model_id: str,
+    payload: ModelCapabilityUpdate,
+    db: Session = Depends(get_db),
+):
+    return update_model_capability(db, provider_id, model_id, payload)
