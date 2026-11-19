@@ -54,7 +54,7 @@ Last updated: 2026-11-19
 - API routes: `POST /tasks`, `GET /tasks`, `GET /tasks/{task_id}`, `POST /tasks/{task_id}/cancel`, and `POST /tasks/{task_id}/retry`.
 - Worker claim/complete/fail functions remain internal only. A single-process Worker Supervisor, handler allowlist, lease recovery, result-size limit, sanitized failure persistence, and graceful shutdown are implemented. It is disabled by default and starts only with `MASOUD_STUDIO_WORKER_ENABLED=true`; only `system.healthcheck` is registered out of the box.
 - SQLite operation is currently single-worker only. Multi-process locking, PostgreSQL concurrency, cancellation signalling for running work, quotas, and worker supervision remain future hardening tasks.
-- Migrations 0007–0008 and Task Manager, Orchestrator, and Worker tests are implemented but have not yet passed CI.
+- Migrations 0007–0009 and Task Manager, Orchestrator, and Worker tests are implemented but have not yet passed CI.
 
 See [Task Manager contract](TASK_MANAGER.md).
 
@@ -66,7 +66,7 @@ See [Task Manager contract](TASK_MANAGER.md).
 - Idempotency protects run creation and detects key/request conflicts.
 - Human approval checkpoints are represented by tasks in `waiting_approval`; approval releases the task to the Task Manager queue, while rejection cancels it.
 - API routes expose workflow registry, run creation/list/detail, and task approval/rejection.
-- Workflow handlers, worker process, run-level pause/resume/cancellation, database-managed workflow templates, and authenticated approvals are not implemented.
+- Creative workflow handlers are not implemented; the generic opt-in Worker Supervisor exists. Database-managed workflow templates and authenticated approvals are not implemented.
 - Migration 0008 and orchestrator tests are implemented but await CI verification.
 
 See [Production Orchestrator contract](PRODUCTION_ORCHESTRATOR.md).
@@ -115,7 +115,7 @@ See [AI Gateway implementation guide](AI_GATEWAY.md) for setup, environment conf
 - React/TypeScript frontend and Web/PWA.
 - Android companion client.
 - Agent Manager, agent permissions, tool sandbox and agent execution lifecycle.
-- Full Production Orchestrator capabilities: database-managed workflow templates, parallel branch fan-in/fan-out, run-level pause/resume/cancel, DLQ UI, and recovery dashboard.
+- Remaining Production Orchestrator capabilities: database-managed workflow templates, parallel branch fan-in/fan-out, DLQ UI, and recovery dashboard. Run-level pause/resume/cancel is implemented.
 - Research Vault, multimodal intake, provenance and evidence graph.
 - Story Engine, Character Bible, World Bible, continuity and universe/series management.
 - Visual Style Engine, Character/Cinematography/Visual Continuity pipeline.
@@ -129,8 +129,8 @@ See [AI Gateway implementation guide](AI_GATEWAY.md) for setup, environment conf
 1. Add integration tests for the outbound HTTP transport, DNS pinning, response sanitization, credential-key rotation, and concurrent idempotency.
 2. Complete AI Gateway operational controls: provider priority/routing, safe failure policy, budget controls, concurrency limits, circuit breaker, and optional streaming.
 3. Add Windows DPAPI-backed secret custody and Windows CI / packaging verification.
-4. Verify migrations 0007–0008 and Task Manager/Orchestrator/Worker tests; add hard execution timeouts/process isolation and multi-worker-safe claims before enabling creative handlers.
-5. Add run-level controls, versioned workflow registry, worker heartbeat/timeout supervision, and operator recovery tooling.
+4. Verify migrations 0007–0009 and Task Manager/Orchestrator/Worker tests; add hard execution timeouts/process isolation and multi-worker-safe claims before enabling creative handlers.
+5. Add a versioned workflow registry, hard worker timeout/process isolation, and operator recovery tooling.
 6. Implement task handlers and proceed with Research/Intake, Story, Character/Universe, Visual, Video, Audio, QA/Compliance, Export, Analytics, and companion clients.
 
 ## Status vocabulary
@@ -177,3 +177,12 @@ Never infer one status from another.
 - Active tasks are allowed to finish; the run reports `pausing` until no active tasks remain. Cancellation is rejected while any task is running.
 - Added regression tests for pause/resume restoration, pending-task cancellation, and refusing to cancel active work.
 - CI verification remains pending; migration and tests must pass before treating this feature as verified.
+
+
+### Run-level controls checkpoint
+- Run-level pause/resume/cancel endpoints are implemented and documented.
+- Migration 0009 persists task pre-pause state so queued and approval-waiting tasks resume to the exact prior state.
+- Active tasks are not killed: pause enters `pausing` until active work finishes; cancel is rejected while any task is running.
+- Added regression tests for idle pause/resume, cancellation, cancellation rejection during active work, and pausing while a step is active.
+- Added worker result validation rejecting non-finite JSON numbers and oversized outputs.
+- Latest branch-head CI status: pending; no test pass is claimed.
