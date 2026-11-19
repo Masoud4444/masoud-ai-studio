@@ -333,3 +333,23 @@ def reject_task_approval(db: Session, task_id: str, reason: str = "Human approva
     db.commit()
     db.refresh(task)
     return serialize_task(task)
+
+
+
+def renew_task_lease(db: Session, task_id: str, worker_id: str,
+                     lease_seconds: int = 120) -> bool:
+    """Extend a live lease only while the caller still owns an unexpired task."""
+    if not worker_id or len(worker_id) > 120 or not 10 <= lease_seconds <= 3600:
+        raise HTTPException(status_code=422, detail={"code": "invalid_worker_lease"})
+    task = db.get(StudioTask, task_id)
+    if task is None or task.status != "running" or task.locked_by != worker_id:
+        return False
+    now = _now()
+    if not _lease_is_valid(task):
+        return False
+    task.lease_expires_at = now + timedelta(seconds=lease_seconds)
+    task.updated_at = now
+    _event(db, task.id, "lease_renewed", "running", "running",
+           {"worker_id": worker_id, "lease_seconds": lease_seconds})
+    db.commit()
+    return True
