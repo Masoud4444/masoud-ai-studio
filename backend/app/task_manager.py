@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .models import Project, StudioTask, TaskDependency, TaskEvent
+from .models import Project, StudioTask, TaskDependency, TaskEvent, ProductionRun, ProductionStep
 
 
 def _now() -> datetime:
@@ -32,6 +32,21 @@ def _event(db: Session, task_id: str, event_type: str, before: str | None,
         from_status=before, to_status=after,
         detail_json=json.dumps(detail or {}, ensure_ascii=False, separators=(",", ":")),
     ))
+
+
+
+def _hold_retry_for_paused_run(db: Session, task: StudioTask) -> bool:
+    """Keep a retried production step paused while its parent run is pausing/paused."""
+    run_status = db.scalar(
+        select(ProductionRun.status)
+        .join(ProductionStep, ProductionStep.run_id == ProductionRun.id)
+        .where(ProductionStep.task_id == task.id)
+    )
+    if run_status not in {"pausing", "paused"}:
+        return False
+    task.paused_from_status = "queued"
+    task.status = "paused"
+    return True
 
 
 def serialize_task(task: StudioTask, include_payload: bool = True) -> dict:
@@ -169,6 +184,7 @@ def retry_task(db: Session, task_id: str) -> dict:
     before = task.status
     task.status = "queued"
     task.available_at = _now()
+    _hold_retry_for_paused_run(db, task)
     task.finished_at = None
     task.error_code = None
     task.error_message = None
@@ -262,6 +278,8 @@ def fail_task(db: Session, task_id: str, worker_id: str, error_code: str,
     retry = task.attempt_count < task.max_attempts
     task.status = "queued" if retry else "failed"
     task.available_at = _now() + timedelta(seconds=retry_delay_seconds) if retry else task.available_at
+    if retry:
+        _hold_retry_for_paused_run(db, task)
     task.finished_at = None if retry else _now()
     task.lease_expires_at = None
     task.locked_by = None
@@ -286,6 +304,8 @@ def recover_expired_leases(db: Session) -> int:
         retry = task.attempt_count < task.max_attempts
         task.status = "queued" if retry else "failed"
         task.available_at = now if retry else task.available_at
+        if retry:
+            _hold_retry_for_paused_run(db, task)
         task.finished_at = None if retry else now
         task.lease_expires_at = None
         task.locked_by = None
