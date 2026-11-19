@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .models import (
-    Asset, Project, ResearchClaim, ResearchClaimEvidence, ResearchEvidence,
+    Asset, Project, ProjectAsset, ResearchClaim, ResearchClaimEvidence, ResearchEvidence,
     ResearchEvent, ResearchSource, ProjectResearchSource,
 )
 from .research_schemas import (
@@ -106,6 +106,13 @@ def create_source(db: Session, payload: ResearchSourceCreate) -> dict:
     asset = db.get(Asset, payload.asset_id) if payload.asset_id else None
     if payload.asset_id and asset is None:
         raise HTTPException(status_code=404, detail={"code": "asset_not_found"})
+    if asset is not None and project is not None:
+        project_asset = db.scalar(select(ProjectAsset.id).where(
+            ProjectAsset.project_id == project.id,
+            ProjectAsset.asset_id == asset.id,
+        ))
+        if project_asset is None:
+            raise HTTPException(status_code=409, detail={"code": "asset_not_attached_to_project"})
     title = payload.title.strip()
     if not title:
         raise HTTPException(status_code=422, detail={"code": "source_title_required"})

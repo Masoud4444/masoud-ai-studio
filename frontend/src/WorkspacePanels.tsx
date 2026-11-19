@@ -42,6 +42,8 @@ type ResearchClaim={id:string;project_id:string;statement:string;claim_type:stri
 
 export function ResearchPanel({projects}:{projects:Project[]}) {
  const [projectId,setProjectId]=useState(projects[0]?.id??"");
+ const [availableAssets,setAvailableAssets]=useState<Asset[]>([]);
+ const [selectedAssetId,setSelectedAssetId]=useState("");
  const [sources,setSources]=useState<ResearchSource[]>([]);
  const [claims,setClaims]=useState<ResearchClaim[]>([]);
  const [sourceType,setSourceType]=useState("url");
@@ -65,6 +67,13 @@ export function ResearchPanel({projects}:{projects:Project[]}) {
   finally{setLoading(false);}
  }
  useEffect(()=>{if(!projectId&&projects.length)setProjectId(projects[0].id);},[projects,projectId]);
+ useEffect(()=>{
+  setSelectedAssetId("");
+  if(!projectId){setAvailableAssets([]);return;}
+  let active=true;
+  api<Asset[]>("/api/v1/projects/"+projectId+"/assets").then(items=>{if(active)setAvailableAssets(items??[]);}).catch(()=>{if(active)setAvailableAssets([]);});
+  return ()=>{active=false;};
+ },[projectId]);
  useEffect(()=>{void load();},[projectId]);
 
  async function createSource(e:FormEvent){
@@ -74,7 +83,8 @@ export function ResearchPanel({projects}:{projects:Project[]}) {
   try{
    await api("/api/v1/research/sources",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
     source_type:sourceType,title:title.trim(),canonical_url:sourceType==="url"?url.trim():null,
-    author:author.trim()||null,summary:summary.trim()||null,project_id:projectId||null
+    author:author.trim()||null,summary:summary.trim()||null,project_id:projectId||null,
+    asset_id:selectedAssetId||null
    })});
    setTitle("");setUrl("");setAuthor("");setSummary("");setNotice("Source saved with its provenance metadata.");await load();
   }catch(e){setError(e instanceof Error?e.message:"Could not save source");}
@@ -159,6 +169,12 @@ export function ResearchPanel({projects}:{projects:Project[]}) {
       <label className="field-label">Author / creator<input value={author} onChange={e=>setAuthor(e.target.value)} placeholder="Optional"/></label>
       <label className="field-label">Short summary<input value={summary} onChange={e=>setSummary(e.target.value)} placeholder="Optional context"/></label>
      </div>
+     {projectId&&<label className="field-label">Attach a stored file · upload files first in Assets
+      <select value={selectedAssetId} onChange={e=>setSelectedAssetId(e.target.value)}>
+       <option value="">No file attached</option>
+       {availableAssets.map(asset=><option key={asset.asset_id} value={asset.asset_id}>{asset.filename} · {asset.mime_type}</option>)}
+      </select>
+     </label>}
      <div className="form-foot"><span><ShieldCheck size={14}/> Metadata only · no background URL fetching</span><button className="primary-button" disabled={busy||!title.trim()}><Plus size={14}/> Save source</button></div>
     </form>
     {error&&<div className="connection-banner">{error}</div>}

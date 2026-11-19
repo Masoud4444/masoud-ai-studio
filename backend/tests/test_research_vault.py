@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from backend.app.database import Base
-from backend.app.models import Project, ResearchEvent
+from backend.app.models import Asset, Project, ProjectAsset, ResearchEvent
 from backend.app.research_schemas import (
     ResearchClaimCreate, ResearchClaimUpdate, ResearchEvidenceCreate, ResearchSourceCreate,
 )
@@ -172,3 +172,41 @@ def test_accepted_claim_cannot_lose_its_last_supporting_relation(db_session):
         link_evidence_to_claim(db_session, claim["id"], evidence["id"], "contextualizes")
     assert exc.value.detail["code"] == "accepted_claim_requires_supporting_evidence"
     assert get_claim(db_session, claim["id"])["evidence"][0]["relationship"] == "supports"
+
+
+
+def test_document_source_asset_must_be_attached_to_selected_project(db_session):
+    project_a = project(db_session, "asset-owner-project")
+    project_b = project(db_session, "asset-other-project")
+    asset = Asset(
+        sha256="a" * 64,
+        size_bytes=128,
+        mime_type="application/pdf",
+        storage_key="blobs/aa/" + "a" * 64,
+    )
+    db_session.add(asset)
+    db_session.flush()
+    db_session.add(ProjectAsset(
+        project_id=project_a.id,
+        asset_id=asset.id,
+        original_filename="source.pdf",
+    ))
+    db_session.commit()
+
+    with pytest.raises(HTTPException) as exc:
+        create_source(db_session, ResearchSourceCreate(
+            source_type="document",
+            title="Mis-scoped document",
+            project_id=project_b.id,
+            asset_id=asset.id,
+        ))
+    assert exc.value.detail["code"] == "asset_not_attached_to_project"
+
+    source = create_source(db_session, ResearchSourceCreate(
+        source_type="document",
+        title="Attached document",
+        project_id=project_a.id,
+        asset_id=asset.id,
+    ))
+    assert source["asset_id"] == asset.id
+    assert source["content_hash"] == asset.sha256
