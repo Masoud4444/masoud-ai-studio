@@ -133,7 +133,7 @@ class WorkerSupervisor:
         try:
             if not isinstance(result, dict):
                 raise TypeError("Task handlers must return an object")
-            encoded = json.dumps(result, ensure_ascii=False, separators=(",", ":"))
+            encoded = json.dumps(result, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
             if len(encoded.encode("utf-8")) > self.max_result_bytes:
                 self._fail(task["id"], "result_too_large", "Task result exceeded the configured limit")
                 return True
