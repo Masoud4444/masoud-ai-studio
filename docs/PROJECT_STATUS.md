@@ -42,7 +42,8 @@ Last updated: 2026-11-19
 - AI model capability registry with declared vs. model-ID-verified states. Provider `/models` probe verifies only model identifiers, not feature behavior.
 - Token usage ledger; manually configured input/output USD-per-million-token pricing; cost estimate snapshot on usage rows; immutable pricing history and pricing version provenance.
 - Usage summary reports unpriced requests separately. Pricing is never guessed or silently fetched.
-- Provider model registry backfill migration for existing provider configurations.\n- Deterministic provider selection by model availability, enabled state, priority and creation time.
+- Provider model registry backfill migration for existing provider configurations.
+- Deterministic provider selection by model availability, enabled state, priority and creation time.
 
 ### AI Gateway API routes
 
@@ -65,7 +66,8 @@ See [AI Gateway implementation guide](AI_GATEWAY.md) for setup, environment conf
 
 - GitHub Actions workflow run `44445452582` completed successfully for commit `cf24526ff43c85ba6bcde6fcc8a9757dc20b485d`.
 - Result: **21 passed, 1 warning** on Python 3.11 / Ubuntu runner.
-- The same CI run successfully executed Alembic upgrades through revisions 0001–0005 on a fresh SQLite database.\n- Provider priority, migration 0006, and the newest concurrency-test adjustment were added afterward; those changes must not be treated as verified until their own CI run completes.
+- The same CI run successfully executed Alembic upgrades through revisions 0001–0005 on a fresh SQLite database.
+- Provider priority, migration 0006, and the newest concurrency-test adjustment were added afterward; those changes must not be treated as verified until their own CI run completes.
 - Earlier failing CI runs exposed implementation defects; those were corrected and the successful run above is the verified result.
 - This is Linux CI verification only. Windows behavior, real provider interoperability, DNS/TLS behavior against external providers, load/concurrency behavior, and recovery on actual desktop storage have not yet been verified.
 - The CI tests mock provider generation and provider model-list responses; they do not make billable requests to a real AI provider.
