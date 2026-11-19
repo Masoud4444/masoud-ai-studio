@@ -277,3 +277,17 @@ def test_concurrent_duplicate_idempotency_key_is_rejected(monkeypatch):
             second_db.close()
     asyncio.run(scenario())
     engine.dispose()
+
+
+def test_model_router_prefers_lower_priority_enabled_provider():
+    from backend.app.ai_gateway import _select_provider
+    engine, Session = gateway_db()
+    with Session() as db:
+        slower = AIProvider(name="Lower Priority Number", base_url="https://api-a.example/v1", models_json='["same-model"]', priority=50)
+        preferred = AIProvider(name="Preferred Provider", base_url="https://api-b.example/v1", models_json='["same-model"]', priority=10)
+        disabled = AIProvider(name="Disabled Provider", base_url="https://api-c.example/v1", models_json='["same-model"]', priority=1, is_enabled=False)
+        db.add_all([slower, preferred, disabled])
+        db.commit()
+        request = ChatCompletionRequest(model="same-model", messages=[{"role":"user","content":"route"}])
+        assert _select_provider(db, request).id == preferred.id
+    engine.dispose()
