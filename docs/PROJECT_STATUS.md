@@ -8,7 +8,7 @@ Last updated: 2026-11-19
 - Active implementation branch: `implementation/bootstrap-001`.
 - The implementation branch is intentionally separate from `main`; no merge has been performed.
 - The Foundation 002 archive has not been inspected or imported into this implementation branch. The backend work below is a fresh implementation and must not be described as an import.
-- Last fully verified implementation commit: `cf24526ff43c85ba6bcde6fcc8a9757dc20b485d`.
+- Last fully verified implementation commit: `cf24526ff43c85ba6bcde6fcc8a9757dc20b485d` (21 tests passed; migrations 0001–0005). Provider priority routing and migration 0006 have been added after that commit and are awaiting CI verification.
 - Later documentation-only commits update the README and AI Gateway guide; their CI is tracked separately.
 
 ## Implemented code
@@ -19,7 +19,7 @@ Last updated: 2026-11-19
 - SQLAlchemy 2 models and SQLite default configuration.
 - Project create, list, read, update, archive, and restore endpoints.
 - Optimistic project version checks and duplicate-slug conflict handling.
-- Alembic migrations 0001–0005; application startup defaults to migration-managed schema mode. Development-only `create_all` bootstrap requires `MASOUD_STUDIO_SCHEMA_MODE=create`.
+- Alembic migrations 0001–0006 (0006 provider priority is pending CI verification); application startup defaults to migration-managed schema mode. Development-only `create_all` bootstrap requires `MASOUD_STUDIO_SCHEMA_MODE=create`.
 
 ### Storage and asset management
 
@@ -30,7 +30,7 @@ Last updated: 2026-11-19
 
 ### AI Gateway
 
-- Provider registry API: create, list, disable.
+- Provider registry API: create, list, disable, enable/disable update, and configurable priority (lower number is preferred).
 - OpenAI-compatible non-streaming chat completion endpoint.
 - AES-256-GCM encryption for provider credentials and stored idempotent responses; per-record key versioning and version-specific environment key support.
 - Provider URL validation at registration and again before outbound requests.
@@ -42,7 +42,7 @@ Last updated: 2026-11-19
 - AI model capability registry with declared vs. model-ID-verified states. Provider `/models` probe verifies only model identifiers, not feature behavior.
 - Token usage ledger; manually configured input/output USD-per-million-token pricing; cost estimate snapshot on usage rows; immutable pricing history and pricing version provenance.
 - Usage summary reports unpriced requests separately. Pricing is never guessed or silently fetched.
-- Provider model registry backfill migration for existing provider configurations.
+- Provider model registry backfill migration for existing provider configurations.\n- Deterministic provider selection by model availability, enabled state, priority and creation time.
 
 ### AI Gateway API routes
 
@@ -65,7 +65,7 @@ See [AI Gateway implementation guide](AI_GATEWAY.md) for setup, environment conf
 
 - GitHub Actions workflow run `44445452582` completed successfully for commit `cf24526ff43c85ba6bcde6fcc8a9757dc20b485d`.
 - Result: **21 passed, 1 warning** on Python 3.11 / Ubuntu runner.
-- The same CI run successfully executed Alembic upgrades through revisions 0001–0005 on a fresh SQLite database.
+- The same CI run successfully executed Alembic upgrades through revisions 0001–0005 on a fresh SQLite database.\n- Provider priority, migration 0006, and the newest concurrency-test adjustment were added afterward; those changes must not be treated as verified until their own CI run completes.
 - Earlier failing CI runs exposed implementation defects; those were corrected and the successful run above is the verified result.
 - This is Linux CI verification only. Windows behavior, real provider interoperability, DNS/TLS behavior against external providers, load/concurrency behavior, and recovery on actual desktop storage have not yet been verified.
 - The CI tests mock provider generation and provider model-list responses; they do not make billable requests to a real AI provider.
