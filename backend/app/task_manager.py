@@ -189,7 +189,7 @@ def retry_task(db: Session, task_id: str) -> dict:
     task.error_code = None
     task.error_message = None
     task.updated_at = _now()
-    _event(db, task.id, "manual_retry", before, "queued")
+    _event(db, task.id, "manual_retry", before, task.status)
     db.commit()
     db.refresh(task)
     return serialize_task(task)
