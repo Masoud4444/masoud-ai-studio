@@ -242,6 +242,76 @@ def post_production_run_cancel(run_id: str, db: Session = Depends(get_db)):
 
 
 
+
+# Read-only local system diagnostics. Never returns credential material or provider secrets.
+def _directory_usage(root):
+    from pathlib import Path
+    total = files = 0
+    if not root.exists():
+        return {"bytes": 0, "files": 0}
+    if root.is_symlink():
+        raise HTTPException(409, detail={"code": "unsafe_storage_root"})
+    for current, directories, filenames in __import__("os").walk(root, followlinks=False):
+        base = Path(current)
+        directories[:] = [name for name in directories if not (base / name).is_symlink()]
+        for name in filenames:
+            item = base / name
+            if item.is_symlink():
+                continue
+            try:
+                if item.is_file():
+                    total += item.stat().st_size
+                    files += 1
+            except OSError:
+                continue
+    return {"bytes": total, "files": files}
+
+
+@router.get("/settings/system")
+def get_system_settings():
+    import os
+    import shutil
+    from pathlib import Path
+    database_name = engine.url.database
+    if not database_name or database_name == ":memory:":
+        database_path = None
+        data_root = Path.cwd() / "data"
+    else:
+        database_path = Path(database_name).expanduser().resolve()
+        data_root = database_path.parent
+    storage_root = Path(STORAGE_ROOT).expanduser().resolve()
+    backup_root = (data_root / "backups").resolve()
+    try:
+        disk = shutil.disk_usage(data_root if data_root.exists() else data_root.parent)
+        disk_info = {"total_bytes": disk.total, "used_bytes": disk.used, "free_bytes": disk.free}
+    except OSError:
+        disk_info = {"total_bytes": None, "used_bytes": None, "free_bytes": None}
+    database_bytes = 0
+    if database_path is not None:
+        for suffix in ("", "-wal", "-shm"):
+            candidate = Path(str(database_path) + suffix)
+            try:
+                if candidate.is_file() and not candidate.is_symlink():
+                    database_bytes += candidate.stat().st_size
+            except OSError:
+                pass
+    key_file = data_root / "credential-key.dpapi"
+    return {
+        "app_data_root": str(data_root),
+        "database_path": str(database_path) if database_path else None,
+        "database_bytes": database_bytes,
+        "storage_path": str(storage_root),
+        "storage": _directory_usage(storage_root),
+        "backup_path": str(backup_root),
+        "backup_count": sum(1 for item in backup_root.glob("masoud-studio-*.zip") if item.is_file() and not item.is_symlink()) if backup_root.exists() else 0,
+        "disk": disk_info,
+        "max_upload_bytes": int(os.getenv("MASOUD_STUDIO_MAX_UPLOAD_BYTES", str(100 * 1024 * 1024))),
+        "desktop_mode": os.getenv("MASOUD_STUDIO_DESKTOP_MODE", "").lower() == "true",
+        "credential_key_present": key_file.is_file() and not key_file.is_symlink(),
+        "network_policy": "loopback-only in packaged desktop mode; no authentication for local process access",
+    }
+
+
 # Local backup management. Restore is deliberately offline-only.
 def _backup_locations():
     database_name = engine.url.database

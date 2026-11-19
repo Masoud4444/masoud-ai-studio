@@ -299,3 +299,30 @@ export function BackupPanel(){
  <div className="backup-guidance"><div><b>Restore is an offline operation</b><p>To restore, exit the studio completely, then run <code>restore-backup-windows.bat</code> from the installed application folder and provide the backup ZIP path. The tool checks the archive and keeps the previous database and storage as rollback copies.</p></div><div><b>Credential key protection</b><p>The Windows DPAPI key is deliberately excluded. Encrypted provider credentials can only be recovered with the original key under the same Windows account; otherwise, re-enter them after restoring.</p></div></div>
  </section>;
 }
+
+
+type SystemSettings={app_data_root:string;database_path:string|null;database_bytes:number;storage_path:string;storage:{bytes:number;files:number};backup_path:string;backup_count:number;disk:{total_bytes:number|null;used_bytes:number|null;free_bytes:number|null};max_upload_bytes:number;desktop_mode:boolean;credential_key_present:boolean;network_policy:string};
+export function SettingsPanel(){
+ const [system,setSystem]=useState<SystemSettings|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState("");
+ async function load(){setLoading(true);setError("");try{setSystem(await api<SystemSettings>("/api/v1/settings/system"));}catch(e){setError(e instanceof Error?e.message:"Could not load local settings");}finally{setLoading(false);}}
+ useEffect(()=>{void load();},[]);
+ const bytes=(value:number|null|undefined)=>{if(value==null)return "Unavailable";if(value<1024)return value+" B";if(value<1024*1024)return (value/1024).toFixed(1)+" KB";if(value<1024*1024*1024)return (value/1024/1024).toFixed(2)+" MB";return (value/1024/1024/1024).toFixed(2)+" GB";};
+ const percent=system?.disk.total_bytes?Math.min(100,Math.max(0,(system.disk.used_bytes??0)/system.disk.total_bytes*100)):0;
+ return <div className="settings-stack">
+ <section className="workspace-panel"><div className="panel-header"><div><span className="eyebrow">STUDIO CONFIGURATION</span><h2>Local system settings</h2><p>Inspect the active data locations, disk capacity and local security posture.</p></div><button className="secondary-button" onClick={()=>void load()} disabled={loading}><RefreshCw size={14}/> Refresh</button></div>
+ {error&&<div className="connection-banner">{error}</div>}
+ {loading?<div className="empty-state">Reading local system configuration…</div>:system&&<>
+ <div className="settings-metrics">
+ <article className="settings-stat"><span>STORAGE USED</span><b>{bytes(system.storage.bytes)}</b><small>{system.storage.files.toLocaleString()} stored files</small></article>
+ <article className="settings-stat"><span>DATABASE</span><b>{bytes(system.database_bytes)}</b><small>SQLite database and active journal files</small></article>
+ <article className="settings-stat"><span>FREE DISK SPACE</span><b>{bytes(system.disk.free_bytes)}</b><small>On the application data volume</small></article>
+ <article className="settings-stat"><span>BACKUP ARCHIVES</span><b>{system.backup_count}</b><small>Local backup files</small></article>
+ </div>
+ <div className="settings-block"><div className="settings-block-heading"><b>Disk capacity</b><span>{bytes(system.disk.used_bytes)} used of {bytes(system.disk.total_bytes)}</span></div><div className="settings-progress"><i style={{width:percent+"%"}}/></div><small>Storage usage is calculated from the local content-addressed asset directory.</small></div>
+ <div className="settings-paths"><div><span>APPLICATION DATA</span><code>{system.app_data_root}</code></div><div><span>DATABASE</span><code>{system.database_path??"In-memory database"}</code></div><div><span>ASSET STORAGE</span><code>{system.storage_path}</code></div><div><span>BACKUP DIRECTORY</span><code>{system.backup_path}</code></div></div>
+ <div className="settings-block"><div className="settings-block-heading"><b>Local security & limits</b><span className={system.desktop_mode?"settings-good":"settings-neutral"}>{system.desktop_mode?"Packaged desktop mode":"Development mode"}</span></div><div className="settings-security"><div><ShieldCheck size={16}/><span>{system.network_policy}</span></div><div><FolderOpen size={16}/><span>Maximum upload size: {bytes(system.max_upload_bytes)}</span></div><div><ShieldCheck size={16}/><span>Windows credential key: {system.credential_key_present?"Present (key material not exposed)":"Not detected in this runtime"}</span></div></div><p className="settings-note">These diagnostics are read-only. Data paths and upload limits are shown for transparency; changing paths requires a controlled migration and application restart. Do not expose the local API to a public network.</p></div>
+ </>}
+ </section>
+ <BackupPanel/>
+ </div>;
+}
