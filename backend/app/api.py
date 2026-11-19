@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Header, Query, UploadFile
 from sqlalchemy.orm import Session
 from .database import get_db
 from .projects import create_project, get_project, list_projects, serialize, set_archived, update_project
 from .schemas import ProjectCreate, ProjectPage, ProjectRead, ProjectUpdate
 from .storage import detach_project_asset, ingest_upload, list_project_assets
-from .ai_gateway import create_provider, list_providers, delete_provider
-from .gateway_schemas import ProviderCreate, ProviderRead
+from .ai_gateway import create_provider, list_providers, delete_provider, generate_chat_completion
+from .gateway_schemas import ProviderCreate, ProviderRead, ChatCompletionRequest, ChatCompletionRead
 
 router = APIRouter(prefix="/api/v1", tags=["studio"])
 
@@ -64,3 +64,12 @@ def get_ai_providers(db: Session = Depends(get_db)):
 @router.delete("/ai/providers/{provider_id}", status_code=204)
 def remove_ai_provider(provider_id: str, db: Session = Depends(get_db)):
     delete_provider(db, provider_id)
+
+
+@router.post("/ai/chat/completions", response_model=ChatCompletionRead)
+async def post_ai_chat_completion(
+    payload: ChatCompletionRequest,
+    idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=8, max_length=200),
+    db: Session = Depends(get_db),
+):
+    return await generate_chat_completion(db, payload, idempotency_key)
