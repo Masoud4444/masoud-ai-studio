@@ -10,7 +10,7 @@ The studio frontend is a React + TypeScript + Vite application. Development mode
 - Assets: project selection, upload, list and detach without deleting the underlying content-addressed blob.
 - Research Vault: source metadata, project scoping, exact excerpts and locators, claims, evidence relationships, review gates, search and bounded local PDF/DOCX text extraction.
 - Story Engine: story dossiers, ordered scene outlines and immutable revision history.
-- Characters & Worlds: character and location dossiers, world rules, relationships, scene links, revision history and continuity fact/issue review.
+- Characters & Worlds: character and location dossiers, world rules, relationships, scene links, revision history and continuity fact/issue review. The explicit in-world timeline API exists; its visual editor is not yet implemented.
 - Video & Audio, Compliance and Settings still contain staged areas; they are not represented as finished production tools.
 
 ## Standard Windows setup and launch

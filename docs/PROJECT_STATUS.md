@@ -177,3 +177,13 @@ Never infer one status from another.
 - This increment has been committed to implementation/bootstrap-001 as 459ffff41b09e905c2fa5f7fafe613a5b638957f.
 - Verification for this increment: repository files and branch head were inspected after commit. No tests or builds were rerun. The launcher has not yet been executed on a Windows machine.
 - This is not yet a native desktop installer. Tauri packaging, a bundled Python runtime/backend, Windows code signing, DPAPI-backed credential protection, update delivery, backup/restore and hands-on Windows acceptance remain outstanding.
+
+
+## Timeline & Event Continuity v0.1 — 2026-11-19
+
+- Added story-scoped in-world timeline events that can optionally reference a screenplay scene.
+- Added explicit directed before/after ordering constraints, duplicate-edge idempotency, same-story ownership validation and cycle rejection.
+- Added deterministic topological analysis. Events without a declared path remain unordered; screenplay scene position is never treated as in-world chronology.
+- API routes: GET/POST /api/v1/stories/{sid}/timeline/events, PATCH /events/{event_id}, GET/POST /relations and POST /analyze.
+- Migration 0016_timeline_events follows 0015_continuity_engine.
+- Backend API implementation is committed but not yet covered by a verified CI result or a Windows runtime check. Timeline UI and dedicated prop registry remain outstanding.

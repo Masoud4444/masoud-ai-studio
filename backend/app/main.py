@@ -13,6 +13,7 @@ load_dotenv(ROOT_DIR / ".env", override=False)
 from .api import router
 from .character_world import router as character_world_router
 from .continuity import router as continuity_router
+from .timeline import router as timeline_router
 from .database import Base, SessionLocal, engine
 from .worker import TaskHandlerRegistry, WorkerSupervisor
 
@@ -56,6 +57,7 @@ app = FastAPI(
 app.include_router(router)
 app.include_router(character_world_router)
 app.include_router(continuity_router)
+app.include_router(timeline_router)
 
 
 @app.get("/health", tags=["system"])
