@@ -6,6 +6,7 @@ import ipaddress
 import json
 import os
 import socket
+import time
 from datetime import datetime, timezone
 from urllib.parse import urlsplit, urlunsplit
 from uuid import uuid4
@@ -13,7 +14,7 @@ from uuid import uuid4
 import aiohttp
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -261,6 +262,8 @@ async def _send_chat_completion(provider: AIProvider, payload: ChatCompletionReq
 async def generate_chat_completion(db: Session, payload: ChatCompletionRequest, idempotency_key: str) -> dict:
     if not idempotency_key or len(idempotency_key) > 200:
         raise HTTPException(status_code=400, detail={"code": "idempotency_key_invalid"})
+    if len(payload.model_dump_json().encode("utf-8")) > 1_000_000:
+        raise HTTPException(status_code=413, detail={"code": "ai_request_too_large"})
     provider = _select_provider(db, payload)
     idem_hash = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
     req_hash = _request_hash(payload)
@@ -269,21 +272,44 @@ async def generate_chat_completion(db: Session, payload: ChatCompletionRequest, 
         if existing.request_hash != req_hash:
             raise HTTPException(status_code=409, detail={"code": "idempotency_key_conflict"})
         if existing.status == "completed" and existing.encrypted_response:
-            result = _decrypt_response(existing.encrypted_response, existing.response_key_version)
+            try:
+                result = _decrypt_response(existing.encrypted_response, existing.response_key_version)
+            except Exception:
+                raise HTTPException(status_code=503, detail={"code": "stored_response_decryption_failed"})
             result["replayed"] = True
             return result
+        now = int(time.time())
         if existing.status == "pending":
-            raise HTTPException(status_code=409, detail={"code": "request_in_progress"})
-        existing.status = "pending"
-        existing.provider_id = provider.id
-        existing.model = payload.model
-        existing.encrypted_response = None
+            if not existing.lease_expires_at or existing.lease_expires_at > now:
+                raise HTTPException(status_code=409, detail={"code": "request_in_progress"})
+            claimed = db.execute(update(AIRequest).where(
+                AIRequest.id == existing.id,
+                AIRequest.status == "pending",
+                AIRequest.lease_expires_at <= now,
+            ).values(lease_expires_at=now + 180, updated_at=datetime.now(timezone.utc)))
+            if claimed.rowcount != 1:
+                db.rollback()
+                raise HTTPException(status_code=409, detail={"code": "request_in_progress"})
+            db.refresh(existing)
+        else:
+            claimed = db.execute(update(AIRequest).where(
+                AIRequest.id == existing.id,
+                AIRequest.status == "failed",
+            ).values(
+                status="pending", lease_expires_at=now + 180,
+                provider_id=provider.id, model=payload.model,
+                encrypted_response=None, updated_at=datetime.now(timezone.utc),
+            ))
+            if claimed.rowcount != 1:
+                db.rollback()
+                raise HTTPException(status_code=409, detail={"code": "request_in_progress"})
+            db.refresh(existing)
         request_row = existing
     else:
         request_row = AIRequest(
             id=str(uuid4()), idempotency_hash=idem_hash, request_hash=req_hash,
             provider_id=provider.id, model=payload.model, status="pending",
-            response_key_version=KEY_VERSION,
+            response_key_version=KEY_VERSION, lease_expires_at=int(time.time()) + 180,
         )
         db.add(request_row)
     try:
@@ -294,6 +320,7 @@ async def generate_chat_completion(db: Session, payload: ChatCompletionRequest, 
     try:
         result = await _send_chat_completion(provider, payload)
         request_row.status = "completed"
+        request_row.lease_expires_at = None
         request_row.encrypted_response = _encrypt_response(result)
         request_row.response_key_version = KEY_VERSION
         db.add(AIUsage(
@@ -309,6 +336,7 @@ async def generate_chat_completion(db: Session, payload: ChatCompletionRequest, 
         failed = db.get(AIRequest, request_row.id)
         if failed:
             failed.status = "failed"
+            failed.lease_expires_at = None
             db.commit()
         raise
 
