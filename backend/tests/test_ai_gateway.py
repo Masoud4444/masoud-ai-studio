@@ -214,3 +214,66 @@ def test_model_pricing_versions_are_explicit_and_auditable():
         history = list_model_pricing_history(db, provider.id, "priced-model")
         assert [item["version"] for item in history] == [2, 1]
     engine.dispose()
+
+
+def test_credential_key_version_rotation_is_supported(monkeypatch):
+    monkeypatch.setenv("MASOUD_STUDIO_CREDENTIAL_KEY_V2", base64.urlsafe_b64encode(b"2" * 32).decode("ascii"))
+    encrypted = encrypt_secret("rotated-secret", "provider", 2)
+    assert decrypt_secret(encrypted, "provider", 2) == "rotated-secret"
+    with pytest.raises(Exception):
+        decrypt_secret(encrypted, "provider", 1)
+
+
+def test_missing_replay_encryption_key_fails_before_provider_call(monkeypatch):
+    engine, Session = gateway_db()
+    monkeypatch.delenv("MASOUD_STUDIO_CREDENTIAL_KEY", raising=False)
+    monkeypatch.delenv("MASOUD_STUDIO_CREDENTIAL_KEY_V1", raising=False)
+    calls = {"count": 0}
+    async def fake_send(provider, payload):
+        calls["count"] += 1
+        return {"id": "should-not-run", "model": payload.model, "content": "no", "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+    monkeypatch.setattr("backend.app.ai_gateway._send_chat_completion", fake_send)
+    with Session() as db:
+        db.add(AIProvider(name="Preflight Provider", base_url="https://api.example/v1", models_json='["m1"]'))
+        db.commit()
+        request = ChatCompletionRequest(model="m1", messages=[{"role":"user","content":"hello"}])
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(generate_chat_completion(db, request, "preflight-key-01"))
+        assert exc.value.status_code == 503
+        assert calls["count"] == 0
+        assert db.query(AIRequest).count() == 0
+    engine.dispose()
+
+
+def test_concurrent_duplicate_idempotency_key_is_rejected(monkeypatch):
+    engine, Session = gateway_db()
+    monkeypatch.setenv("MASOUD_STUDIO_CREDENTIAL_KEY", base64.urlsafe_b64encode(b"c" * 32).decode("ascii"))
+    async def scenario():
+        started = asyncio.Event()
+        release = asyncio.Event()
+        calls = {"count": 0}
+        async def fake_send(provider, payload):
+            calls["count"] += 1
+            started.set()
+            await release.wait()
+            return {"id": "concurrent-1", "model": payload.model, "content": "one", "prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
+        monkeypatch.setattr("backend.app.ai_gateway._send_chat_completion", fake_send)
+        request = ChatCompletionRequest(model="m1", messages=[{"role":"user","content":"same"}])
+        first_db, second_db = Session(), Session()
+        try:
+            first_task = asyncio.create_task(generate_chat_completion(first_db, request, "concurrent-key-01"))
+            await started.wait()
+            with pytest.raises(HTTPException) as exc:
+                await generate_chat_completion(second_db, request, "concurrent-key-01")
+            assert exc.value.status_code == 409
+            assert exc.value.detail["code"] == "request_in_progress"
+            release.set()
+            result = await first_task
+            assert result["content"] == "one"
+            assert calls["count"] == 1
+        finally:
+            release.set()
+            first_db.close()
+            second_db.close()
+    asyncio.run(scenario())
+    engine.dispose()
