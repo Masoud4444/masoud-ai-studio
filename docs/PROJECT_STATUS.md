@@ -260,3 +260,10 @@ Never infer one status from another.
 - Added a locally persisted settings file (atomic write + fsync) for backup retention policy. Supported retention limits: 3, 5, 10, 20, 30, 50 or 100 archives; server validates 3–100.
 - Backup creation verifies the newly written archive (manifest SHA-256 and SQLite integrity) before pruning older archives. At least three are retained. Existing archives are untouched when backup creation or verification fails.
 - Settings UI exposes retention choice and explicit save action. Data-path changes remain disabled until a separate offline migration flow is implemented.
+
+
+## Runtime diagnostics v0.1 — 2026-11-19
+
+- Added a read-only runtime endpoint reporting backend version, live database connectivity, worker enabled/running state, worker ID and registered task handlers.
+- Worker status is derived from the actual lifespan task rather than only the environment flag. The UI explains that only registered handlers can be claimed and the built-in healthcheck is not a creative production handler.
+- No start/stop controls are exposed: the packaged launcher currently owns process lifecycle and the worker is disabled by default.

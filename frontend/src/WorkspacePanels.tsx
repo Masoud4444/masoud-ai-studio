@@ -302,6 +302,7 @@ export function BackupPanel(){
 
 
 type SystemSettings={app_data_root:string;database_path:string|null;database_bytes:number;storage_path:string;storage:{bytes:number;files:number};backup_path:string;backup_count:number;disk:{total_bytes:number|null;used_bytes:number|null;free_bytes:number|null};max_upload_bytes:number;desktop_mode:boolean;credential_key_present:boolean;network_policy:string};
+type RuntimeSettings={backend:{status:string;version:string};database:{status:string};worker:{enabled:boolean;status:string;worker_id:string;registered_handlers:string[]};execution_note:string};
 export function SettingsPanel(){
  const [preferences,setPreferences]=useState<{backup_retention_count:number}>({backup_retention_count:20});
  const [savingPreferences,setSavingPreferences]=useState(false);
@@ -310,7 +311,8 @@ export function SettingsPanel(){
  async function savePreferences(){setSavingPreferences(true);setPreferenceNotice("");try{const saved=await api<{backup_retention_count:number}>("/api/v1/settings/preferences",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(preferences)});setPreferences(saved);setPreferenceNotice("Backup retention preference saved.");}catch(e){setPreferenceNotice(e instanceof Error?e.message:"Could not save preferences");}finally{setSavingPreferences(false);}}
 
  const [system,setSystem]=useState<SystemSettings|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState("");
- async function load(){setLoading(true);setError("");try{setSystem(await api<SystemSettings>("/api/v1/settings/system"));}catch(e){setError(e instanceof Error?e.message:"Could not load local settings");}finally{setLoading(false);}}
+ const [runtime,setRuntime]=useState<RuntimeSettings|null>(null);
+ async function load(){setLoading(true);setError("");try{const [settings,diagnostics]=await Promise.all([api<SystemSettings>("/api/v1/settings/system"),api<RuntimeSettings>("/api/v1/settings/runtime")]);setSystem(settings);setRuntime(diagnostics);}catch(e){setError(e instanceof Error?e.message:"Could not load local settings");}finally{setLoading(false);}}
  useEffect(()=>{void load();void loadPreferences();},[]);
  const bytes=(value:number|null|undefined)=>{if(value==null)return "Unavailable";if(value<1024)return value+" B";if(value<1024*1024)return (value/1024).toFixed(1)+" KB";if(value<1024*1024*1024)return (value/1024/1024).toFixed(2)+" MB";return (value/1024/1024/1024).toFixed(2)+" GB";};
  const percent=system?.disk.total_bytes?Math.min(100,Math.max(0,(system.disk.used_bytes??0)/system.disk.total_bytes*100)):0;
@@ -318,7 +320,7 @@ export function SettingsPanel(){
  <section className="workspace-panel"><div className="panel-header"><div><span className="eyebrow">STUDIO CONFIGURATION</span><h2>Local system settings</h2><p>Inspect the active data locations, disk capacity and local security posture.</p></div><button className="secondary-button" onClick={()=>void load()} disabled={loading}><RefreshCw size={14}/> Refresh</button></div>
  {error&&<div className="connection-banner">{error}</div>}
  {loading?<div className="empty-state">Reading local system configuration…</div>:system&&<>
- <div className="settings-metrics">
+ <div className="settings-block"><div className="settings-block-heading"><b>Service status</b><span>Live local diagnostics</span></div><div className="settings-security"><div><ShieldCheck size={16}/><span>Backend: {runtime?.backend.status??"Unknown"} · v{runtime?.backend.version??"—"}</span></div><div><Activity size={16}/><span>Database: {runtime?.database.status??"Unknown"}</span></div><div><Activity size={16}/><span>Worker: {runtime?.worker.status??"Unknown"} · {runtime?.worker.worker_id??"—"}</span></div><div><BookOpen size={16}/><span>Registered handlers: {runtime?.worker.registered_handlers.join(", ")||"None"}</span></div></div><p className="settings-note">{runtime?.execution_note??"Runtime status unavailable."}</p></div><div className="settings-metrics">
  <article className="settings-stat"><span>STORAGE USED</span><b>{bytes(system.storage.bytes)}</b><small>{system.storage.files.toLocaleString()} stored files</small></article>
  <article className="settings-stat"><span>DATABASE</span><b>{bytes(system.database_bytes)}</b><small>SQLite database and active journal files</small></article>
  <article className="settings-stat"><span>FREE DISK SPACE</span><b>{bytes(system.disk.free_bytes)}</b><small>On the application data volume</small></article>
