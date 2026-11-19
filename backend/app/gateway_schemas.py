@@ -58,3 +58,11 @@ class ChatCompletionRead(BaseModel):
     completion_tokens: int
     total_tokens: int
     replayed: bool = False
+
+class ModelCapabilityUpdate(BaseModel):
+    capabilities: list[Literal["chat", "vision", "audio_input", "audio_output", "image_generation", "video_generation", "embeddings", "tools", "json_mode", "streaming"]] = Field(default_factory=list, max_length=10)
+    context_window: int | None = Field(default=None, ge=1, le=10_000_000)
+    max_output_tokens: int | None = Field(default=None, ge=1, le=1_000_000)
+    supports_streaming: bool = False
+    supports_tools: bool = False
+    supports_vision: bool = False
