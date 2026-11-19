@@ -160,3 +160,10 @@ Never infer one status from another.
 - API: GET/POST/PATCH /api/v1/stories/{story_id}/continuity/facts; POST /analyze; GET /issues; PATCH /issues/{issue_id}.
 - Scope limitation: scene position is used as narrative order, not an inferred in-world timestamp. Automatic screenplay NLP, object/prop identity resolution, cross-episode timeline reasoning and visual frame comparison are future increments.
 - Previously passed test suites were not rerun. No manual test result is claimed for this increment.
+
+
+## Continuity Ledger UI v0.2
+- Added UI for recording character, location and prop state assertions against individual scenes.
+- Added transition explanations and evidence/production notes; fact records can be versioned and soft-deactivated through the API.
+- Added one-click deterministic analysis and a review queue to confirm, dismiss as false positive, or mark findings resolved.
+- The interface distinguishes high/medium/low severity and displays the source scenes and fact history.
