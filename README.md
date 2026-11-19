@@ -22,7 +22,7 @@ A public-code, private-by-design, local-first AI creative production studio for 
 ## Current implementation
 
 ### Backend
-- FastAPI, SQLAlchemy 2, SQLite and Alembic migrations through 0011.
+- FastAPI, SQLAlchemy 2, SQLite and Alembic migrations through 0012.
 - Project lifecycle API with optimistic version checks.
 - Content-addressed local storage and project asset linking.
 - AI Provider registry, encrypted credentials, SSRF-aware URL validation and OpenAI-compatible non-streaming gateway.
@@ -31,6 +31,7 @@ A public-code, private-by-design, local-first AI creative production studio for 
 - Production Orchestrator with preproduction workflow, approval gates and run pause/resume/cancel.
 - Worker Supervisor with handler allowlist, lease heartbeat, bounded JSON results and sanitized failures; disabled by default.
 - Agent Manager with lifecycle governance, tool grants and internal budget reservation ledger. A first text-only Agent Runtime slice is implemented with explicit AI-generation permission, configured pricing, conservative budget reservation and AI Gateway idempotency. Tool Broker, tool execution and process sandbox are not implemented.
+- Research Vault v0.1: source registry, project-source links, exact evidence excerpts/locators, deduplication, project claims, support/contradiction links and provenance events.
 
 ### Frontend
 - React, TypeScript, Vite and responsive dark studio shell.
@@ -38,7 +39,8 @@ A public-code, private-by-design, local-first AI creative production studio for 
 - Production room: create and inspect preproduction runs; pause, resume and cancel controls.
 - AI agents: create draft profiles and view/configure registry state.
 - Assets: upload, list and detach project assets.
-- Research Vault, Characters & Worlds, Video & Audio, Compliance and Settings are staged modules, not completed tools.
+- Research Vault: register sources, capture evidence excerpts and locators, create project claims, link evidence and review claims.
+- Characters & Worlds, Video & Audio, Compliance and Settings remain staged modules.
 
 ### Desktop and companion clients
 - Windows setup/start scripts are provided.
@@ -58,8 +60,8 @@ The backend listens on `127.0.0.1:8000`. The frontend dev server proxies `/api` 
 
 ## CI verification checkpoint
 
-- Latest backend run [44508429782](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44508429782): **75 passed, 1 warning**; Alembic upgrade to head succeeded on a fresh SQLite database through migration 0011.
-- Frontend build GitHub Actions run [44507106256](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44507106256): successful for the frontend tree at that commit.
+- Latest backend run [44509841356](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44509841356): **81 passed, 1 warning**; Alembic upgrade to head succeeded on a fresh SQLite database through migration 0012.
+- Latest frontend build run [44509841316](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44509841316): successful for the Research Vault workspace.
 - CI ran on Linux. Windows installation, local browser interaction, provider interoperability and desktop packaging still require hands-on verification.
 
 ## Development
@@ -100,3 +102,4 @@ Build frontend with `npm run build`.
 - [Production Orchestrator](docs/PRODUCTION_ORCHESTRATOR.md)
 - [AI Gateway](docs/AI_GATEWAY.md)
 - [Agent Manager](docs/AGENT_MANAGER.md)
+- [Research Vault](docs/RESEARCH_VAULT.md)

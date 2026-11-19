@@ -8,7 +8,8 @@ The current frontend is a React + TypeScript + Vite application designed to run 
 - Production room: list workflows and runs, create a preproduction run, pause/resume/cancel run controls, approval-gate visibility.
 - AI agents: create draft agent profiles, list registry, enable/disable where provider configuration permits.
 - Assets: select a project, upload an asset, list attached assets, detach an asset without deleting the underlying content-addressed blob.
-- Research Vault, Characters & Worlds, Video & Audio, Compliance and Settings currently show explicit staged-module states; they are not represented as completed features.
+- Research Vault: register source metadata, scope sources to projects, capture exact excerpts and locators, create project claims, link evidence as support/contradiction/context and review claims with evidence gates.
+- Characters & Worlds, Video & Audio, Compliance and Settings show explicit staged-module states; they are not represented as completed features.
 
 ## Development
 
@@ -34,3 +35,8 @@ The API and Vite server are bound to loopback by default. Do not expose the back
 - Production run creation only queues the existing preproduction tasks; creative handlers are not yet registered with the Worker Supervisor.
 - Human approval gates remain enforced by the backend.
 - No paid provider credentials are included in the repository.
+
+
+## Research Vault scope
+
+The first UI slice is a manual curation workspace. It does not fetch URLs, crawl sites, parse uploaded documents, run OCR/transcription or invoke AI extraction. URL records are metadata only. See RESEARCH_VAULT.md for the data contract and safety boundaries.

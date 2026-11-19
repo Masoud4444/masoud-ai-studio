@@ -13,7 +13,7 @@ Last updated: 2026-11-19
 
 ## Implemented backend
 
-- FastAPI application, SQLAlchemy 2 models, SQLite baseline and Alembic migrations 0001–0011.
+- FastAPI application, SQLAlchemy 2 models, SQLite baseline and Alembic migrations 0001–0012.
 - Project create/list/read/update/archive/restore API, optimistic version checks and duplicate-slug handling.
 - Content-addressed asset storage using SHA-256, streamed uploads, size limits, temporary staging, atomic placement, MIME sniffing, filename sanitization, project listing and detach.
 - AI Gateway provider registry, priority selection, OpenAI-compatible non-streaming completion, encrypted credentials and idempotent response storage (AES-256-GCM), SSRF-aware URL checks, DNS pinning, TLS verification, disabled redirects/proxies, sanitized errors, usage ledger and manually configured pricing history.
@@ -21,6 +21,7 @@ Last updated: 2026-11-19
 - Worker Supervisor: handler allowlist, lease heartbeat, bounded JSON results, sanitized handler errors and graceful shutdown. Disabled by default; only `system.healthcheck` is registered out of the box.
 - Production Orchestrator: code-defined `creative.preproduction` v1 workflow, persisted runs/steps, idempotent creation, approval gates, pause/resume/cancel.
 - Agent Manager: draft/enabled/disabled lifecycle, versioned config, provider/model checks, permissions/tool grants, approval requirements for write/execute grants, audit events and internal budget reservation ledger. A first text-only Agent Runtime is implemented at `POST /api/v1/agents/{agent_id}/run`, with explicit `ai.generate` permission, required model pricing, conservative pre-call budget reservation and Gateway idempotency.
+- Research Vault v0.1: source records, reusable project-source links, asset references, metadata-only URL records, exact evidence excerpts with locators, SHA-256 evidence deduplication, project claims, supporting/contradicting/contextualizing relationships, review gates and append-only provenance events. Migration 0012.
 
 ## Implemented frontend
 
@@ -29,13 +30,14 @@ Last updated: 2026-11-19
 - Production room: create/list preproduction runs, inspect step state and approval gates, pause/resume/cancel controls.
 - AI agents: create draft profiles, view registry, enable/disable where provider/model requirements permit.
 - Assets: project selection, upload, list and detach. Detach does not delete the shared content-addressed blob.
-- Research Vault, Characters & Worlds, Video & Audio, Compliance and Settings appear as staged modules; they are not implemented feature-complete screens.
+- Research Vault workspace: register sources, browse project-linked sources, capture exact evidence excerpts/locators, create project claims, link evidence as support/contradiction/context and accept/reject claims only when the required evidence relation exists.
+- Characters & Worlds, Video & Audio, Compliance and Settings remain staged modules.
 - Windows setup/start scripts and frontend guide are present under `scripts/` and `docs/FRONTEND.md`. The setup script checks Python 3.11+/Node.js 20+, installs dependencies, builds the frontend, then applies migrations.
 
 ## Verification evidence
 
-- Latest backend run [44508429782](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44508429782), commit `f1fe41cd2fbf4b605bec5a8e4742dc8a303e1251`: **75 passed, 1 warning**; fresh SQLite Alembic upgrade through head succeeded through migration 0011. Earlier baseline run [44507323858](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44507323858) passed 72 tests.
-- Latest frontend build run [44508429943](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44508429943), commit `f1fe41cd2fbf4b605bec5a8e4742dc8a303e1251`: successful. Baseline build run [44507106256](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44507106256) also passed.
+- Latest backend run [44509841356](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44509841356), commit `270fc8cce654b19dfc99f5ce257c8df2bcf510da`: **81 passed, 1 warning**; fresh SQLite Alembic upgrade through head succeeded through migration 0012.
+- Latest frontend build [44509841316](https://github.com/Masoud4444/masoud-ai-studio/actions/runs/44509841316), same commit: successful.
 - These are Linux CI checks. Windows install/runtime, real browser workflows, provider interoperability, concurrency/load behavior and desktop packaging have not been verified.
 - CI mocks provider generation/model-list responses; no billable provider calls are made by CI.
 - One Starlette/httpx deprecation warning remains.
@@ -46,6 +48,7 @@ Last updated: 2026-11-19
 - Never commit provider keys, encryption keys, local database files, generated assets or private project data.
 - No provider API keys are configured by default. The system does not make paid calls automatically.
 - Worker is disabled by default; creative workflow handlers are not registered.
+- Research Vault URLs are metadata only; no remote URL fetching, crawling or browser automation is performed. Uploaded document parsing/OCR/transcription and AI-assisted extraction are not implemented.
 - Agent Runtime currently performs text-only model generation; it does not execute tool grants or access files. Tool Broker, tool execution, process sandbox, hard timeouts and operator recovery for abandoned reservations are not implemented. Runtime budget reservation and settlement are integrated for text-generation calls, but provider invoice reconciliation is not implemented.
 - SQLite is single-worker only until multi-process locking is verified.
 - Synchronous handlers cannot be forcibly interrupted; hard process-level timeout/isolation is not implemented.
@@ -54,7 +57,7 @@ Last updated: 2026-11-19
 ## Not implemented yet
 
 - Windows desktop shell/packaging (Tauri), Android companion and hardened Web/PWA.
-- Research Vault, multimodal intake, provenance/evidence graph.
+- Multimodal Research Vault intake, safe document parsing, OCR/transcription, source credibility scoring, semantic search and AI-assisted evidence extraction. The manual source/evidence/claim foundation is implemented.
 - Story Engine, script/scene/dialogue/versioning, Character Bible, World Bible, continuity and universe/series management.
 - Visual Style Engine, character model sheets, cinematography, shot planning, storyboard/animatic completion.
 - Image/video/audio generation, subtitles, non-destructive editing, VFX/compositing.
@@ -64,12 +67,12 @@ Last updated: 2026-11-19
 
 ## Next implementation sequence
 
-1. Run the Windows setup script on the target PC; verify Python/Node versions, migrations, backend health and frontend browser interaction. Record any errors and fix them before expanding the UI.
-2. Add backend/frontend integration tests for project, asset, production and agent screens; add a current frontend build run after any frontend source changes.
-3. Harden local deployment: configuration validation, safe logs/telemetry, Windows DPAPI credential storage, backup/restore and startup/shutdown behavior.
-4. Implement hard worker execution isolation and multi-worker-safe claims before registering creative handlers.
-5. Complete Agent Runtime and Tool Broker only after runtime permission checks, approval enforcement, budget reservation/reconciliation and sandboxing are in place.
-6. Build Research Vault and evidence/provenance workflows, then Story Engine, Character/World continuity, Visual/Cinematography, production media tools, QA/compliance, export and companion clients.
+1. Run the Windows setup script on the target PC; verify Python/Node versions, migrations through 0012, backend health and browser workflows. Record and fix any local runtime issues.
+2. Add safe local document ingestion to Research Vault using the existing content-addressed storage layer, MIME allowlists, quarantine and parser isolation. Do not add background URL fetching until an SSRF-safe fetch subsystem exists.
+3. Add end-to-end integration tests for project, asset, Research Vault, production and Agent screens.
+4. Harden local deployment: configuration validation, safe telemetry, Windows DPAPI credential storage, backup/restore and startup/shutdown behavior.
+5. Implement hard worker execution isolation and multi-worker-safe claims before registering creative handlers; then extend Agent Runtime/Tool Broker with explicit permission checks, approval enforcement, budget reconciliation and sandboxing.
+6. Build Story Engine, Character/World continuity, Visual/Cinematography, production media tools, QA/compliance, export and companion clients.
 
 ## Status vocabulary
 
