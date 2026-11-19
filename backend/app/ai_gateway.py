@@ -342,7 +342,7 @@ async def generate_chat_completion(db: Session, payload: ChatCompletionRequest, 
 
 
 def list_model_capabilities(db: Session) -> list[dict]:
-    rows = db.scalars(
+    rows = db.execute(
         select(AIModelCapability, AIProvider)
         .join(AIProvider, AIProvider.id == AIModelCapability.provider_id)
         .order_by(AIProvider.name.asc(), AIModelCapability.model_id.asc())
