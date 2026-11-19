@@ -1,4 +1,4 @@
-"""Add concurrency-safe Agent budget reservation ledger."""
+"""Create Agent monthly budget reservation ledger."""
 from alembic import op
 import sqlalchemy as sa
 
@@ -13,7 +13,7 @@ def upgrade():
         "agent_budget_reservations",
         sa.Column("id", sa.String(length=36), primary_key=True),
         sa.Column("agent_id", sa.String(length=36), sa.ForeignKey("studio_agents.id", ondelete="RESTRICT"), nullable=False),
-        sa.Column("idempotency_hash", sa.String(length=64), nullable=False, unique=True),
+        sa.Column("idempotency_hash", sa.String(length=64), nullable=False),
         sa.Column("request_hash", sa.String(length=64), nullable=False),
         sa.Column("period_start", sa.Date(), nullable=False),
         sa.Column("reserved_usd", sa.Numeric(18, 8), nullable=False),
@@ -21,6 +21,7 @@ def upgrade():
         sa.Column("status", sa.String(length=20), nullable=False, server_default="reserved"),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.UniqueConstraint("idempotency_hash", name="uq_agent_budget_idempotency"),
     )
     op.create_index("ix_agent_budget_reservations_agent_id", "agent_budget_reservations", ["agent_id"])
     op.create_index("ix_agent_budget_reservations_idempotency_hash", "agent_budget_reservations", ["idempotency_hash"], unique=True)
