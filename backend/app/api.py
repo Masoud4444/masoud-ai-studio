@@ -13,6 +13,15 @@ from .orchestrator_schemas import ProductionRunCreate
 from .agent_manager import create_agent, get_agent, list_agents, update_agent, replace_agent_tools, enable_agent, disable_agent
 from .agent_runtime import run_agent
 from .agent_schemas import AgentCreate, AgentUpdate, AgentToolsUpdate, AgentRunRequest
+from .research_vault import (
+    create_source, get_source, list_sources, link_source_to_project,
+    detach_source_from_project, create_evidence, list_evidence,
+    create_claim, list_claims, get_claim, link_evidence_to_claim, update_claim,
+)
+from .research_schemas import (
+    ResearchSourceCreate, ResearchEvidenceCreate, ResearchClaimCreate,
+    ResearchClaimEvidenceCreate, ResearchClaimUpdate,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["studio"])
 
@@ -225,6 +234,94 @@ def post_production_run_resume(run_id: str, db: Session = Depends(get_db)):
 def post_production_run_cancel(run_id: str, db: Session = Depends(get_db)):
     return cancel_production_run(db, run_id)
 
+
+
+# Research Vault: manually curated source provenance, evidence and project claims.
+@router.post("/research/sources", status_code=201)
+def post_research_source(payload: ResearchSourceCreate, db: Session = Depends(get_db)):
+    return create_source(db, payload)
+
+
+@router.get("/research/sources")
+def get_research_sources(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    project_id: str | None = Query(None, min_length=36, max_length=36),
+    db: Session = Depends(get_db),
+):
+    return list_sources(db, limit=limit, offset=offset, project_id=project_id)
+
+
+@router.get("/research/sources/{source_id}")
+def get_research_source(source_id: str, db: Session = Depends(get_db)):
+    return get_source(db, source_id)
+
+
+@router.post("/research/sources/{source_id}/projects/{project_id}")
+def post_research_source_project(
+    source_id: str, project_id: str,
+    notes: str | None = Query(None, max_length=5000),
+    db: Session = Depends(get_db),
+):
+    return link_source_to_project(db, source_id, project_id, notes)
+
+
+@router.delete("/research/sources/{source_id}/projects/{project_id}", status_code=204)
+def delete_research_source_project(source_id: str, project_id: str, db: Session = Depends(get_db)):
+    detach_source_from_project(db, source_id, project_id)
+
+
+@router.post("/research/sources/{source_id}/evidence", status_code=201)
+def post_research_evidence(
+    source_id: str, payload: ResearchEvidenceCreate, db: Session = Depends(get_db)
+):
+    return create_evidence(db, source_id, payload)
+
+
+@router.get("/research/sources/{source_id}/evidence")
+def get_research_evidence(
+    source_id: str,
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    return list_evidence(db, source_id, limit=limit, offset=offset)
+
+
+@router.post("/research/claims", status_code=201)
+def post_research_claim(payload: ResearchClaimCreate, db: Session = Depends(get_db)):
+    return create_claim(db, payload)
+
+
+@router.get("/research/claims")
+def get_research_claims(
+    project_id: str = Query(..., min_length=36, max_length=36),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    return list_claims(db, project_id, limit=limit, offset=offset)
+
+
+@router.get("/research/claims/{claim_id}")
+def get_research_claim(claim_id: str, db: Session = Depends(get_db)):
+    return get_claim(db, claim_id)
+
+
+@router.patch("/research/claims/{claim_id}")
+def patch_research_claim(
+    claim_id: str, payload: ResearchClaimUpdate, db: Session = Depends(get_db)
+):
+    return update_claim(db, claim_id, payload)
+
+
+@router.post("/research/claims/{claim_id}/evidence/{evidence_id}")
+def post_research_claim_evidence(
+    claim_id: str, evidence_id: str,
+    payload: ResearchClaimEvidenceCreate,
+    db: Session = Depends(get_db),
+):
+    return link_evidence_to_claim(db, claim_id, evidence_id, payload.relationship, payload.note)
 
 
 @router.post("/agents", status_code=201)

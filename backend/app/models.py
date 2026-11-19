@@ -251,3 +251,79 @@ class AgentBudgetReservation(Base):
     status: Mapped[str] = mapped_column(String(20), default="reserved", index=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+
+
+class ResearchSource(Base):
+    __tablename__ = "research_sources"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    source_type: Mapped[str] = mapped_column(String(24), index=True, nullable=False)
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    canonical_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    author: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    publisher: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    language: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    asset_id: Mapped[str | None] = mapped_column(ForeignKey("assets.id", ondelete="RESTRICT"), index=True, nullable=True)
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+
+class ProjectResearchSource(Base):
+    __tablename__ = "project_research_sources"
+    __table_args__ = (UniqueConstraint("project_id", "source_id", name="uq_project_research_source"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="RESTRICT"), index=True, nullable=False)
+    source_id: Mapped[str] = mapped_column(ForeignKey("research_sources.id", ondelete="RESTRICT"), index=True, nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class ResearchEvidence(Base):
+    __tablename__ = "research_evidence"
+    __table_args__ = (UniqueConstraint("source_id", "content_hash", name="uq_research_evidence_hash"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    source_id: Mapped[str] = mapped_column(ForeignKey("research_sources.id", ondelete="RESTRICT"), index=True, nullable=False)
+    evidence_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    excerpt: Mapped[str] = mapped_column(Text, nullable=False)
+    locator: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    content_hash: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class ResearchClaim(Base):
+    __tablename__ = "research_claims"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="RESTRICT"), index=True, nullable=False)
+    statement: Mapped[str] = mapped_column(Text, nullable=False)
+    claim_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="draft", index=True, nullable=False)
+    rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+
+class ResearchClaimEvidence(Base):
+    __tablename__ = "research_claim_evidence"
+    __table_args__ = (UniqueConstraint("claim_id", "evidence_id", name="uq_research_claim_evidence"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    claim_id: Mapped[str] = mapped_column(ForeignKey("research_claims.id", ondelete="RESTRICT"), index=True, nullable=False)
+    evidence_id: Mapped[str] = mapped_column(ForeignKey("research_evidence.id", ondelete="RESTRICT"), index=True, nullable=False)
+    relationship: Mapped[str] = mapped_column(String(20), nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class ResearchEvent(Base):
+    __tablename__ = "research_events"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    entity_type: Mapped[str] = mapped_column(String(24), index=True, nullable=False)
+    entity_id: Mapped[str] = mapped_column(String(36), index=True, nullable=False)
+    event_type: Mapped[str] = mapped_column(String(48), nullable=False)
+    detail_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True, nullable=False)
