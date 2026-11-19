@@ -61,7 +61,9 @@ Example request body (send directly to the local API; never paste a real API key
 
 The URL validator accepts HTTPS on port 443, rejects credentials/query/fragment/local and non-public destinations, and checks DNS at registration. Immediately before each outbound call, the gateway resolves again, rejects any non-global answer, and pins the connection to the validated address while preserving TLS hostname verification. Redirects and environment proxies are disabled.
 
-Model routing selects the first enabled provider declaring the requested model, ordered by ascending priority and then creation time. Provider priority can be changed with the provider PATCH route.\n\nThe provider connectivity test calls `GET {base_url}/models`. It verifies that declared model IDs are present in the provider's returned list. This does **not** prove that each declared capability (vision, tools, audio, etc.) works. The status `model_id_verified` is deliberately narrower than capability verification.
+Model routing selects the first enabled provider declaring the requested model, ordered by ascending priority and then creation time. Provider priority can be changed with the provider PATCH route.
+
+The provider connectivity test calls `GET {base_url}/models`. It verifies that declared model IDs are present in the provider's returned list. This does **not** prove that each declared capability (vision, tools, audio, etc.) works. The status `model_id_verified` is deliberately narrower than capability verification.
 
 ## Send a chat completion
 
