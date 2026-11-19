@@ -68,7 +68,11 @@ def validate_provider_url(value: str) -> str:
         if not addresses or any(not address.is_global for address in addresses):
             raise ValueError
         # Normalize away fragments/query and preserve an optional provider API path.
-        authority = f"[{host}]" if ":" in host else host\n        port = parsed.port\n        if port and port != 443:\n            authority = f"{authority}:{port}"\n        return urlunsplit(("https", authority, parsed.path.rstrip("/"), "", ""))
+        authority = f"[{host}]" if ":" in host else host
+        port = parsed.port
+        if port and port != 443:
+            authority = f"{authority}:{port}"
+        return urlunsplit(("https", authority, parsed.path.rstrip("/"), "", ""))
     except Exception:
         raise HTTPException(status_code=422, detail={"code": "provider_url_rejected"})
 
