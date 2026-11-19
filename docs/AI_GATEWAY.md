@@ -32,7 +32,7 @@ alembic upgrade head
 
 Set `MASOUD_STUDIO_DATABASE_URL` before running Alembic if the database is not the default SQLite file. Managed application startup defaults to migration mode and no longer silently calls `create_all`. `MASOUD_STUDIO_SCHEMA_MODE=create` enables the development-only metadata bootstrap.
 
-Migrations 0001–0005 are intentionally non-destructive on downgrade. The first revision adopts existing tables with `checkfirst`; later revisions add gateway lease, capability, pricing, pricing-history and registry-backfill support.
+Migrations 0001–0006 are intentionally non-destructive on downgrade. The first revision adopts existing tables with `checkfirst`; later revisions add gateway lease, capability, pricing, pricing-history and registry-backfill support.
 
 ## Credential encryption
 
