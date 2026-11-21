@@ -1,0 +1,25 @@
+name: Runtime diagnostics regression
+on:
+  push:
+    branches: ["implementation/**"]
+    paths:
+      - "backend/app/main.py"
+      - "backend/tests/test_runtime_diagnostics.py"
+      - ".github/workflows/runtime-diagnostics-regression.yml"
+  pull_request:
+    paths:
+      - "backend/app/main.py"
+      - "backend/tests/test_runtime_diagnostics.py"
+      - ".github/workflows/runtime-diagnostics-regression.yml"
+permissions:
+  contents: read
+jobs:
+  runtime-diagnostics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -r requirements.txt
+      - run: pytest -q backend/tests/test_runtime_diagnostics.py
