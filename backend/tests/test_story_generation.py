@@ -294,3 +294,44 @@ def test_scene_generation_prompt_binds_story_and_canon():
     assert "binding" in messages[0]["content"]
     assert "REQUESTED SCENE COUNT: 3" in messages[1]["content"]
     assert "Mara" in messages[1]["content"]
+
+
+
+def test_scene_generation_handler_returns_review_only_canonical_proposal(monkeypatch):
+    calls = {}
+
+    async def fake_generate(db, request, idempotency_key):
+        calls["model"] = request.model
+        calls["key"] = idempotency_key
+        calls["messages"] = request.messages
+        return {
+            "model": request.model,
+            "content": json.dumps({"scenes": [{
+                "title": "The Threshold", "slugline": "INT. ARCHIVE - NIGHT",
+                "summary": "Mara hears the archive answer.",
+                "dramatic_purpose": "Turn the mystery into a personal choice.",
+                "location_id": None, "time_of_day": "Night", "character_ids": [],
+                "conflict": "The answer exposes her secret.",
+                "emotional_turn": "Fear becomes responsibility.",
+                "beats": ["Hear the signal", "Choose to answer"],
+                "continuity_notes": "Her left hand remains bandaged.",
+            }]}),
+            "prompt_tokens": 12, "completion_tokens": 28, "total_tokens": 40,
+        }
+
+    monkeypatch.setattr(story_generation, "generate_chat_completion", fake_generate)
+    handler = story_generation.build_story_scene_generation_handler(lambda: DummySession())
+    result = handler({
+        "story": {"story_id": "story-1", "canonical_bible": {"characters": [], "locations": []}},
+        "brief": "Keep the decision morally difficult.", "scene_count": 1,
+        "model": "test-model", "provider_id": None, "temperature": 0.7, "max_tokens": 1000,
+        "_studio_task": {"id": "scene-task-1"},
+    })
+    assert calls["model"] == "test-model"
+    assert calls["key"] == "story-scenes:scene-task-1"
+    assert "REQUESTED SCENE COUNT: 1" in calls["messages"][1]["content"]
+    assert result["kind"] == "story_scenes_proposal"
+    assert result["review_required"] is True
+    assert result["canonical_story_modified"] is False
+    assert result["usage"]["total_tokens"] == 40
+    assert result["proposal"]["scenes"][0]["emotional_turn"] == "Fear becomes responsibility."

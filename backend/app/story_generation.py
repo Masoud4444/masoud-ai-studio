@@ -489,6 +489,9 @@ def apply_story_scene_generation_task(
         raise HTTPException(status_code=404, detail={"code": "story_not_found"})
     if story.project_id != task.project_id:
         raise HTTPException(status_code=409, detail={"code": "story_scenes_project_mismatch"})
+    project = db.get(Project, story.project_id)
+    if project is None or project.status != "active" or story.status in {"archived", "locked"}:
+        raise HTTPException(status_code=409, detail={"code": "story_not_active"})
     if task_payload.get("story", {}).get("story_version") != story.version or payload.expected_version != story.version:
         raise HTTPException(status_code=409, detail={"code": "story_scenes_stale"})
     try:
