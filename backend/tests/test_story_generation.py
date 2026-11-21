@@ -226,3 +226,26 @@ def test_apply_outline_persists_human_value_question_and_act_structure():
     assert result["central_question"] == story.central_question
     assert result["human_value"] == story.human_value
     assert result["act_structure"][0]["turning_point"] == "The signal reveals a human voice"
+
+
+def test_outline_prompt_uses_canonical_bible_as_binding_context():
+    messages = story_generation._build_messages({
+        "story": {
+            "story_id": "story-1",
+            "title": "The Signal",
+            "canonical_bible": {
+                "characters": [{"id": "c1", "name": "Mara", "goals": "Protect the archive"}],
+                "relationships": [{"source_id": "c1", "target_id": "c2", "kind": "siblings"}],
+                "world_rules": [{"statement": "No signal crosses the valley after dusk"}],
+                "active_continuity_facts": [{"attribute": "injury", "value": "left hand bandaged"}],
+            },
+        },
+        "brief": "Write a tense second act.",
+    })
+    system = messages[0]["content"].lower()
+    user = messages[1]["content"]
+    assert "canonical bible" in system
+    assert "binding constraints" in system
+    assert "Mara" in user
+    assert "left hand bandaged" in user
+    assert "No signal crosses the valley after dusk" in user

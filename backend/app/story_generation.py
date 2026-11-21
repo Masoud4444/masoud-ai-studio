@@ -5,7 +5,11 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import update
+from sqlalchemy import select, update
+from .character_world import Character, Location, Relationship, WorldRule, SceneCharacter, SceneLocation
+from .continuity import ContinuityFact
+from .props import StoryProp
+from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from .ai_gateway import generate_chat_completion
@@ -31,8 +35,69 @@ def create_story_outline_task(
     scenes = db.query(StoryScene).filter(
         StoryScene.story_id == story.id
     ).order_by(StoryScene.position.asc()).all()
+    # Capture the canonical story bible at task creation time. The worker receives
+    # a bounded, immutable context snapshot and never queries mutable story records.
+    characters = db.scalars(select(Character).where(Character.story_id == story.id).order_by(Character.name).limit(60)).all()
+    locations = db.scalars(select(Location).where(Location.story_id == story.id).order_by(Location.name).limit(60)).all()
+    relationships = db.scalars(select(Relationship).where(Relationship.story_id == story.id).limit(120)).all()
+    world_rules = db.scalars(select(WorldRule).where(WorldRule.story_id == story.id).limit(100)).all()
+    props = db.scalars(select(StoryProp).where(StoryProp.story_id == story.id).order_by(StoryProp.name).limit(100)).all()
+    continuity_facts = db.scalars(
+        select(ContinuityFact).where(
+            ContinuityFact.story_id == story.id, ContinuityFact.active.is_(True)
+        ).order_by(ContinuityFact.created_at.desc()).limit(150)
+    ).all()
+    character_ids = [item.id for item in characters]
+    location_ids = [item.id for item in locations]
+    scene_character_links = db.scalars(
+        select(SceneCharacter).where(SceneCharacter.character_id.in_(character_ids)).limit(300)
+    ).all() if character_ids else []
+    scene_location_links = db.scalars(
+        select(SceneLocation).where(SceneLocation.location_id.in_(location_ids)).limit(300)
+    ).all() if location_ids else []
+    bible_context = {
+        "characters": [{
+            "id": item.id, "name": item.name, "role": item.role, "age": item.age,
+            "appearance": item.appearance_json, "psychology": item.psychology_json,
+            "backstory": item.backstory, "goals": item.goals, "conflict": item.conflict,
+            "arc": item.arc, "voice_notes": item.voice_notes,
+        } for item in characters],
+        "relationships": [{
+            "source_id": item.source_id, "target_id": item.target_id,
+            "kind": item.kind, "description": item.description,
+        } for item in relationships],
+        "locations": [{
+            "id": item.id, "name": item.name, "type": item.location_type,
+            "description": item.description, "geography": item.geography_json,
+            "culture": item.culture_json,
+        } for item in locations],
+        "world_rules": [{
+            "category": item.category, "statement": item.statement,
+            "rationale": item.rationale,
+        } for item in world_rules],
+        "props": [{
+            "id": item.id, "name": item.name, "category": item.category,
+            "description": item.description, "origin": item.origin,
+            "initial_state": item.initial_state, "current_holder_id": item.current_holder_id,
+            "status": item.status,
+        } for item in props],
+        "scene_character_links": [{
+            "scene_id": item.scene_id, "character_id": item.character_id,
+            "presence_type": item.presence_type, "note": item.note,
+        } for item in scene_character_links],
+        "scene_location_links": [{
+            "scene_id": item.scene_id, "location_id": item.location_id, "note": item.note,
+        } for item in scene_location_links],
+        "active_continuity_facts": [{
+            "scene_id": item.scene_id, "subject_type": item.subject_type,
+            "subject_ref": item.subject_ref, "subject_label": item.subject_label,
+            "attribute": item.attribute, "value": item.value,
+            "transition_note": item.transition_note, "evidence_note": item.evidence_note,
+        } for item in continuity_facts],
+    }
     snapshot = {
         "story_id": story.id,
+        "canonical_bible": bible_context,
         "story_version": story.version,
         "project_id": story.project_id,
         "title": story.title,
@@ -76,9 +141,14 @@ def _build_messages(payload: dict[str, Any]) -> list[dict[str, str]]:
             "content": (
                 "You are a senior story editor and dramaturg working inside a professional creative studio. "
                 "Develop a coherent, original, human-relevant story outline. Preserve the supplied premise and "
-                "creative intent; do not invent factual claims about real people or events. Avoid clichés, "
-                "unearned emotional manipulation, generic moralizing and filler. Identify meaningful audience "
-                "engagement and character agency where appropriate. Return valid JSON only, with keys: "
+                "creative intent and canonical Bible. Treat character psychology, backstory, goals, "
+                "relationships, world rules, locations, props and active continuity facts as binding constraints. "
+                "Do not silently rename, contradict, merge or invent canonical characters, places, objects or rules. "
+                "If the brief requires a deliberate canon change, flag it in the synopsis rather than silently "
+                "rewriting the Bible. Respect existing scene-character and scene-location links. Do not invent "
+                "factual claims about real people or events. Avoid clichés, unearned emotional manipulation, "
+                "generic moralizing and filler. Identify meaningful audience engagement and character agency. "
+                "Return valid JSON only, with keys: "
                 "logline, synopsis, central_question, human_value, act_structure (array of objects with "
                 "act, purpose, turning_point), and scenes (array of objects with title, slugline, summary, "
                 "dramatic_purpose, beats array). Do not include markdown fences."
@@ -89,7 +159,10 @@ def _build_messages(payload: dict[str, Any]) -> list[dict[str, str]]:
             "content": (
                 "Develop an outline from this story dossier and creative brief. This is a proposal only; "
                 "do not assume it is approved or modify canonical story records.\n\n"
-                f"STORY DOSSIER:\n{story!r}\n\nCREATIVE BRIEF:\n{payload.get('brief', '')}"
+                f"STORY DOSSIER AND CANONICAL BIBLE:\n{story!r}\n\nCREATIVE BRIEF:\n{payload.get('brief', '')}\n\n"
+                "When no canonical entries exist, create new characters and locations only when useful. "
+                "For each scene, use existing character/location identities where applicable and avoid "
+                "continuity conflicts with the supplied active facts."
             ),
         },
     ]
