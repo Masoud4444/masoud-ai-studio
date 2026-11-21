@@ -4,6 +4,11 @@ from pydantic import BaseModel, Field, model_validator
 StoryFormat = Literal["short_film", "feature_film", "series", "documentary", "animation", "novel", "short_story", "advertisement", "other"]
 StoryStatus = Literal["development", "outlined", "drafting", "review", "locked", "archived"]
 
+class StoryAct(BaseModel):
+    act: str = Field(min_length=1, max_length=120)
+    purpose: str = Field(min_length=1, max_length=2000)
+    turning_point: str = Field(min_length=1, max_length=2000)
+
 class StoryCreate(BaseModel):
     project_id: str = Field(min_length=36, max_length=36)
     title: str = Field(min_length=1, max_length=240)
@@ -14,6 +19,9 @@ class StoryCreate(BaseModel):
     logline: str | None = Field(default=None, max_length=1000)
     synopsis: str | None = Field(default=None, max_length=30000)
     creative_intent: str | None = Field(default=None, max_length=12000)
+    central_question: str | None = Field(default=None, max_length=2000)
+    human_value: str | None = Field(default=None, max_length=3000)
+    act_structure: list[StoryAct] = Field(default_factory=list, max_length=8)
 
 class StoryUpdate(BaseModel):
     expected_version: int = Field(ge=1)
@@ -26,12 +34,15 @@ class StoryUpdate(BaseModel):
     logline: str | None = Field(default=None, max_length=1000)
     synopsis: str | None = Field(default=None, max_length=30000)
     creative_intent: str | None = Field(default=None, max_length=12000)
+    central_question: str | None = Field(default=None, max_length=2000)
+    human_value: str | None = Field(default=None, max_length=3000)
+    act_structure: list[StoryAct] | None = Field(default=None, max_length=8)
     status: StoryStatus | None = None
     @model_validator(mode="after")
     def non_empty_update(self):
         if not (self.model_fields_set - {"expected_version", "change_note"}):
             raise ValueError("At least one story field must be updated")
-        for field_name in self.model_fields_set - {"expected_version", "change_note", "genre", "target_audience", "premise", "logline", "synopsis", "creative_intent"}:
+        for field_name in self.model_fields_set - {"expected_version", "change_note", "genre", "target_audience", "premise", "logline", "synopsis", "creative_intent", "central_question", "human_value"}:
             if getattr(self, field_name) is None:
                 raise ValueError(f"{field_name} cannot be null")
         return self

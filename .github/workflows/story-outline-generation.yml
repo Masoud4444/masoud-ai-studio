@@ -5,7 +5,10 @@ on:
     branches: [implementation/bootstrap-001]
     paths:
       - "backend/app/story_generation.py"
+      - "backend/app/story_engine.py"
+      - "backend/app/models.py"
       - "backend/app/story_schemas.py"
+      - "backend/migrations/versions/0019_story_intent_structure.py"
       - "backend/app/main.py"
       - "backend/app/api.py"
       - "backend/tests/test_story_generation.py"
@@ -14,7 +17,10 @@ on:
     branches: [implementation/bootstrap-001]
     paths:
       - "backend/app/story_generation.py"
+      - "backend/app/story_engine.py"
+      - "backend/app/models.py"
       - "backend/app/story_schemas.py"
+      - "backend/migrations/versions/0019_story_intent_structure.py"
       - "backend/app/main.py"
       - "backend/app/api.py"
       - "backend/tests/test_story_generation.py"

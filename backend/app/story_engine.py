@@ -13,6 +13,10 @@ def _beats(raw):
     try: value = json.loads(raw or "[]")
     except (TypeError, ValueError): value = []
     return value if isinstance(value, list) else []
+def _acts(raw):
+    try: value = json.loads(raw or "[]")
+    except (TypeError, ValueError): value = []
+    return value if isinstance(value, list) else []
 def _scene_data(scene):
     return {"id":scene.id,"position":scene.position,"title":scene.title,"slugline":scene.slugline,"summary":scene.summary,
             "dramatic_purpose":scene.dramatic_purpose,"location":scene.location,"time_of_day":scene.time_of_day,
@@ -21,7 +25,9 @@ def _scene_data(scene):
 def _story_fields(story):
     return {"id":story.id,"project_id":story.project_id,"title":story.title,"format":story.format,"genre":story.genre,
             "target_audience":story.target_audience,"premise":story.premise,"logline":story.logline,"synopsis":story.synopsis,
-            "creative_intent":story.creative_intent,"status":story.status,"version":story.version,
+            "creative_intent":story.creative_intent,"central_question":story.central_question,
+            "human_value":story.human_value,"act_structure":_acts(story.act_structure_json),
+            "status":story.status,"version":story.version,
             "created_at":story.created_at,"updated_at":story.updated_at}
 def _snapshot(db, story, note=None):
     scenes=db.scalars(select(StoryScene).where(StoryScene.story_id==story.id).order_by(StoryScene.position)).all()
@@ -47,7 +53,9 @@ def create_story(db:Session,payload:StoryCreate):
     title=payload.title.strip()
     if not title: raise HTTPException(status_code=422,detail={"code":"story_title_required"})
     story=Story(project_id=project.id,title=title,format=payload.format,genre=payload.genre,target_audience=payload.target_audience,
-        premise=payload.premise,logline=payload.logline,synopsis=payload.synopsis,creative_intent=payload.creative_intent)
+        premise=payload.premise,logline=payload.logline,synopsis=payload.synopsis,creative_intent=payload.creative_intent,
+        central_question=payload.central_question,human_value=payload.human_value,
+        act_structure_json=_dump([item.model_dump() for item in payload.act_structure]))
     db.add(story);db.flush();_snapshot(db,story,"Initial story dossier");db.commit();db.refresh(story)
     return _payload(db,story,True)
 def list_stories(db:Session,project_id=None,limit=50,offset=0):
@@ -60,7 +68,9 @@ def update_story(db:Session,story_id:str,payload:StoryUpdate):
     story=_get(db,story_id)
     if story.version!=payload.expected_version: raise HTTPException(status_code=409,detail={"code":"story_version_conflict","current_version":story.version})
     values=payload.model_dump(exclude_unset=True,exclude={"expected_version","change_note"})
-    for key,value in values.items(): setattr(story,key,value.strip() if key=="title" and isinstance(value,str) else value)
+    for key,value in values.items():
+        if key == "act_structure": story.act_structure_json = _dump([item.model_dump() for item in value])
+        else: setattr(story,key,value.strip() if key=="title" and isinstance(value,str) else value)
     if not story.title.strip(): raise HTTPException(status_code=422,detail={"code":"story_title_required"})
     _bump(db,story,payload.change_note or "Story dossier updated");db.commit();db.refresh(story)
     return _payload(db,story,True)
@@ -135,6 +145,9 @@ def apply_outline_proposal(db: Session, story_id: str, expected_version: int, pr
 
     story.logline = proposal["logline"]
     story.synopsis = proposal["synopsis"]
+    story.central_question = proposal["central_question"]
+    story.human_value = proposal["human_value"]
+    story.act_structure_json = _dump(proposal["act_structure"])
     if story.status == "development":
         story.status = "outlined"
 

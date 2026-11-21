@@ -179,3 +179,50 @@ def test_outline_apply_rejects_stale_story_snapshot(monkeypatch):
         assert exc.detail["code"] == "story_outline_stale"
     else:
         raise AssertionError("A proposal generated from an older story version must be rejected")
+
+
+def test_apply_outline_persists_human_value_question_and_act_structure():
+    from types import SimpleNamespace
+    from backend.app.models import Project, StoryScene
+    from backend.app.story_engine import apply_outline_proposal
+    from backend.app.story_schemas import StoryOutlineProposal
+
+    story = SimpleNamespace(
+        id="story-1", project_id="project-1", version=1, status="development",
+        logline="Old logline", synopsis="Old synopsis", central_question=None,
+        human_value=None, act_structure_json="[]", title="The Signal",
+        format="short_film", genre=None, target_audience=None, premise=None,
+        creative_intent="Preserve the original creative intent",
+        created_at=None, updated_at=None,
+    )
+    project = SimpleNamespace(status="active")
+    class Rows:
+        def __init__(self, rows): self.rows = rows
+        def all(self): return self.rows
+    class FakeDB:
+        def __init__(self): self.scenes=[]; self.revisions=[]
+        def get(self, model, _id): return project if model is Project else story
+        def scalar(self, _query): return 0
+        def scalars(self, _query): return Rows(self.scenes)
+        def add(self, item):
+            if isinstance(item, StoryScene): self.scenes.append(item)
+            else: self.revisions.append(item)
+        def flush(self): pass
+        def commit(self): pass
+        def refresh(self, _item): pass
+
+    proposal = StoryOutlineProposal.model_validate(_valid_outline_proposal()).model_dump()
+    proposal["central_question"] = "Who deserves a response?"
+    proposal["human_value"] = "Empathy and responsibility"
+    proposal["act_structure"] = [{
+        "act": "Act One", "purpose": "Introduce the signal",
+        "turning_point": "The signal reveals a human voice",
+    }]
+    db = FakeDB()
+    result = apply_outline_proposal(db, "story-1", 1, proposal)
+    assert story.central_question == "Who deserves a response?"
+    assert story.human_value == "Empathy and responsibility"
+    assert json.loads(story.act_structure_json)[0]["act"] == "Act One"
+    assert result["central_question"] == story.central_question
+    assert result["human_value"] == story.human_value
+    assert result["act_structure"][0]["turning_point"] == "The signal reveals a human voice"
