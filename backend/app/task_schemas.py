@@ -10,6 +10,7 @@ class TaskCreate(BaseModel):
     priority: int = Field(default=100, ge=0, le=10000)
     depends_on: list[str] = Field(default_factory=list, max_length=100)
     max_attempts: int = Field(default=3, ge=1, le=20)
+    execution_mode: str | None = Field(default=None, pattern="^(auto|local|cloud)$")
 
 
 class TaskRead(BaseModel):

@@ -18,6 +18,8 @@ from .timeline import router as timeline_router
 from .props import router as props_router
 from .database import Base, SessionLocal, engine
 from .worker import TaskHandlerRegistry, WorkerSupervisor
+from .execution_policy import cloud_executor_configured
+from .cloud_executor import build_cloud_task_handler
 
 
 @asynccontextmanager
@@ -38,12 +40,14 @@ async def lifespan(app: FastAPI):
         # The only built-in handler is a safe smoke-test task. Production
         # workflow handlers are registered by their owning modules later.
         registry.register("system.healthcheck", lambda _payload: {"ok": True})
+        if cloud_executor_configured():
+            registry.register_cloud_handler(build_cloud_task_handler(SessionLocal, app.state.worker_id))
         supervisor = WorkerSupervisor(
             session_factory=SessionLocal,
             worker_id=os.getenv("MASOUD_STUDIO_WORKER_ID", "local-worker-1"),
             registry=registry,
         )
-        app.state.worker_handlers = registry.task_types
+        app.state.worker_handlers = registry.task_types + (["cloud.dispatch"] if registry.cloud_enabled else [])
         worker_task = asyncio.create_task(supervisor.run_forever())
         app.state.worker_task = worker_task
 

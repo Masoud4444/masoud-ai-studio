@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import func, select, or_, not_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -59,18 +59,44 @@ def serialize_task(task: StudioTask, include_payload: bool = True) -> dict:
         "created_at": task.created_at, "updated_at": task.updated_at,
         "started_at": task.started_at, "finished_at": task.finished_at,
         "result": json.loads(task.result_json) if task.result_json else None,
+        **_execution_metadata(task.payload_json),
     }
     if include_payload:
-        result["payload"] = json.loads(task.payload_json)
+        result["payload"] = _public_payload(task.payload_json)
     return result
 
 
+def _execution_metadata(payload_json: str) -> dict:
+    try:
+        value = json.loads(payload_json).get("_studio_execution", {})
+    except (TypeError, ValueError, AttributeError):
+        value = {}
+    return {
+        "execution_mode": value.get("mode", "local"),
+        "estimated_duration_seconds": value.get("estimated_duration_seconds"),
+        "payload_size_bytes": value.get("payload_size_bytes", 0),
+        "cloud_recommended": bool(value.get("cloud_recommended", False)),
+        "remote_job_id": value.get("remote_job_id"),
+        "progress_stage": value.get("progress_stage", "queued"),
+        "progress_percent": value.get("progress_percent", 0),
+        "estimated_cost_usd": value.get("estimated_cost_usd"),
+        "actual_cost_usd": value.get("actual_cost_usd"),
+    }
+
+
+def _public_payload(payload_json: str) -> dict:
+    value = json.loads(payload_json)
+    value.pop("_studio_execution", None)
+    return value
+
+
 def _request_hash(task_type: str, project_id: str | None, priority: int,
-                  payload: dict, dependencies: list[str], max_attempts: int) -> str:
+                  payload: dict, dependencies: list[str], max_attempts: int,
+                  execution: dict | None = None) -> str:
     canonical = json.dumps({
         "task_type": task_type, "project_id": project_id, "priority": priority,
         "payload": payload, "dependencies": sorted(dependencies),
-        "max_attempts": max_attempts,
+        "max_attempts": max_attempts, "execution": execution or {},
     }, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -78,7 +104,9 @@ def _request_hash(task_type: str, project_id: str | None, priority: int,
 def create_task(db: Session, task_type: str, payload: dict, idempotency_key: str,
                 project_id: str | None = None, priority: int = 100,
                 dependencies: list[str] | None = None, max_attempts: int = 3,
-                depends_on: list[str] | None = None) -> dict:
+                depends_on: list[str] | None = None, execution_mode: str = "local",
+                estimated_duration_seconds: int | None = None, payload_size_bytes: int = 0,
+                cloud_recommended: bool = False) -> dict:
     # `depends_on` is retained as a compatibility alias for direct callers.
     if dependencies is not None and depends_on is not None and set(dependencies) != set(depends_on):
         raise HTTPException(status_code=422, detail={"code": "conflicting_task_dependencies"})
@@ -86,7 +114,11 @@ def create_task(db: Session, task_type: str, payload: dict, idempotency_key: str
     if not idempotency_key or len(idempotency_key) > 200:
         raise HTTPException(status_code=422, detail={"code": "invalid_idempotency_key"})
     key_hash = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
-    request_hash = _request_hash(task_type, project_id, priority, payload, dependencies, max_attempts)
+    if execution_mode not in {"local", "cloud"}:
+        raise HTTPException(status_code=422, detail={"code": "invalid_execution_mode"})
+    execution = {"mode": execution_mode, "estimated_duration_seconds": estimated_duration_seconds,
+                 "payload_size_bytes": payload_size_bytes, "cloud_recommended": bool(cloud_recommended)}
+    request_hash = _request_hash(task_type, project_id, priority, payload, dependencies, max_attempts, execution)
     existing = db.scalar(select(StudioTask).where(StudioTask.idempotency_hash == key_hash))
     if existing:
         if existing.request_hash != request_hash:
@@ -106,7 +138,10 @@ def create_task(db: Session, task_type: str, payload: dict, idempotency_key: str
     task = StudioTask(
         id=str(uuid4()), project_id=project_id, task_type=task_type,
         status="queued", priority=priority,
-        payload_json=json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+        payload_json=json.dumps({**payload, "_studio_execution": {
+            **execution, "remote_job_id": None, "progress_stage": "queued",
+            "progress_percent": 0, "estimated_cost_usd": None, "actual_cost_usd": None,
+        }}, ensure_ascii=False, separators=(",", ":")),
         request_hash=request_hash, idempotency_hash=key_hash,
         max_attempts=max_attempts, available_at=now, created_at=now, updated_at=now,
     )
@@ -200,7 +235,8 @@ def retry_task(db: Session, task_id: str) -> dict:
 
 
 def claim_task(db: Session, worker_id: str, lease_seconds: int = 120,
-               task_types: list[str] | None = None) -> dict | None:
+               task_types: list[str] | None = None,
+               execution_modes: list[str] | None = None) -> dict | None:
     """Claim one eligible task. SQLite deployments should run a single worker process."""
     if not worker_id or len(worker_id) > 120 or not 10 <= lease_seconds <= 3600:
         raise HTTPException(status_code=422, detail={"code": "invalid_worker_claim"})
@@ -213,11 +249,20 @@ def claim_task(db: Session, worker_id: str, lease_seconds: int = 120,
         if not task_types:
             return None
         candidate_query = candidate_query.where(StudioTask.task_type.in_(task_types))
+    if execution_modes == ["cloud"]:
+        candidate_query = candidate_query.where(StudioTask.payload_json.like('%"_studio_execution":{"mode":"cloud"%'))
+    elif execution_modes == ["local"]:
+        candidate_query = candidate_query.where(or_(
+            not_(StudioTask.payload_json.like('%"_studio_execution"%')),
+            StudioTask.payload_json.like('%"_studio_execution":{"mode":"local"%'),
+        ))
     candidates = db.scalars(
         candidate_query.order_by(StudioTask.priority.asc(), StudioTask.created_at.asc())
         .limit(100).with_for_update(skip_locked=True)
     ).all()
     for task in candidates:
+        if execution_modes and _execution_metadata(task.payload_json)["execution_mode"] not in execution_modes:
+            continue
         dependencies = db.scalars(
             select(StudioTask.status).join(
                 TaskDependency, TaskDependency.depends_on_task_id == StudioTask.id
@@ -377,3 +422,60 @@ def renew_task_lease(db: Session, task_id: str, worker_id: str,
            {"worker_id": worker_id, "lease_seconds": lease_seconds})
     db.commit()
     return True
+
+
+
+def update_task_execution(db: Session, task_id: str, worker_id: str, *,
+                          remote_job_id: str | None = None, progress_stage: str | None = None,
+                          progress_percent: int | None = None,
+                          estimated_cost_usd: float | None = None,
+                          actual_cost_usd: float | None = None) -> dict:
+    task = db.get(StudioTask, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail={"code": "task_not_found"})
+    if task.status != "running" or task.locked_by != worker_id or not _lease_is_valid(task):
+        raise HTTPException(status_code=409, detail={"code": "task_lease_not_owned"})
+    if progress_percent is not None and (isinstance(progress_percent, bool) or not 0 <= progress_percent <= 100):
+        raise HTTPException(status_code=422, detail={"code": "invalid_task_progress"})
+    for cost in (estimated_cost_usd, actual_cost_usd):
+        if cost is not None and (isinstance(cost, bool) or not isinstance(cost, (int, float))
+                                 or not __import__("math").isfinite(cost) or cost < 0 or cost > 1000000000):
+            raise HTTPException(status_code=422, detail={"code": "invalid_task_cost"})
+    raw = json.loads(task.payload_json)
+    meta = raw.setdefault("_studio_execution", {})
+    before = (meta.get("progress_stage"), meta.get("progress_percent"), meta.get("remote_job_id"))
+    if remote_job_id is not None:
+        if not remote_job_id or len(remote_job_id) > 200:
+            raise HTTPException(status_code=422, detail={"code": "invalid_remote_job_id"})
+        meta["remote_job_id"] = remote_job_id
+    if progress_stage is not None:
+        meta["progress_stage"] = progress_stage[:40]
+    if progress_percent is not None:
+        meta["progress_percent"] = progress_percent
+    if estimated_cost_usd is not None:
+        meta["estimated_cost_usd"] = round(float(estimated_cost_usd), 8)
+    if actual_cost_usd is not None:
+        meta["actual_cost_usd"] = round(float(actual_cost_usd), 8)
+    task.payload_json = json.dumps(raw, ensure_ascii=False, separators=(",", ":"))
+    task.updated_at = _now()
+    after = (meta.get("progress_stage"), meta.get("progress_percent"), meta.get("remote_job_id"))
+    if after != before:
+        _event(db, task.id, "execution_progress", "running", "running", {
+            "stage": meta.get("progress_stage"), "percent": meta.get("progress_percent"),
+            "remote_job_id_present": bool(meta.get("remote_job_id")),
+        })
+    db.commit()
+    db.refresh(task)
+    return serialize_task(task)
+
+
+def list_task_events(db: Session, task_id: str) -> list[dict]:
+    if db.get(StudioTask, task_id) is None:
+        raise HTTPException(status_code=404, detail={"code": "task_not_found"})
+    rows = db.scalars(select(TaskEvent).where(TaskEvent.task_id == task_id)
+                      .order_by(TaskEvent.created_at.asc(), TaskEvent.id.asc())).all()
+    return [{"id": row.id, "event_type": row.event_type, "from_status": row.from_status,
+             "to_status": row.to_status, "detail": json.loads(row.detail_json),
+             "created_at": row.created_at} for row in rows]
+
+

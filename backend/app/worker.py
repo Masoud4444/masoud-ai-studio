@@ -22,6 +22,7 @@ _TASK_TYPE = re.compile(r"^[a-z][a-z0-9_.-]{0,99}$")
 class TaskHandlerRegistry:
     def __init__(self) -> None:
         self._handlers: dict[str, TaskHandler] = {}
+        self._cloud_handler: TaskHandler | None = None
 
     def register(self, task_type: str, handler: TaskHandler) -> None:
         if not _TASK_TYPE.fullmatch(task_type):
@@ -32,12 +33,21 @@ class TaskHandlerRegistry:
             raise TypeError("Task handler must be callable")
         self._handlers[task_type] = handler
 
+    def register_cloud_handler(self, handler: TaskHandler) -> None:
+        if self._cloud_handler is not None or not callable(handler):
+            raise ValueError("Invalid or duplicate cloud handler")
+        self._cloud_handler = handler
+
     @property
     def task_types(self) -> list[str]:
         return sorted(self._handlers)
 
-    def get(self, task_type: str) -> TaskHandler | None:
-        return self._handlers.get(task_type)
+    @property
+    def cloud_enabled(self) -> bool:
+        return self._cloud_handler is not None
+
+    def get(self, task_type: str, execution_mode: str = "local") -> TaskHandler | None:
+        return self._cloud_handler if execution_mode == "cloud" else self._handlers.get(task_type)
 
 
 class WorkerSupervisor:
@@ -77,16 +87,18 @@ class WorkerSupervisor:
         db = self.session_factory()
         try:
             recover_expired_leases(db)
-            task = claim_task(
-                db, self.worker_id, self.lease_seconds,
-                task_types=self.registry.task_types,
-            )
+            task = None
+            if self.registry.task_types:
+                task = claim_task(db, self.worker_id, self.lease_seconds,
+                                  task_types=self.registry.task_types, execution_modes=["local"])
+            if task is None and self.registry.cloud_enabled:
+                task = claim_task(db, self.worker_id, self.lease_seconds, execution_modes=["cloud"])
         finally:
             db.close()
         if task is None:
             return False
 
-        handler = self.registry.get(task["task_type"])
+        handler = self.registry.get(task["task_type"], task.get("execution_mode", "local"))
         if handler is None:
             # Defensive guard; claim filtering should make this unreachable.
             self._fail(task["id"], "handler_unavailable", "No handler is registered")
@@ -115,13 +127,17 @@ class WorkerSupervisor:
         heartbeat.start()
         try:
             payload = task.get("payload") or {}
-            result = handler(payload)
+            handler_payload = dict(payload)
+            handler_payload["_studio_task"] = {"id": task["id"], "task_type": task["task_type"],
+                                                "execution_mode": task.get("execution_mode", "local")}
+            result = handler(handler_payload)
         except Exception as exc:
             heartbeat_stop.set()
             heartbeat.join()
             if not lease_lost.is_set():
-                code = "handler_invalid_result" if isinstance(exc, (TypeError, ValueError)) else "handler_error"
-                self._fail(task["id"], code, "Task handler failed; inspect local diagnostic tooling")
+                code = getattr(exc, "error_code", None) or ("handler_invalid_result" if isinstance(exc, (TypeError, ValueError)) else "handler_error")
+                message = getattr(exc, "public_message", "Task handler failed; inspect local diagnostic tooling")
+                self._fail(task["id"], code, message)
             return True
         finally:
             heartbeat_stop.set()
@@ -139,8 +155,9 @@ class WorkerSupervisor:
                 return True
             self._complete(task["id"], result)
         except Exception as exc:
-            code = "handler_invalid_result" if isinstance(exc, (TypeError, ValueError)) else "handler_error"
-            self._fail(task["id"], code, "Task handler failed; inspect local diagnostic tooling")
+            code = getattr(exc, "error_code", None) or ("handler_invalid_result" if isinstance(exc, (TypeError, ValueError)) else "handler_error")
+            message = getattr(exc, "public_message", "Task handler failed; inspect local diagnostic tooling")
+            self._fail(task["id"], code, message)
         return True
 
     def _complete(self, task_id: str, result: dict[str, Any]) -> None:

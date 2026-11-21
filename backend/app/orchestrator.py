@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .models import Project, ProductionRun, ProductionStep, StudioTask, TaskDependency, TaskEvent
+from .execution_policy import DEFAULT_EXECUTION_PREFERENCES, resolve_execution
 
 
 WORKFLOWS = {
@@ -61,6 +62,9 @@ def _run_payload(run: ProductionRun, db: Session, replayed: bool = False) -> dic
             "depends_on": db.scalars(select(TaskDependency.depends_on_task_id)
                 .where(TaskDependency.task_id == task.id)).all(),
             "error_code": task.error_code,
+            "execution_mode": json.loads(task.payload_json).get("_studio_execution", {}).get("mode", "local"),
+            "progress_stage": json.loads(task.payload_json).get("_studio_execution", {}).get("progress_stage", "queued"),
+            "progress_percent": json.loads(task.payload_json).get("_studio_execution", {}).get("progress_percent", 0),
         })
     if run.status == "cancelled":
         status = "cancelled"
@@ -92,7 +96,10 @@ def _run_payload(run: ProductionRun, db: Session, replayed: bool = False) -> dic
 
 
 def create_production_run(db: Session, workflow_key: str, inputs: dict,
-                          idempotency_key: str, project_id: str | None = None) -> dict:
+                          idempotency_key: str, project_id: str | None = None,
+                          execution_mode: str | None = None,
+                          execution_preferences: dict | None = None,
+                          cloud_available: bool = False) -> dict:
     spec = WORKFLOWS.get(workflow_key)
     if spec is None:
         raise HTTPException(status_code=422, detail={"code": "unknown_workflow"})
@@ -101,7 +108,7 @@ def create_production_run(db: Session, workflow_key: str, inputs: dict,
     key_hash = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
     canonical = json.dumps({
         "workflow_key": workflow_key, "workflow_version": spec["version"],
-        "project_id": project_id, "inputs": inputs,
+        "project_id": project_id, "inputs": inputs, "execution_mode": execution_mode,
     }, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     request_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     existing = db.scalar(select(ProductionRun).where(ProductionRun.idempotency_hash == key_hash))
@@ -133,14 +140,27 @@ def create_production_run(db: Session, workflow_key: str, inputs: dict,
                 "inputs": inputs,
             }
             task_key = hashlib.sha256(f"{run_id}:{step['key']}".encode()).hexdigest()
+            decision = resolve_execution(
+                step["task_type"], payload, execution_mode,
+                execution_preferences or DEFAULT_EXECUTION_PREFERENCES, cloud_available,
+            )
+            execution = {
+                "mode": decision["execution_mode"],
+                "estimated_duration_seconds": decision["estimated_duration_seconds"],
+                "payload_size_bytes": decision["payload_size_bytes"],
+                "cloud_recommended": decision["cloud_recommended"],
+                "remote_job_id": None, "progress_stage": "queued", "progress_percent": 0,
+                "estimated_cost_usd": None, "actual_cost_usd": None,
+            }
+            task_payload = {**payload, "_studio_execution": execution}
             task_hash = hashlib.sha256(json.dumps({
                 "task_type": step["task_type"], "payload": payload,
-                "dependencies": step["depends_on"], "position": position,
+                "execution": execution, "dependencies": step["depends_on"], "position": position,
             }, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
             task = StudioTask(
                 id=task_id, project_id=project_id, task_type=step["task_type"],
                 status="waiting_approval" if step["approval_required"] else "queued",
-                priority=100, payload_json=json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+                priority=100, payload_json=json.dumps(task_payload, ensure_ascii=False, separators=(",", ":")),
                 request_hash=task_hash, idempotency_hash=task_key,
                 max_attempts=3, attempt_count=0, available_at=now,
                 created_at=now, updated_at=now,

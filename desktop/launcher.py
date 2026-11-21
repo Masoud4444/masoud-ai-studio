@@ -73,6 +73,11 @@ def _load_master_key(data_dir: Path) -> bytes:
 
 
 def _configure_environment() -> Path:
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(_resource_root() / ".env", override=False)
+    except Exception:
+        pass
     root = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Masoud AI Studio"
     logs_dir = root / "logs"
     settings_file = root / "desktop-settings.json"
@@ -100,7 +105,8 @@ def _configure_environment() -> Path:
     os.environ["MASOUD_STUDIO_CREDENTIAL_KEY_FILE"] = str(root / "credential-key.dpapi")
     os.environ["MASOUD_STUDIO_CREDENTIAL_KEY"] = base64.urlsafe_b64encode(key).decode("ascii")
     os.environ["MASOUD_STUDIO_CREDENTIAL_KEY_VERSION"] = "1"
-    os.environ["MASOUD_STUDIO_WORKER_ENABLED"] = "false"
+    cloud_ready = bool(os.environ.get("MASOUD_STUDIO_CLOUD_EXECUTOR_URL", "").strip().startswith("https://") and os.environ.get("MASOUD_STUDIO_CLOUD_EXECUTOR_TOKEN", "").strip())
+    os.environ["MASOUD_STUDIO_WORKER_ENABLED"] = "true" if cloud_ready else "false"
     os.environ["MASOUD_STUDIO_DESKTOP_MODE"] = "true"
     os.environ["MASOUD_STUDIO_PORT"] = "8000"
     os.environ["MASOUD_STUDIO_SCHEMA_MODE"] = "migrate"

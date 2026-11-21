@@ -9,8 +9,9 @@ from .schemas import ProjectCreate, ProjectPage, ProjectRead, ProjectUpdate
 from .storage import detach_project_asset, ingest_upload, list_project_assets
 from .ai_gateway import create_provider, list_providers, delete_provider, update_provider, generate_chat_completion, list_model_capabilities, update_model_capability, test_provider_connection, set_model_pricing, get_usage_summary, list_model_pricing_history
 from .gateway_schemas import ProviderCreate, ProviderRead, ProviderUpdate, ChatCompletionRequest, ChatCompletionRead, ModelCapabilityUpdate, ModelPricingUpdate
-from .task_manager import create_task, get_task, list_tasks, cancel_task, retry_task, approve_task, reject_task_approval
+from .task_manager import create_task, get_task, list_tasks, cancel_task, retry_task, approve_task, reject_task_approval, list_task_events
 from .task_schemas import TaskCreate, TaskRead
+from .execution_policy import DEFAULT_EXECUTION_PREFERENCES, cloud_executor_configured, resolve_execution
 from .orchestrator import (list_workflows, create_production_run, get_production_run, list_production_runs, pause_production_run, resume_production_run, cancel_production_run)
 from .orchestrator_schemas import ProductionRunCreate
 from .agent_manager import create_agent, get_agent, list_agents, update_agent, replace_agent_tools, enable_agent, disable_agent
@@ -147,16 +148,27 @@ def patch_ai_provider(provider_id: str, payload: ProviderUpdate, db: Session = D
 
 
 @router.post("/tasks", status_code=201)
+def _cloud_execution_ready():
+    import os
+    return cloud_executor_configured() and os.getenv("MASOUD_STUDIO_WORKER_ENABLED", "false").lower() == "true"
+
+
 def post_task(
     payload: TaskCreate,
     idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=8, max_length=200),
     db: Session = Depends(get_db),
 ):
+    preferences = _read_preferences()
+    decision = resolve_execution(payload.task_type, payload.payload, payload.execution_mode,
+                                 preferences, _cloud_execution_ready())
     return create_task(
         db, task_type=payload.task_type, payload=payload.payload,
         idempotency_key=idempotency_key, project_id=payload.project_id,
         priority=payload.priority, dependencies=payload.depends_on,
-        max_attempts=payload.max_attempts,
+        max_attempts=payload.max_attempts, execution_mode=decision["execution_mode"],
+        estimated_duration_seconds=decision["estimated_duration_seconds"],
+        payload_size_bytes=decision["payload_size_bytes"],
+        cloud_recommended=decision["cloud_recommended"],
     )
 
 
@@ -174,6 +186,11 @@ def get_tasks(
 @router.get("/tasks/{task_id}")
 def get_task_route(task_id: str, db: Session = Depends(get_db)):
     return get_task(db, task_id)
+
+
+@router.get("/tasks/{task_id}/events")
+def get_task_events(task_id: str, db: Session = Depends(get_db)):
+    return list_task_events(db, task_id)
 
 
 @router.post("/tasks/{task_id}/cancel")
@@ -211,6 +228,9 @@ def post_production_run(
     return create_production_run(
         db, workflow_key=payload.workflow_key, inputs=payload.inputs,
         idempotency_key=idempotency_key, project_id=payload.project_id,
+        execution_mode=payload.execution_mode,
+        execution_preferences=_read_preferences(),
+        cloud_available=_cloud_execution_ready(),
     )
 
 
@@ -328,17 +348,26 @@ def _settings_file():
 def _read_preferences():
     import json
     path = _settings_file()
-    defaults = {"backup_retention_count": 20}
+    defaults = {"backup_retention_count": 20, **DEFAULT_EXECUTION_PREFERENCES}
     if not path.exists():
         return defaults
     if path.is_symlink() or path.stat().st_size > 16384:
         raise HTTPException(409, detail={"code": "settings_file_unsafe"})
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
-        count = raw.get("backup_retention_count", 20)
+        if not isinstance(raw, dict):
+            raise ValueError("Settings must be an object")
+        values = {**defaults, **{key: value for key, value in raw.items() if key in defaults}}
+        count, seconds, size = values["backup_retention_count"], values["local_max_estimated_seconds"], values["local_max_payload_bytes"]
         if isinstance(count, bool) or not isinstance(count, int) or not 3 <= count <= 100:
             raise ValueError("Invalid backup retention setting")
-        return {"backup_retention_count": count}
+        if values["execution_mode"] not in {"auto", "local", "cloud"}:
+            raise ValueError("Invalid execution mode")
+        if isinstance(seconds, bool) or not isinstance(seconds, int) or not 1 <= seconds <= 3600:
+            raise ValueError("Invalid local duration threshold")
+        if isinstance(size, bool) or not isinstance(size, int) or not 1024 <= size <= 52428800:
+            raise ValueError("Invalid local payload threshold")
+        return values
     except (OSError, ValueError, TypeError):
         raise HTTPException(409, detail={"code": "settings_file_invalid"})
 
@@ -352,23 +381,45 @@ def get_settings_preferences():
 def put_settings_preferences(payload: dict):
     import json
     import os
-    if set(payload) != {"backup_retention_count"}:
+    allowed = {"backup_retention_count", "execution_mode", "local_max_estimated_seconds", "local_max_payload_bytes"}
+    if not isinstance(payload, dict) or not payload or not set(payload).issubset(allowed):
         raise HTTPException(422, detail={"code": "unsupported_settings_fields"})
-    count = payload.get("backup_retention_count")
+    values = {**_read_preferences(), **payload}
+    count, seconds, size = values["backup_retention_count"], values["local_max_estimated_seconds"], values["local_max_payload_bytes"]
     if isinstance(count, bool) or not isinstance(count, int) or not 3 <= count <= 100:
-        raise HTTPException(422, detail={"code": "invalid_backup_retention", "minimum": 3, "maximum": 100})
+        raise HTTPException(status_code=422, detail={"code": "invalid_backup_retention", "minimum": 3, "maximum": 100})
+    if values["execution_mode"] not in {"auto", "local", "cloud"}:
+        raise HTTPException(status_code=422, detail={"code": "invalid_execution_mode"})
+    if isinstance(seconds, bool) or not isinstance(seconds, int) or not 1 <= seconds <= 3600:
+        raise HTTPException(status_code=422, detail={"code": "invalid_local_duration_threshold"})
+    if isinstance(size, bool) or not isinstance(size, int) or not 1024 <= size <= 52428800:
+        raise HTTPException(status_code=422, detail={"code": "invalid_local_payload_threshold"})
     path = _settings_file()
+    if path.is_symlink():
+        raise HTTPException(status_code=409, detail={"code": "settings_file_unsafe"})
     path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_name(path.name + ".tmp")
     try:
         with temp.open("w", encoding="utf-8") as stream:
-            json.dump({"backup_retention_count": count}, stream, sort_keys=True)
+            json.dump(values, stream, sort_keys=True)
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temp, path)
     finally:
         temp.unlink(missing_ok=True)
-    return {"backup_retention_count": count}
+    return values
+
+
+@router.get("/settings/execution")
+def get_execution_capabilities():
+    import os
+    return {
+        "cloud_executor_configured": cloud_executor_configured(),
+        "worker_enabled": os.getenv("MASOUD_STUDIO_WORKER_ENABLED", "false").lower() == "true",
+        "remote_protocol": "POST /v1/jobs + GET /v1/jobs/{job_id}",
+        "status_persistence": "local_database",
+        "polling_supported": True,
+    }
 
 
 # Local backup management. Restore is deliberately offline-only.

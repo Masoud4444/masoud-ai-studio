@@ -283,3 +283,16 @@ Never infer one status from another.
 - Added a read-only Fountain screenplay export for each story dossier. It preserves scene order, explicit sluglines, script body text and editorial metadata comments (scene title, summary, dramatic purpose and beats).
 - Export is generated from the current saved story state; it does not mutate the story or create a revision. The Story Engine exposes a direct download link for the .fountain file.
 - Export uses a deterministic UTF-8 text renderer and a story-scoped attachment filename. Focused regression coverage is isolated from previously passing suites.
+
+
+## Execution Orchestration v0.1 — 2026-11-21
+
+- Added persisted workspace execution preferences: Auto / Local / Cloud, local estimated-time threshold (default 8 seconds) and payload-size threshold (default 2 MiB). Preferences remain in the existing atomic local settings file.
+- Added deterministic task routing. Auto selects local for light work and cloud for known render/batch tasks, estimates above threshold or oversized payloads. Heavy work is not silently pushed onto the local device when no cloud executor is configured; the API returns a clear setup error. Explicit Local remains an intentional override.
+- Extended the existing SQLAlchemy task queue without introducing a new broker or database migration. Execution mode, remote job ID, stage, progress and cost metadata are persisted inside a reserved task metadata object and hidden from the task's user payload.
+- Added a generic HTTPS cloud executor adapter using HTTPX: idempotent submission, bounded async polling, timeouts, no redirects, response-size limits, sanitized errors, retry-safe job IDs and optional estimate/actual cost reporting.
+- Worker claims local and cloud tasks separately. Cloud work runs in a worker thread while the task lease heartbeat continues; the desktop launcher enables the worker only when cloud endpoint and token are configured.
+- Added task event history endpoint and an Execution Center that polls saved jobs while visible. Closing the UI does not erase queued jobs or remote IDs; a restarted client reloads them from the local database.
+- Added focused regression tests and a dedicated workflow for execution routing and durable cloud-job metadata. Previously passing suites were not manually rerun.
+- Android companion integration is documented against AndroidX WorkManager. This repository does not yet contain a native Android application module, so the API and integration contract are platform-neutral but the Android client implementation remains a later client-side phase.
+- Cloud dispatch requires an administrator-provisioned HTTPS executor implementing the documented POST /v1/jobs and GET /v1/jobs/{job_id} contract. No cloud account, GPU capacity, provider URL or paid service is provisioned by this commit.

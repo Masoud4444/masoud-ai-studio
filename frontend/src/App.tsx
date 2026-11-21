@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { AgentsPanel, AssetsPanel, ComingSoonPanel, SettingsPanel, ProductionPanel, ResearchPanel, StoryPanel } from "./WorkspacePanels";
+import { AgentsPanel, AssetsPanel, ComingSoonPanel, ExecutionPanel, SettingsPanel, ProductionPanel, ResearchPanel, StoryPanel } from "./WorkspacePanels";
 import { CharacterWorldPanel } from "./CharacterWorldPanel";
 import { TimelinePanel } from "./TimelinePanel";
 import {
   Activity, ArrowUpRight, AudioLines, BookOpen, Check, ChevronDown, Clock,
-  CircleHelp, Clapperboard, Command, FolderKanban, Gauge, Image, Layers3,
+  CircleHelp, Clapperboard, Command, Cpu, FolderKanban, Gauge, Image, Layers3,
   Plus, Search, Settings2, ShieldCheck, Sparkles, Video, X
 } from "lucide-react";
 
@@ -26,6 +26,7 @@ const nav = [
   { label: "Video & audio", icon: AudioLines },
   { label: "AI agents", icon: Sparkles },
   { label: "Compliance", icon: ShieldCheck },
+  { label: "Execution center", icon: Cpu },
   { label: "Settings", icon: Settings2 }
 ];
 
@@ -161,6 +162,7 @@ function App() {
           {active === "Timeline" && <TimelinePanel projects={projects}/>}
           {active === "Video & audio" && <ComingSoonPanel title="Video & audio" description="Media generation, audio, subtitles, editing and compositing will be integrated incrementally through the production pipeline."/>}
           {active === "Compliance" && <ComingSoonPanel title="Compliance" description="Originality, rights, platform policy and publishing-readiness checks will be added as a dedicated review layer."/>}
+          {active === "Execution center" && <ExecutionPanel/>}
           {active === "Settings" && <SettingsPanel/>}
           <footer><span>MASOUD AI STUDIO <i>·</i> PRIVATE BY DESIGN</span><span>Full vision. Simplified architecture. Incremental implementation.</span></footer>
         </div>
