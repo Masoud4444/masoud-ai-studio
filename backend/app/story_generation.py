@@ -60,10 +60,14 @@ def create_story_outline_task(
     character_ids = [item.id for item in characters]
     location_ids = [item.id for item in locations]
     scene_character_links = db.scalars(
-        select(SceneCharacter).join(StoryScene, StoryScene.id == SceneCharacter.scene_id).where(\n            StoryScene.story_id == story.id, SceneCharacter.character_id.in_(character_ids)\n        ).limit(300)
+        select(SceneCharacter).join(StoryScene, StoryScene.id == SceneCharacter.scene_id).where(
+            StoryScene.story_id == story.id, SceneCharacter.character_id.in_(character_ids)
+        ).limit(300)
     ).all() if character_ids else []
     scene_location_links = db.scalars(
-        select(SceneLocation).join(StoryScene, StoryScene.id == SceneLocation.scene_id).where(\n            StoryScene.story_id == story.id, SceneLocation.location_id.in_(location_ids)\n        ).limit(300)
+        select(SceneLocation).join(StoryScene, StoryScene.id == SceneLocation.scene_id).where(
+            StoryScene.story_id == story.id, SceneLocation.location_id.in_(location_ids)
+        ).limit(300)
     ).all() if location_ids else []
     bible_context = {
         "characters": [{
@@ -168,8 +172,16 @@ def _build_messages(payload: dict[str, Any]) -> list[dict[str, str]]:
             "role": "user",
             "content": (
                 "Develop an outline from this story dossier and creative brief. This is a proposal only; "
-                "do not assume it is approved or modify canonical story records.\n\n"
-                f"STORY DOSSIER AND CANONICAL BIBLE:\n{story!r}\n\nCREATIVE BRIEF:\n{payload.get('brief', '')}\n\n"
+                "do not assume it is approved or modify canonical story records.
+
+"
+                f"STORY DOSSIER AND CANONICAL BIBLE:
+{story!r}
+
+CREATIVE BRIEF:
+{payload.get('brief', '')}
+
+"
                 "When no canonical entries exist, create new characters and locations only when useful. "
                 "For each scene, use existing character/location identities where applicable and avoid "
                 "continuity conflicts with the supplied active facts."
@@ -247,7 +259,8 @@ def parse_story_outline_content(content: str) -> dict[str, Any]:
             lines = lines[1:]
         if lines and lines[-1].strip() == "```":
             lines = lines[:-1]
-        candidate = "\n".join(lines).strip()
+        candidate = "
+".join(lines).strip()
     try:
         decoded = json.loads(candidate)
     except (TypeError, ValueError):
