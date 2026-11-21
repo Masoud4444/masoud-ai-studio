@@ -20,6 +20,7 @@ from .database import Base, SessionLocal, engine
 from .worker import TaskHandlerRegistry, WorkerSupervisor
 from .execution_policy import cloud_executor_configured
 from .cloud_executor import build_cloud_task_handler
+from .story_generation import build_story_outline_handler
 
 
 @asynccontextmanager
@@ -40,6 +41,7 @@ async def lifespan(app: FastAPI):
         # The only built-in handler is a safe smoke-test task. Production
         # workflow handlers are registered by their owning modules later.
         registry.register("system.healthcheck", lambda _payload: {"ok": True})
+        registry.register("story.generate_outline", build_story_outline_handler(SessionLocal))
         if cloud_executor_configured():
             registry.register_cloud_handler(build_cloud_task_handler(SessionLocal, app.state.worker_id))
         supervisor = WorkerSupervisor(
@@ -122,7 +124,7 @@ def runtime_diagnostics():
             "worker_id": getattr(app.state, "worker_id", "local-worker-1"),
             "registered_handlers": list(getattr(app.state, "worker_handlers", [])),
         },
-        "execution_note": "Only registered task handlers can be claimed; the built-in healthcheck is not a creative production handler.",
+        "execution_note": "Only registered task handlers can be claimed. Story outline generation uses the configured AI Gateway and returns a review-only proposal.",
     }
 
 

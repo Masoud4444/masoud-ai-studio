@@ -323,3 +323,13 @@ Never infer one status from another.
 - This increment does not add user authentication; it follows the existing loopback/local API trust boundary. A native Android client and remote worker direct-upload credential flow remain future work.
 - Added a task-level artifact panel to Execution Center for attaching, listing, previewing and downloading completed-job files; preview/download links remain task-scoped.
 - Added focused task-artifact API regression coverage and a dedicated workflow; no previously passing suite is manually rerun.
+
+
+## AI-assisted Story Outline vertical slice — 2026-11-21
+
+- Added `POST /api/v1/stories/{story_id}/outline-tasks`, an idempotent task-creation route scoped to an active story and its project.
+- The local Worker now registers `story.generate_outline`. It calls the configured AI Gateway using the selected model, and the existing provider URL, credential encryption, request idempotency and response-size controls remain in force.
+- The Story Engine UI can submit an outline request with a model identifier and creative direction. The task appears in Execution Center and its result is available through the existing result-download endpoint.
+- Generation is review-first: the worker returns a structured proposal payload and never writes generated text into canonical story or scene records. Human review and explicit editing remain required.
+- Added focused worker-handler regression tests and a dedicated GitHub Actions workflow. Previously passing suites are not manually rerun.
+- Local execution requires the Worker to be enabled and at least one compatible AI provider/model to be configured in AI Gateway. The user's Windows installation has not been executed or verified from this hosted environment.

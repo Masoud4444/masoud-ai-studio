@@ -1,0 +1,35 @@
+name: Story outline generation regression
+
+on:
+  push:
+    branches: [implementation/bootstrap-001]
+    paths:
+      - "backend/app/story_generation.py"
+      - "backend/app/story_schemas.py"
+      - "backend/app/main.py"
+      - "backend/app/api.py"
+      - "backend/tests/test_story_generation.py"
+      - ".github/workflows/story-outline-generation.yml"
+  pull_request:
+    branches: [implementation/bootstrap-001]
+    paths:
+      - "backend/app/story_generation.py"
+      - "backend/app/story_schemas.py"
+      - "backend/app/main.py"
+      - "backend/app/api.py"
+      - "backend/tests/test_story_generation.py"
+      - ".github/workflows/story-outline-generation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  story-outline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -r requirements.txt
+      - run: python -m pytest backend/tests/test_story_generation.py -q

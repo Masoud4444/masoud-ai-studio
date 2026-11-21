@@ -29,7 +29,8 @@ from .story_engine import create_story, list_stories, get_story, update_story, c
 from .story_export import render_fountain
 from .models import Story, StoryScene
 from sqlalchemy import select
-from .story_schemas import StoryCreate, StoryUpdate, StorySceneCreate, StorySceneUpdate, StorySceneReorder
+from .story_schemas import StoryCreate, StoryUpdate, StorySceneCreate, StorySceneUpdate, StorySceneReorder, StoryOutlineTaskCreate
+from .story_generation import create_story_outline_task
 from .research_schemas import (
     ResearchSourceCreate, ResearchEvidenceCreate, ResearchClaimCreate,
     ResearchClaimEvidenceCreate, ResearchClaimUpdate,
@@ -700,6 +701,16 @@ def post_story(payload: StoryCreate, db: Session = Depends(get_db)):
 @router.get("/stories")
 def get_stories(project_id: str | None = Query(None, min_length=36, max_length=36), limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0), db: Session = Depends(get_db)):
     return list_stories(db, project_id=project_id, limit=limit, offset=offset)
+
+@router.post("/stories/{story_id}/outline-tasks", status_code=201)
+def post_story_outline_task(
+    story_id: str,
+    payload: StoryOutlineTaskCreate,
+    idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=8, max_length=200),
+    db: Session = Depends(get_db),
+):
+    return create_story_outline_task(db, story_id, payload, idempotency_key)
+
 
 @router.get("/stories/{story_id}/export/fountain")
 def export_story_fountain(story_id: str, db: Session = Depends(get_db)):

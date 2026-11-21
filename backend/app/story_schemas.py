@@ -69,3 +69,11 @@ class StorySceneUpdate(BaseModel):
 class StorySceneReorder(BaseModel):
     expected_story_version: int = Field(ge=1)
     scene_ids: list[str] = Field(min_length=1, max_length=500)
+
+
+class StoryOutlineTaskCreate(BaseModel):
+    model: str = Field(min_length=1, max_length=160)
+    provider_id: str | None = Field(default=None, min_length=1, max_length=120)
+    brief: str = Field(min_length=1, max_length=12000)
+    temperature: float = Field(default=0.7, ge=0, le=2)
+    max_tokens: int = Field(default=4000, ge=256, le=12000)
