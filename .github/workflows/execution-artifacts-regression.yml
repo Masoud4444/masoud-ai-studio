@@ -1,0 +1,24 @@
+name: Execution artifact management regression
+on:
+  push:
+    branches: [implementation/bootstrap-001]
+    paths:
+      - "backend/app/api.py"
+      - "backend/app/models.py"
+      - "backend/app/storage.py"
+      - "backend/migrations/versions/0018_task_artifacts.py"
+      - "backend/tests/test_execution_artifacts.py"
+      - ".github/workflows/execution-artifacts-regression.yml"
+permissions:
+  contents: read
+jobs:
+  execution-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install -r requirements.txt
+      - name: Run only the focused execution artifact regressions
+        run: python -m pytest backend/tests/test_execution_artifacts.py -q

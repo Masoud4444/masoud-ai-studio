@@ -311,3 +311,14 @@ Never infer one status from another.
 - Incomplete tasks return a stable `task_result_not_ready` conflict rather than an empty or partial download.
 - Responses set `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`; the endpoint reuses the existing task read path and introduces no new persistence schema.
 - Execution Center now exposes a download action only after a task reaches `succeeded`.
+
+
+## Execution artifact management v0.1 — 2026-11-21
+
+- Added a task-to-asset association using the existing content-addressed asset store; binary media stays in storage while task/artifact metadata remains in SQLite.
+- Task artifacts can only be attached to a succeeded task that belongs to a project. Uploads reuse the project's asset-ingestion limits, SHA-256 deduplication and safe filename normalization; arbitrary cloud result URLs are never fetched.
+- Added task-scoped artifact listing and download endpoints. Every read verifies the artifact is associated with the requested task; storage paths are resolved under the configured root, symlink targets are rejected, and stored size is checked.
+- Inline preview is limited to a fixed image/audio/video MIME allowlist. Other formats are served as attachments. Responses use no-store and nosniff headers.
+- Detaching a task association does not delete the underlying project asset or blob. Automated orphan cleanup is intentionally not enabled.
+- This increment does not add user authentication; it follows the existing loopback/local API trust boundary. A native Android client and remote worker direct-upload credential flow remain future work.
+- Added focused task-artifact API regression coverage and a dedicated workflow; no previously passing suite is manually rerun.

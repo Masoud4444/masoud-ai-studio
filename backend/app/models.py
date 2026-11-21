@@ -40,6 +40,16 @@ class ProjectAsset(Base):
     original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
+class TaskArtifact(Base):
+    __tablename__ = "task_artifacts"
+    __table_args__ = (UniqueConstraint("task_id", "asset_id", name="uq_task_artifact"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    task_id: Mapped[str] = mapped_column(ForeignKey("studio_tasks.id", ondelete="RESTRICT"), index=True, nullable=False)
+    asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id", ondelete="RESTRICT"), index=True, nullable=False)
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
 class AIProvider(Base):
     __tablename__ = "ai_providers"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))

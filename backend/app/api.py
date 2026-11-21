@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, File, Header, Query, UploadFile, HTTPException
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from sqlalchemy.orm import Session
 from .database import get_db, engine
 from .storage import STORAGE_ROOT
 from .backup import BackupError, create_backup, verify_backup
 from .projects import create_project, get_project, list_projects, serialize, set_archived, update_project
 from .schemas import ProjectCreate, ProjectPage, ProjectRead, ProjectUpdate
-from .storage import detach_project_asset, ingest_upload, list_project_assets
+from .storage import (detach_project_asset, ingest_upload, list_project_assets,\n                     attach_task_artifact, list_task_artifacts, resolve_task_artifact_file)
 from .ai_gateway import create_provider, list_providers, delete_provider, update_provider, generate_chat_completion, list_model_capabilities, update_model_capability, test_provider_connection, set_model_pricing, get_usage_summary, list_model_pricing_history
 from .gateway_schemas import ProviderCreate, ProviderRead, ProviderUpdate, ChatCompletionRequest, ChatCompletionRead, ModelCapabilityUpdate, ModelPricingUpdate
 from .task_manager import create_task, get_task, list_tasks, cancel_task, retry_task, approve_task, reject_task_approval, list_task_events
@@ -200,6 +200,46 @@ def get_task_result(task_id: str, db: Session = Depends(get_db)):
             "Cache-Control": "no-store",
             "X-Content-Type-Options": "nosniff",
         },
+    )
+
+
+@router.post("/tasks/{task_id}/artifacts", status_code=201)
+async def post_task_artifact(task_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    from .models import StudioTask
+    task = db.get(StudioTask, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail={"code": "task_not_found"})
+    if task.status != "succeeded":
+        raise HTTPException(status_code=409, detail={"code": "task_artifacts_require_succeeded_task"})
+    if not task.project_id:
+        raise HTTPException(status_code=409, detail={"code": "task_project_required_for_artifacts"})
+    asset, project_link = await ingest_upload(db, task.project_id, file)
+    link = attach_task_artifact(db, task_id, asset.id, project_link.original_filename)
+    return {
+        "id": link.id, "asset_id": asset.id, "sha256": asset.sha256,
+        "size_bytes": asset.size_bytes, "mime_type": asset.mime_type,
+        "filename": link.original_filename, "created_at": link.created_at,
+    }
+
+
+@router.get("/tasks/{task_id}/artifacts")
+def get_task_artifacts(task_id: str, db: Session = Depends(get_db)):
+    return list_task_artifacts(db, task_id)
+
+
+@router.get("/tasks/{task_id}/artifacts/{artifact_id}")
+def get_task_artifact(task_id: str, artifact_id: str, preview: bool = Query(False), db: Session = Depends(get_db)):
+    asset, link, path = resolve_task_artifact_file(db, task_id, artifact_id)
+    previewable = asset.mime_type in {
+        "image/png", "image/jpeg", "image/gif", "image/webp",
+        "audio/mpeg", "audio/wav", "audio/ogg", "audio/flac",
+        "video/mp4", "video/webm",
+    }
+    disposition = "inline" if preview and previewable else "attachment"
+    return FileResponse(
+        path, media_type=asset.mime_type,
+        filename=link.original_filename, content_disposition_type=disposition,
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
     )
 
 

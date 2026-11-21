@@ -106,3 +106,81 @@ def detach_project_asset(db: Session, project_id: str, link_id: str):
     db.delete(link)
     db.commit()
     # Blob bytes are retained. Garbage collection must prove zero references before deletion.
+
+
+def attach_task_artifact(db: Session, task_id: str, asset_id: str, filename: str):
+    from .models import StudioTask, TaskArtifact
+    task = db.get(StudioTask, task_id)
+    if task is None:
+        raise HTTPException(404, detail={"code": "task_not_found"})
+    if task.status != "succeeded":
+        raise HTTPException(409, detail={"code": "task_artifacts_require_succeeded_task"})
+    if not task.project_id:
+        raise HTTPException(409, detail={"code": "task_project_required_for_artifacts"})
+    linked = db.scalar(select(ProjectAsset).where(
+        ProjectAsset.project_id == task.project_id, ProjectAsset.asset_id == asset_id
+    ))
+    if linked is None:
+        raise HTTPException(404, detail={"code": "project_asset_not_found"})
+    existing = db.scalar(select(TaskArtifact).where(
+        TaskArtifact.task_id == task_id, TaskArtifact.asset_id == asset_id
+    ))
+    if existing is not None:
+        return existing
+    link = TaskArtifact(task_id=task_id, asset_id=asset_id, original_filename=safe_filename(filename))
+    db.add(link)
+    try:
+        db.commit()
+        db.refresh(link)
+    except IntegrityError:
+        db.rollback()
+        existing = db.scalar(select(TaskArtifact).where(
+            TaskArtifact.task_id == task_id, TaskArtifact.asset_id == asset_id
+        ))
+        if existing is None:
+            raise HTTPException(409, detail={"code": "task_artifact_conflict"})
+        return existing
+    return link
+
+
+def list_task_artifacts(db: Session, task_id: str):
+    from .models import StudioTask, TaskArtifact
+    if db.get(StudioTask, task_id) is None:
+        raise HTTPException(404, detail={"code": "task_not_found"})
+    rows = db.execute(
+        select(Asset, TaskArtifact).join(TaskArtifact, TaskArtifact.asset_id == Asset.id)
+        .where(TaskArtifact.task_id == task_id)
+        .order_by(TaskArtifact.created_at.desc())
+    ).all()
+    return [{
+        "id": link.id, "asset_id": asset.id, "sha256": asset.sha256,
+        "size_bytes": asset.size_bytes, "mime_type": asset.mime_type,
+        "filename": link.original_filename, "created_at": link.created_at,
+        "previewable": asset.mime_type in {
+            "image/png", "image/jpeg", "image/gif", "image/webp",
+            "audio/mpeg", "audio/wav", "audio/ogg", "audio/flac",
+            "video/mp4", "video/webm",
+        },
+    } for asset, link in rows]
+
+
+def resolve_task_artifact_file(db: Session, task_id: str, artifact_id: str):
+    from .models import StudioTask, TaskArtifact
+    if db.get(StudioTask, task_id) is None:
+        raise HTTPException(404, detail={"code": "task_not_found"})
+    row = db.execute(
+        select(Asset, TaskArtifact).join(TaskArtifact, TaskArtifact.asset_id == Asset.id)
+        .where(TaskArtifact.task_id == task_id, TaskArtifact.id == artifact_id)
+    ).first()
+    if row is None:
+        raise HTTPException(404, detail={"code": "task_artifact_not_found"})
+    asset, link = row
+    path = blob_path(asset.sha256)
+    if not path.is_file() or path.is_symlink():
+        raise HTTPException(404, detail={"code": "artifact_file_missing"})
+    try:
+        if path.stat().st_size != asset.size_bytes:
+            raise HTTPException(409, detail={"code": "artifact_size_mismatch"})
+    except OSError:
+        raise HTTPException(404, detail={"code": "artifact_file_missing"})
+    return asset, link, path
