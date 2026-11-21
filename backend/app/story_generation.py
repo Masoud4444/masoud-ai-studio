@@ -511,7 +511,7 @@ def apply_story_scene_generation_task(
     if known_characters != character_ids or known_locations != location_ids:
         raise HTTPException(status_code=422, detail={"code": "story_scenes_unknown_canonical_reference"})
     from .story_engine import _bump, _payload
-        for offset, item in enumerate(proposal["scenes"], 1):
+    for offset, item in enumerate(proposal["scenes"], 1):
         beats = list(item["beats"])
         if item["emotional_turn"]:
             beats.append("Emotional turn: " + item["emotional_turn"])
