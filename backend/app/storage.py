@@ -37,7 +37,10 @@ def detect_mime(header: bytes) -> str:
 
 def blob_path(sha: str) -> Path:
     root = STORAGE_ROOT.resolve()
-    target = (root / "blobs" / sha[:2] / sha).resolve()
+    candidate = root / "blobs" / sha[:2] / sha
+    if candidate.is_symlink():
+        raise HTTPException(status_code=400, detail={"code": "invalid_storage_path"})
+    target = candidate.resolve()
     if root not in target.parents:
         raise HTTPException(status_code=400, detail={"code": "invalid_storage_path"})
     return target

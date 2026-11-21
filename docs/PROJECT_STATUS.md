@@ -321,4 +321,5 @@ Never infer one status from another.
 - Inline preview is limited to a fixed image/audio/video MIME allowlist. Other formats are served as attachments. Responses use no-store and nosniff headers.
 - Detaching a task association does not delete the underlying project asset or blob. Automated orphan cleanup is intentionally not enabled.
 - This increment does not add user authentication; it follows the existing loopback/local API trust boundary. A native Android client and remote worker direct-upload credential flow remain future work.
+- Added a task-level artifact panel to Execution Center for attaching, listing, previewing and downloading completed-job files; preview/download links remain task-scoped.
 - Added focused task-artifact API regression coverage and a dedicated workflow; no previously passing suite is manually rerun.
