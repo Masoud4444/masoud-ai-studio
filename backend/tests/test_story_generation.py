@@ -203,7 +203,7 @@ def test_apply_outline_persists_human_value_question_and_act_structure():
         def __init__(self): self.scenes=[]; self.revisions=[]
         def get(self, model, _id): return project if model is Project else story
         def scalar(self, _query): return 0
-        def scalars(self, _query): return Rows(self.scenes)
+        def scalars(self, query): return Rows(self.revisions if "story_revisions" in str(query) else self.scenes)
         def add(self, item):
             if isinstance(item, StoryScene): self.scenes.append(item)
             else: self.revisions.append(item)
