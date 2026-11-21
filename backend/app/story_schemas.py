@@ -77,3 +77,30 @@ class StoryOutlineTaskCreate(BaseModel):
     brief: str = Field(min_length=1, max_length=12000)
     temperature: float = Field(default=0.7, ge=0, le=2)
     max_tokens: int = Field(default=4000, ge=256, le=12000)
+
+
+class StoryOutlineSceneProposal(BaseModel):
+    title: str = Field(min_length=1, max_length=240)
+    slugline: str | None = Field(default=None, max_length=300)
+    summary: str = Field(min_length=1, max_length=12000)
+    dramatic_purpose: str | None = Field(default=None, max_length=1000)
+    beats: list[str] = Field(default_factory=list, max_length=40)
+
+
+class StoryOutlineActProposal(BaseModel):
+    act: str = Field(min_length=1, max_length=120)
+    purpose: str = Field(min_length=1, max_length=2000)
+    turning_point: str = Field(min_length=1, max_length=2000)
+
+
+class StoryOutlineProposal(BaseModel):
+    logline: str = Field(min_length=1, max_length=1000)
+    synopsis: str = Field(min_length=1, max_length=30000)
+    central_question: str = Field(min_length=1, max_length=2000)
+    human_value: str = Field(min_length=1, max_length=3000)
+    act_structure: list[StoryOutlineActProposal] = Field(min_length=1, max_length=8)
+    scenes: list[StoryOutlineSceneProposal] = Field(min_length=1, max_length=100)
+
+
+class StoryOutlineApply(BaseModel):
+    expected_version: int = Field(ge=1)

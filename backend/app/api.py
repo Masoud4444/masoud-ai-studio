@@ -29,8 +29,8 @@ from .story_engine import create_story, list_stories, get_story, update_story, c
 from .story_export import render_fountain
 from .models import Story, StoryScene
 from sqlalchemy import select
-from .story_schemas import StoryCreate, StoryUpdate, StorySceneCreate, StorySceneUpdate, StorySceneReorder, StoryOutlineTaskCreate
-from .story_generation import create_story_outline_task
+from .story_schemas import StoryCreate, StoryUpdate, StorySceneCreate, StorySceneUpdate, StorySceneReorder, StoryOutlineTaskCreate, StoryOutlineApply
+from .story_generation import create_story_outline_task, apply_story_outline_task
 from .research_schemas import (
     ResearchSourceCreate, ResearchEvidenceCreate, ResearchClaimCreate,
     ResearchClaimEvidenceCreate, ResearchClaimUpdate,
@@ -710,6 +710,16 @@ def post_story_outline_task(
     db: Session = Depends(get_db),
 ):
     return create_story_outline_task(db, story_id, payload, idempotency_key)
+
+
+@router.post("/stories/{story_id}/outline-tasks/{task_id}/apply")
+def post_story_outline_apply(
+    story_id: str,
+    task_id: str,
+    payload: StoryOutlineApply,
+    db: Session = Depends(get_db),
+):
+    return apply_story_outline_task(db, story_id, task_id, payload)
 
 
 @router.get("/stories/{story_id}/export/fountain")

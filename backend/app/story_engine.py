@@ -113,3 +113,46 @@ def reorder_scenes(db: Session, story_id: str, expected_story_version: int, scen
     db.commit()
     db.refresh(story)
     return _payload(db, story, True)
+
+
+
+def apply_outline_proposal(db: Session, story_id: str, expected_version: int, proposal: dict, commit: bool = True):
+    """Append a reviewed AI outline as scenes in one versioned story revision."""
+    story = _get(db, story_id)
+    if story.version != expected_version:
+        raise HTTPException(status_code=409, detail={
+            "code": "story_version_conflict", "current_version": story.version
+        })
+    project = db.get(Project, story.project_id)
+    if project is None or project.status != "active" or story.status in {"archived", "locked"}:
+        raise HTTPException(status_code=409, detail={"code": "story_not_active"})
+
+    existing_count = db.scalar(
+        select(func.count()).select_from(StoryScene).where(StoryScene.story_id == story_id)
+    ) or 0
+    if existing_count + len(proposal["scenes"]) > 500:
+        raise HTTPException(status_code=409, detail={"code": "story_scene_limit_exceeded"})
+
+    story.logline = proposal["logline"]
+    story.synopsis = proposal["synopsis"]
+    if story.status == "development":
+        story.status = "outlined"
+
+    for offset, item in enumerate(proposal["scenes"], 1):
+        db.add(StoryScene(
+            story_id=story.id,
+            position=existing_count + offset,
+            title=item["title"].strip(),
+            slugline=item.get("slugline"),
+            summary=item["summary"],
+            dramatic_purpose=item.get("dramatic_purpose"),
+            beats_json=_dump(item.get("beats", [])),
+        ))
+
+    _bump(db, story, f"AI outline proposal applied · {len(proposal['scenes'])} scenes appended")
+    if commit:
+        db.commit()
+        db.refresh(story)
+    else:
+        db.flush()
+    return _payload(db, story, True)

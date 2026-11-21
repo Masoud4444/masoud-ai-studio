@@ -1,4 +1,4 @@
-import asyncio
+import json
 
 from backend.app import story_generation
 
@@ -27,7 +27,16 @@ def test_outline_handler_calls_gateway_idempotently_and_returns_review_only(monk
         calls["key"] = idempotency_key
         calls["messages"] = request.messages
         return {
-            "model": request.model, "content": '{"logline":"A signal changes everything.","scenes":[]}',
+            "model": request.model, "content": json.dumps({
+                "logline": "A signal changes everything.",
+                "synopsis": "A technician must decide whether to answer.",
+                "central_question": "Who deserves a response?",
+                "human_value": "Empathy",
+                "act_structure": [{"act": "One", "purpose": "Setup", "turning_point": "The signal repeats"}],
+                "scenes": [{"title": "First contact", "slugline": "INT. RADIO ROOM - NIGHT",
+                            "summary": "A signal arrives.", "dramatic_purpose": "Introduce the mystery.",
+                            "beats": ["Listen", "Respond"]}],
+            }),
             "prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30,
         }
 
@@ -50,6 +59,7 @@ def test_outline_handler_calls_gateway_idempotently_and_returns_review_only(monk
     assert result["canonical_story_modified"] is False
     assert result["usage"]["total_tokens"] == 30
     assert result["content"].startswith('{"logline"')
+    assert result["proposal"]["scenes"][0]["title"] == "First contact"
 
 
 def test_outline_handler_rejects_missing_worker_task_id():
@@ -60,3 +70,112 @@ def test_outline_handler_rejects_missing_worker_task_id():
         assert "task id" in str(exc)
     else:
         raise AssertionError("Expected missing task id to be rejected")
+
+
+
+def test_outline_parser_accepts_fenced_json_and_normalizes_fields():
+    proposal = {
+        "logline": "A signal changes everything.",
+        "synopsis": "A technician must decide whether to answer.",
+        "central_question": "Who deserves a response?",
+        "human_value": "Empathy",
+        "act_structure": [{"act": "One", "purpose": "Setup", "turning_point": "The signal repeats"}],
+        "scenes": [{"title": "First contact", "summary": "A signal arrives.", "beats": ["Listen", "Respond"]}],
+    }
+    parsed = story_generation.parse_story_outline_content(" ```json\n" + json.dumps(proposal) + "\n``` ")
+    assert parsed["scenes"][0]["title"] == "First contact"
+    assert parsed["scenes"][0]["slugline"] is None
+
+
+def test_outline_parser_rejects_invalid_or_incomplete_json():
+    for content in ("not json", '{"logline":"Only a logline"}'):
+        try:
+            story_generation.parse_story_outline_content(content)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("Expected invalid outline content to be rejected")
+
+
+
+def _valid_outline_proposal():
+    return {
+        "logline": "A signal changes everything.",
+        "synopsis": "A technician must decide whether to answer.",
+        "central_question": "Who deserves a response?",
+        "human_value": "Empathy",
+        "act_structure": [{"act": "One", "purpose": "Setup", "turning_point": "The signal repeats"}],
+        "scenes": [{"title": "First contact", "summary": "A signal arrives.", "beats": ["Listen"]}],
+    }
+
+
+def test_outline_apply_is_scoped_versioned_and_one_time(monkeypatch):
+    import json
+    from types import SimpleNamespace
+    from fastapi import HTTPException
+    from backend.app.models import StudioTask
+    from backend.app.story_schemas import StoryOutlineApply
+
+    task = SimpleNamespace(
+        id="task-1", task_type="story.generate_outline", status="succeeded", project_id="project-1",
+        payload_json=json.dumps({"story": {"story_id": "story-1", "story_version": 3}}),
+        result_json=json.dumps({
+            "kind": "story_outline_proposal", "story_id": "story-1", "review_required": True,
+            "canonical_story_modified": False, "proposal": _valid_outline_proposal(),
+        }),
+    )
+    story = SimpleNamespace(project_id="project-1", version=3)
+    class FakeDB:
+        def __init__(self): self.commits = 0
+        def get(self, model, _id): return task if model is StudioTask else story
+        def execute(self, _statement): return SimpleNamespace(rowcount=1)
+        def commit(self): self.commits += 1
+    db = FakeDB()
+    monkeypatch.setattr(story_generation, "apply_outline_proposal",
+                        lambda *_args, **_kwargs: {"version": 4, "scene_count": 1})
+
+    result = story_generation.apply_story_outline_task(
+        db, "story-1", "task-1", StoryOutlineApply(expected_version=3)
+    )
+    assert result["version"] == 4
+    assert db.commits == 1
+    assert json.loads(task.result_json)["applied_at"]
+
+    try:
+        story_generation.apply_story_outline_task(
+            db, "story-1", "task-1", StoryOutlineApply(expected_version=4)
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 409
+        assert exc.detail["code"] == "story_outline_already_applied"
+    else:
+        raise AssertionError("An applied outline must not be applied twice")
+
+
+def test_outline_apply_rejects_stale_story_snapshot(monkeypatch):
+    import json
+    from types import SimpleNamespace
+    from fastapi import HTTPException
+    from backend.app.models import StudioTask
+    from backend.app.story_schemas import StoryOutlineApply
+
+    task = SimpleNamespace(
+        task_type="story.generate_outline", status="succeeded", project_id="project-1",
+        payload_json=json.dumps({"story": {"story_id": "story-1", "story_version": 2}}),
+        result_json=json.dumps({
+            "kind": "story_outline_proposal", "story_id": "story-1", "review_required": True,
+            "canonical_story_modified": False, "proposal": _valid_outline_proposal(),
+        }),
+    )
+    story = SimpleNamespace(project_id="project-1", version=3)
+    class FakeDB:
+        def get(self, model, _id): return task if model is StudioTask else story
+    try:
+        story_generation.apply_story_outline_task(
+            FakeDB(), "story-1", "task-1", StoryOutlineApply(expected_version=3)
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 409
+        assert exc.detail["code"] == "story_outline_stale"
+    else:
+        raise AssertionError("A proposal generated from an older story version must be rejected")

@@ -1,14 +1,18 @@
 """Review-first, worker-backed AI story outline generation."""
 import asyncio
+import json
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException
+from sqlalchemy import update
 from sqlalchemy.orm import Session, sessionmaker
 
 from .ai_gateway import generate_chat_completion
 from .gateway_schemas import ChatCompletionRequest
-from .models import Project, Story, StoryScene
-from .story_schemas import StoryOutlineTaskCreate
+from .models import Project, Story, StoryScene, StudioTask
+from .story_schemas import StoryOutlineTaskCreate, StoryOutlineProposal, StoryOutlineApply
+from .story_engine import apply_outline_proposal
 from .task_manager import create_task
 
 
@@ -21,7 +25,7 @@ def create_story_outline_task(
     project = db.get(Project, story.project_id)
     if project is None:
         raise HTTPException(status_code=404, detail={"code": "project_not_found"})
-    if project.status != "active" or story.status == "archived":
+    if project.status != "active" or story.status in {"archived", "locked"}:
         raise HTTPException(status_code=409, detail={"code": "story_not_active"})
 
     scenes = db.query(StoryScene).filter(
@@ -29,6 +33,7 @@ def create_story_outline_task(
     ).order_by(StoryScene.position.asc()).all()
     snapshot = {
         "story_id": story.id,
+        "story_version": story.version,
         "project_id": story.project_id,
         "title": story.title,
         "format": story.format,
@@ -135,6 +140,7 @@ def build_story_outline_handler(session_factory: sessionmaker):
             "story_id": payload["story"]["story_id"],
             "model": response["model"],
             "content": response["content"],
+            "proposal": parse_story_outline_content(response["content"]),
             "usage": {
                 "prompt_tokens": response.get("prompt_tokens", 0),
                 "completion_tokens": response.get("completion_tokens", 0),
@@ -145,3 +151,76 @@ def build_story_outline_handler(session_factory: sessionmaker):
         }
 
     return handle
+
+
+
+def parse_story_outline_content(content: str) -> dict[str, Any]:
+    if not isinstance(content, str) or not content.strip():
+        raise ValueError("The AI provider returned an empty story outline.")
+    candidate = content.strip()
+    if candidate.startswith("```"):
+        lines = candidate.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        candidate = "\n".join(lines).strip()
+    try:
+        decoded = json.loads(candidate)
+    except (TypeError, ValueError):
+        raise ValueError("The AI response was not valid JSON. Retry generation with a JSON-capable model.") from None
+    try:
+        return StoryOutlineProposal.model_validate(decoded).model_dump()
+    except Exception:
+        raise ValueError("The AI response did not match the required story outline structure. Retry generation.") from None
+
+
+def apply_story_outline_task(
+    db: Session, story_id: str, task_id: str, payload: StoryOutlineApply
+) -> dict:
+    task = db.get(StudioTask, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail={"code": "task_not_found"})
+    if task.task_type != "story.generate_outline":
+        raise HTTPException(status_code=409, detail={"code": "task_not_story_outline"})
+    if task.status != "succeeded" or not task.result_json:
+        raise HTTPException(status_code=409, detail={"code": "story_outline_not_ready"})
+    if not task.project_id:
+        raise HTTPException(status_code=409, detail={"code": "story_outline_project_missing"})
+    try:
+        task_payload = json.loads(task.payload_json)
+        result = json.loads(task.result_json)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=409, detail={"code": "story_outline_result_invalid"}) from None
+    if (task_payload.get("story", {}).get("story_id") != story_id
+            or result.get("story_id") != story_id
+            or result.get("kind") != "story_outline_proposal"
+            or result.get("review_required") is not True):
+        raise HTTPException(status_code=409, detail={"code": "story_outline_scope_mismatch"})
+    if result.get("canonical_story_modified") is not False:
+        raise HTTPException(status_code=409, detail={"code": "story_outline_result_invalid"})
+    if result.get("applied_at"):
+        raise HTTPException(status_code=409, detail={"code": "story_outline_already_applied"})
+    story = db.get(Story, story_id)
+    if story is None:
+        raise HTTPException(status_code=404, detail={"code": "story_not_found"})
+    if story.project_id != task.project_id:
+        raise HTTPException(status_code=409, detail={"code": "story_outline_project_mismatch"})
+    if task_payload.get("story", {}).get("story_version") != story.version:
+        raise HTTPException(status_code=409, detail={"code": "story_outline_stale"})
+    try:
+        validated = StoryOutlineProposal.model_validate(result.get("proposal")).model_dump()
+    except Exception:
+        raise HTTPException(status_code=422, detail={"code": "story_outline_proposal_invalid"}) from None
+    result["applied_at"] = datetime.now(timezone.utc).isoformat()
+    marked_result = json.dumps(result, ensure_ascii=False, separators=(",", ":"))
+    claimed = db.execute(
+        update(StudioTask)
+        .where(StudioTask.id == task_id, StudioTask.result_json == task.result_json)
+        .values(result_json=marked_result)
+    )
+    if claimed.rowcount != 1:
+        raise HTTPException(status_code=409, detail={"code": "story_outline_already_applied"})
+    story_result = apply_outline_proposal(db, story_id, payload.expected_version, validated, commit=False)
+    db.commit()
+    return story_result

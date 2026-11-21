@@ -333,3 +333,13 @@ Never infer one status from another.
 - Generation is review-first: the worker returns a structured proposal payload and never writes generated text into canonical story or scene records. Human review and explicit editing remain required.
 - Added focused worker-handler regression tests and a dedicated GitHub Actions workflow. Previously passing suites are not manually rerun.
 - Local execution requires the Worker to be enabled and at least one compatible AI provider/model to be configured in AI Gateway. The user's Windows installation has not been executed or verified from this hosted environment.
+
+
+## Story outline validation and human approval — 2026-11-21
+
+- AI outline output is now parsed and validated against bounded Pydantic schemas before task success; fenced JSON is normalized and malformed/incomplete output fails safely.
+- Story Engine polls the queued task, presents a structured proposal, and requires an explicit human approval action.
+- Applying a proposal checks task status/type, story and project scope, review-only metadata, proposal schema and expected story version.
+- Approved scenes are appended, not substituted for existing work. Story logline/synopsis are updated and a new immutable revision is saved.
+- Application is one-time: a conditional task-result update claims the proposal, and the applied marker plus story revision are committed in the same database transaction, preventing duplicate scene insertion on repeated requests. The proposal is also bound to the exact story version used when generation started; stale proposals are rejected.
+- A 500-scene cap prevents oversized generated outlines from overwhelming a project.
