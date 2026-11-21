@@ -124,7 +124,7 @@ def runtime_diagnostics():
             "worker_id": getattr(app.state, "worker_id", "local-worker-1"),
             "registered_handlers": list(getattr(app.state, "worker_handlers", [])),
         },
-        "execution_note": "Only registered task handlers can be claimed. Story outline generation uses the configured AI Gateway and returns a review-only proposal.",
+        "execution_note": "Only registered task handlers can be claimed; the healthcheck is not a creative production handler. Story outline generation uses the configured AI Gateway and returns a review-only proposal.",
     }
 
 
