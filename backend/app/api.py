@@ -29,8 +29,10 @@ from .story_engine import create_story, list_stories, get_story, update_story, c
 from .story_export import render_fountain
 from .models import Story, StoryScene
 from sqlalchemy import select
-from .story_schemas import (StoryCreate, StoryUpdate, StorySceneCreate, StorySceneUpdate, StorySceneReorder,\n    StoryOutlineTaskCreate, StoryOutlineApply, StorySceneGenerationTaskCreate, StorySceneGenerationApply)
-from .story_generation import (create_story_outline_task, apply_story_outline_task,\n    create_story_scene_generation_task, apply_story_scene_generation_task)
+from .story_schemas import (StoryCreate, StoryUpdate, StorySceneCreate, StorySceneUpdate, StorySceneReorder,
+    StoryOutlineTaskCreate, StoryOutlineApply, StorySceneGenerationTaskCreate, StorySceneGenerationApply)
+from .story_generation import (create_story_outline_task, apply_story_outline_task,
+    create_story_scene_generation_task, apply_story_scene_generation_task)
 from .research_schemas import (
     ResearchSourceCreate, ResearchEvidenceCreate, ResearchClaimCreate,
     ResearchClaimEvidenceCreate, ResearchClaimUpdate,

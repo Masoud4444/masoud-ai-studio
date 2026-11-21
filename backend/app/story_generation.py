@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from .character_world import Character, Location, Relationship, WorldRule, SceneCharacter, SceneLocation
 from .continuity import ContinuityFact
 from .props import StoryProp
@@ -14,7 +14,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from .ai_gateway import generate_chat_completion
 from .gateway_schemas import ChatCompletionRequest
 from .models import Project, Story, StoryScene, StudioTask
-from .story_schemas import (StoryOutlineTaskCreate, StoryOutlineProposal, StoryOutlineApply,\n    StorySceneGenerationTaskCreate, StorySceneGenerationProposal, StorySceneGenerationApply)
+from .story_schemas import (StoryOutlineTaskCreate, StoryOutlineProposal, StoryOutlineApply,
+    StorySceneGenerationTaskCreate, StorySceneGenerationProposal, StorySceneGenerationApply)
 from .story_engine import apply_outline_proposal
 from .task_manager import create_task
 
