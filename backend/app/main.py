@@ -20,7 +20,7 @@ from .database import Base, SessionLocal, engine
 from .worker import TaskHandlerRegistry, WorkerSupervisor
 from .execution_policy import cloud_executor_configured
 from .cloud_executor import build_cloud_task_handler
-from .story_generation import build_story_outline_handler
+from .story_generation import build_story_outline_handler, build_story_scene_generation_handler
 
 
 @asynccontextmanager
@@ -42,6 +42,7 @@ async def lifespan(app: FastAPI):
         # workflow handlers are registered by their owning modules later.
         registry.register("system.healthcheck", lambda _payload: {"ok": True})
         registry.register("story.generate_outline", build_story_outline_handler(SessionLocal))
+        registry.register("story.generate_scenes", build_story_scene_generation_handler(SessionLocal))
         if cloud_executor_configured():
             registry.register_cloud_handler(build_cloud_task_handler(SessionLocal, app.state.worker_id))
         supervisor = WorkerSupervisor(

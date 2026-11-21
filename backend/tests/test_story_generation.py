@@ -257,3 +257,40 @@ def test_decode_json_backed_bible_fields_preserves_structure_and_legacy_text():
     assert story_generation._decode_json_field(json.dumps(nested)) == nested
     assert story_generation._decode_json_field("legacy free-form note") == "legacy free-form note"
     assert story_generation._decode_json_field(None) is None
+
+
+
+def test_scene_generation_parser_enforces_exact_count_and_canonical_ids_shape():
+    proposal = {"scenes": [{
+        "title": "The Threshold", "slugline": "INT. ARCHIVE - NIGHT",
+        "summary": "Mara discovers the archive is answering her.",
+        "dramatic_purpose": "Turn the mystery into a personal choice.",
+        "location_id": "l" * 36, "time_of_day": "Night",
+        "character_ids": ["c" * 36], "conflict": "The signal exposes her secret.",
+        "emotional_turn": "Fear becomes responsibility.",
+        "beats": ["Hear the signal", "Recognize the voice"],
+        "continuity_notes": "Her left hand remains bandaged.",
+    }]}
+    parsed = story_generation.parse_story_scene_generation_content(json.dumps(proposal), 1)
+    assert parsed["scenes"][0]["character_ids"] == ["c" * 36]
+    assert parsed["scenes"][0]["emotional_turn"] == "Fear becomes responsibility."
+    try:
+        story_generation.parse_story_scene_generation_content(json.dumps(proposal), 2)
+    except ValueError as exc:
+        assert "unexpected number" in str(exc)
+    else:
+        raise AssertionError("Expected exact scene count enforcement")
+
+
+def test_scene_generation_prompt_binds_story_and_canon():
+    messages = story_generation._build_scene_generation_messages({
+        "story": {"story_id": "s1", "canonical_bible": {
+            "characters": [{"id": "c1", "name": "Mara"}],
+            "locations": [{"id": "l1", "name": "Archive"}],
+            "world_rules": [{"statement": "No signal after dusk"}],
+        }},
+        "brief": "Keep the choice morally difficult.", "scene_count": 3,
+    })
+    assert "binding" in messages[0]["content"]
+    assert "REQUESTED SCENE COUNT: 3" in messages[1]["content"]
+    assert "Mara" in messages[1]["content"]

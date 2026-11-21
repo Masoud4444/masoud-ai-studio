@@ -29,8 +29,8 @@ from .story_engine import create_story, list_stories, get_story, update_story, c
 from .story_export import render_fountain
 from .models import Story, StoryScene
 from sqlalchemy import select
-from .story_schemas import StoryCreate, StoryUpdate, StorySceneCreate, StorySceneUpdate, StorySceneReorder, StoryOutlineTaskCreate, StoryOutlineApply
-from .story_generation import create_story_outline_task, apply_story_outline_task
+from .story_schemas import (StoryCreate, StoryUpdate, StorySceneCreate, StorySceneUpdate, StorySceneReorder,\n    StoryOutlineTaskCreate, StoryOutlineApply, StorySceneGenerationTaskCreate, StorySceneGenerationApply)
+from .story_generation import (create_story_outline_task, apply_story_outline_task,\n    create_story_scene_generation_task, apply_story_scene_generation_task)
 from .research_schemas import (
     ResearchSourceCreate, ResearchEvidenceCreate, ResearchClaimCreate,
     ResearchClaimEvidenceCreate, ResearchClaimUpdate,
@@ -720,6 +720,26 @@ def post_story_outline_apply(
     db: Session = Depends(get_db),
 ):
     return apply_story_outline_task(db, story_id, task_id, payload)
+
+
+@router.post("/stories/{story_id}/scene-generation-tasks", status_code=201)
+def post_story_scene_generation_task(
+    story_id: str,
+    payload: StorySceneGenerationTaskCreate,
+    idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=8, max_length=200),
+    db: Session = Depends(get_db),
+):
+    return create_story_scene_generation_task(db, story_id, payload, idempotency_key)
+
+
+@router.post("/stories/{story_id}/scene-generation-tasks/{task_id}/apply")
+def post_story_scene_generation_apply(
+    story_id: str,
+    task_id: str,
+    payload: StorySceneGenerationApply,
+    db: Session = Depends(get_db),
+):
+    return apply_story_scene_generation_task(db, story_id, task_id, payload)
 
 
 @router.get("/stories/{story_id}/export/fountain")

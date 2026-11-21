@@ -115,3 +115,34 @@ class StoryOutlineProposal(BaseModel):
 
 class StoryOutlineApply(BaseModel):
     expected_version: int = Field(ge=1)
+
+
+class StorySceneGenerationTaskCreate(BaseModel):
+    model: str = Field(min_length=1, max_length=160)
+    provider_id: str | None = Field(default=None, min_length=1, max_length=120)
+    brief: str = Field(min_length=1, max_length=12000)
+    scene_count: int = Field(default=6, ge=1, le=30)
+    temperature: float = Field(default=0.7, ge=0, le=2)
+    max_tokens: int = Field(default=5000, ge=512, le=12000)
+
+
+class StoryGeneratedScene(BaseModel):
+    title: str = Field(min_length=1, max_length=240)
+    slugline: str | None = Field(default=None, max_length=300)
+    summary: str = Field(min_length=1, max_length=12000)
+    dramatic_purpose: str = Field(min_length=1, max_length=1000)
+    location_id: str | None = Field(default=None, min_length=36, max_length=36)
+    time_of_day: str | None = Field(default=None, max_length=80)
+    character_ids: list[str] = Field(default_factory=list, max_length=30)
+    conflict: str = Field(min_length=1, max_length=2000)
+    emotional_turn: str = Field(min_length=1, max_length=2000)
+    beats: list[str] = Field(min_length=1, max_length=40)
+    continuity_notes: str = Field(default="", max_length=2000)
+
+
+class StorySceneGenerationProposal(BaseModel):
+    scenes: list[StoryGeneratedScene] = Field(min_length=1, max_length=30)
+
+
+class StorySceneGenerationApply(BaseModel):
+    expected_version: int = Field(ge=1)
