@@ -345,6 +345,19 @@ def create_story_scene_generation_task(
     scenes = db.scalars(select(StoryScene).where(
         StoryScene.story_id == story.id
     ).order_by(StoryScene.position.asc()).limit(500)).all()
+    relationships = db.scalars(select(Relationship).where(
+        Relationship.story_id == story.id
+    ).limit(120)).all()
+    props = db.scalars(select(StoryProp).where(
+        StoryProp.story_id == story.id
+    ).order_by(StoryProp.name).limit(100)).all()
+    scene_ids = [item.id for item in scenes]
+    scene_character_links = db.scalars(select(SceneCharacter).where(
+        SceneCharacter.scene_id.in_(scene_ids)
+    ).limit(300)).all() if scene_ids else []
+    scene_location_links = db.scalars(select(SceneLocation).where(
+        SceneLocation.scene_id.in_(scene_ids)
+    ).limit(300)).all() if scene_ids else []
 
     snapshot = {
         "story_id": story.id, "project_id": story.project_id, "story_version": story.version,
@@ -360,6 +373,16 @@ def create_story_scene_generation_task(
             "locations": [{"id": x.id, "name": x.name, "type": x.location_type,
                 "description": x.description, "geography": _decode_json_field(x.geography_json),
                 "culture": _decode_json_field(x.culture_json)} for x in locations],
+            "relationships": [{"source_id": x.source_id, "target_id": x.target_id,
+                "kind": x.kind, "description": x.description} for x in relationships],
+            "props": [{"id": x.id, "name": x.name, "category": x.category,
+                "description": x.description, "origin": x.origin, "initial_state": x.initial_state,
+                "current_holder_id": x.current_holder_id, "status": x.status} for x in props],
+            "existing_scene_character_links": [{"scene_id": x.scene_id,
+                "character_id": x.character_id, "presence_type": x.presence_type, "note": x.note}
+                for x in scene_character_links],
+            "existing_scene_location_links": [{"scene_id": x.scene_id,
+                "location_id": x.location_id, "note": x.note} for x in scene_location_links],
             "world_rules": [{"category": x.category, "statement": x.statement} for x in rules],
             "active_continuity_facts": [{"scene_id": x.scene_id, "subject_type": x.subject_type,
                 "subject_ref": x.subject_ref, "subject_label": x.subject_label,
