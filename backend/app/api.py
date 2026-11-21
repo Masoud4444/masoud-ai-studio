@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, File, Header, Query, UploadFile, HTTPException
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy.orm import Session
 from .database import get_db, engine
 from .storage import STORAGE_ROOT
@@ -186,6 +186,21 @@ def get_tasks(
 @router.get("/tasks/{task_id}")
 def get_task_route(task_id: str, db: Session = Depends(get_db)):
     return get_task(db, task_id)
+
+
+@router.get("/tasks/{task_id}/result")
+def get_task_result(task_id: str, db: Session = Depends(get_db)):
+    task = get_task(db, task_id)
+    if task.get("status") != "succeeded" or not isinstance(task.get("result"), dict):
+        raise HTTPException(status_code=409, detail={"code": "task_result_not_ready"})
+    return JSONResponse(
+        content=task["result"],
+        headers={
+            "Content-Disposition": f'attachment; filename="masoud-studio-task-{task_id}-result.json"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.get("/tasks/{task_id}/events")

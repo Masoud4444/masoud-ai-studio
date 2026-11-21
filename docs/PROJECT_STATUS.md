@@ -303,3 +303,11 @@ Never infer one status from another.
 - Corrected the POST /api/v1/tasks route binding: the route decorator now applies to the task-creation handler rather than the cloud-readiness helper.
 - The cloud-readiness helper remains an internal configuration check used by execution routing and is not exposed as a task-creation endpoint.
 - Added a focused route-registration regression test and a dedicated workflow that runs only this new test; previously passing execution and backend suites are not rerun manually.
+
+
+## Execution result retrieval — 2026-11-21
+
+- Added `GET /api/v1/tasks/{task_id}/result` for completed tasks. It returns the saved structured result as a downloadable JSON attachment.
+- Incomplete tasks return a stable `task_result_not_ready` conflict rather than an empty or partial download.
+- Responses set `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`; the endpoint reuses the existing task read path and introduces no new persistence schema.
+- Execution Center now exposes a download action only after a task reaches `succeeded`.
