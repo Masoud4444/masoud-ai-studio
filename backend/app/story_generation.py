@@ -221,6 +221,7 @@ def apply_story_outline_task(
     )
     if claimed.rowcount != 1:
         raise HTTPException(status_code=409, detail={"code": "story_outline_already_applied"})
+    task.result_json = marked_result
     story_result = apply_outline_proposal(db, story_id, payload.expected_version, validated, commit=False)
     db.commit()
     return story_result
