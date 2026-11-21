@@ -147,12 +147,12 @@ def patch_ai_provider(provider_id: str, payload: ProviderUpdate, db: Session = D
     return update_provider(db, provider_id, payload)
 
 
-@router.post("/tasks", status_code=201)
 def _cloud_execution_ready():
     import os
     return cloud_executor_configured() and os.getenv("MASOUD_STUDIO_WORKER_ENABLED", "false").lower() == "true"
 
 
+@router.post("/tasks", status_code=201)
 def post_task(
     payload: TaskCreate,
     idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=8, max_length=200),

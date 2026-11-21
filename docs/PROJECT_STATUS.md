@@ -296,3 +296,10 @@ Never infer one status from another.
 - Added focused regression tests and a dedicated workflow for execution routing and durable cloud-job metadata. Previously passing suites were not manually rerun.
 - Android companion integration is documented against AndroidX WorkManager. This repository does not yet contain a native Android application module, so the API and integration contract are platform-neutral but the Android client implementation remains a later client-side phase.
 - Cloud dispatch requires an administrator-provisioned HTTPS executor implementing the documented POST /v1/jobs and GET /v1/jobs/{job_id} contract. No cloud account, GPU capacity, provider URL or paid service is provisioned by this commit.
+
+
+## Execution task API route correction — 2026-11-21
+
+- Corrected the POST /api/v1/tasks route binding: the route decorator now applies to the task-creation handler rather than the cloud-readiness helper.
+- The cloud-readiness helper remains an internal configuration check used by execution routing and is not exposed as a task-creation endpoint.
+- Added a focused route-registration regression test and a dedicated workflow that runs only this new test; previously passing execution and backend suites are not rerun manually.
