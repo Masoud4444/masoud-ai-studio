@@ -249,3 +249,11 @@ def test_outline_prompt_uses_canonical_bible_as_binding_context():
     assert "Mara" in user
     assert "left hand bandaged" in user
     assert "No signal crosses the valley after dusk" in user
+
+
+
+def test_decode_json_backed_bible_fields_preserves_structure_and_legacy_text():
+    nested = {"silhouette": "angular", "palette": ["umber", "blue"]}
+    assert story_generation._decode_json_field(json.dumps(nested)) == nested
+    assert story_generation._decode_json_field("legacy free-form note") == "legacy free-form note"
+    assert story_generation._decode_json_field(None) is None

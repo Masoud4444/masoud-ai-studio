@@ -9,7 +9,6 @@ from sqlalchemy import select, update
 from .character_world import Character, Location, Relationship, WorldRule, SceneCharacter, SceneLocation
 from .continuity import ContinuityFact
 from .props import StoryProp
-from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from .ai_gateway import generate_chat_completion
@@ -18,6 +17,17 @@ from .models import Project, Story, StoryScene, StudioTask
 from .story_schemas import StoryOutlineTaskCreate, StoryOutlineProposal, StoryOutlineApply
 from .story_engine import apply_outline_proposal
 from .task_manager import create_task
+
+
+def _decode_json_field(value: Any) -> Any:
+    """Decode JSON-backed Bible fields before embedding them in model context."""
+    if not isinstance(value, str):
+        return value
+    try:
+        return json.loads(value)
+    except (TypeError, ValueError):
+        # Preserve legacy free-form values rather than silently dropping canon.
+        return value
 
 
 def create_story_outline_task(
@@ -50,15 +60,15 @@ def create_story_outline_task(
     character_ids = [item.id for item in characters]
     location_ids = [item.id for item in locations]
     scene_character_links = db.scalars(
-        select(SceneCharacter).where(SceneCharacter.character_id.in_(character_ids)).limit(300)
+        select(SceneCharacter).join(StoryScene, StoryScene.id == SceneCharacter.scene_id).where(\n            StoryScene.story_id == story.id, SceneCharacter.character_id.in_(character_ids)\n        ).limit(300)
     ).all() if character_ids else []
     scene_location_links = db.scalars(
-        select(SceneLocation).where(SceneLocation.location_id.in_(location_ids)).limit(300)
+        select(SceneLocation).join(StoryScene, StoryScene.id == SceneLocation.scene_id).where(\n            StoryScene.story_id == story.id, SceneLocation.location_id.in_(location_ids)\n        ).limit(300)
     ).all() if location_ids else []
     bible_context = {
         "characters": [{
             "id": item.id, "name": item.name, "role": item.role, "age": item.age,
-            "appearance": item.appearance_json, "psychology": item.psychology_json,
+            "appearance": _decode_json_field(item.appearance_json), "psychology": _decode_json_field(item.psychology_json),
             "backstory": item.backstory, "goals": item.goals, "conflict": item.conflict,
             "arc": item.arc, "voice_notes": item.voice_notes,
         } for item in characters],
