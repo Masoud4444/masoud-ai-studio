@@ -394,7 +394,7 @@ def _build_scene_generation_messages(payload: dict[str, Any]) -> list[dict[str, 
             "The number of scenes must exactly match the requested count."
         )},
         {"role": "user", "content": (
-            f"STORY AND CANONICAL CONTEXT:\n{json.dumps(story, ensure_ascii=False, default=_json_default)}\n\n"
+            f"STORY AND CANONICAL CONTEXT:\n{json.dumps(story, ensure_ascii=False)}\n\n"
             f"REQUESTED SCENE COUNT: {payload.get('scene_count')}\n"
             f"CREATIVE BRIEF: {payload.get('brief', '')}\n"
             "Return a review-only proposal. Do not change existing story data."
@@ -511,8 +511,7 @@ def apply_story_scene_generation_task(
     if known_characters != character_ids or known_locations != location_ids:
         raise HTTPException(status_code=422, detail={"code": "story_scenes_unknown_canonical_reference"})
     from .story_engine import _bump, _payload
-    from .models import StoryRevision
-    for offset, item in enumerate(proposal["scenes"], 1):
+        for offset, item in enumerate(proposal["scenes"], 1):
         beats = list(item["beats"])
         if item["emotional_turn"]:
             beats.append("Emotional turn: " + item["emotional_turn"])
@@ -529,7 +528,7 @@ def apply_story_scene_generation_task(
         )
         db.add(scene)
         db.flush()
-        for character_id in item["character_ids"]:
+        for character_id in dict.fromkeys(item["character_ids"]):
             db.add(SceneCharacter(scene_id=scene.id, character_id=character_id))
         if item.get("location_id"):
             db.add(SceneLocation(scene_id=scene.id, location_id=item["location_id"]))
