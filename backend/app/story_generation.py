@@ -47,6 +47,7 @@ def create_story_outline_task(
     ).order_by(StoryScene.position.asc()).all()
     # Capture the canonical story bible at task creation time. The worker receives
     # a bounded, immutable context snapshot and never queries mutable story records.
+    # Scene links are scoped through StoryScene to prevent cross-story context leakage.
     characters = db.scalars(select(Character).where(Character.story_id == story.id).order_by(Character.name).limit(60)).all()
     locations = db.scalars(select(Location).where(Location.story_id == story.id).order_by(Location.name).limit(60)).all()
     relationships = db.scalars(select(Relationship).where(Relationship.story_id == story.id).limit(120)).all()
@@ -82,8 +83,8 @@ def create_story_outline_task(
         } for item in relationships],
         "locations": [{
             "id": item.id, "name": item.name, "type": item.location_type,
-            "description": item.description, "geography": item.geography_json,
-            "culture": item.culture_json,
+            "description": item.description, "geography": _decode_json_field(item.geography_json),
+            "culture": _decode_json_field(item.culture_json),
         } for item in locations],
         "world_rules": [{
             "category": item.category, "statement": item.statement,
@@ -172,16 +173,8 @@ def _build_messages(payload: dict[str, Any]) -> list[dict[str, str]]:
             "role": "user",
             "content": (
                 "Develop an outline from this story dossier and creative brief. This is a proposal only; "
-                "do not assume it is approved or modify canonical story records.
-
-"
-                f"STORY DOSSIER AND CANONICAL BIBLE:
-{story!r}
-
-CREATIVE BRIEF:
-{payload.get('brief', '')}
-
-"
+                "do not assume it is approved or modify canonical story records.\n\n"
+                f"STORY DOSSIER AND CANONICAL BIBLE:\n{story!r}\n\nCREATIVE BRIEF:\n{payload.get('brief', '')}\n\n"
                 "When no canonical entries exist, create new characters and locations only when useful. "
                 "For each scene, use existing character/location identities where applicable and avoid "
                 "continuity conflicts with the supplied active facts."
@@ -259,8 +252,7 @@ def parse_story_outline_content(content: str) -> dict[str, Any]:
             lines = lines[1:]
         if lines and lines[-1].strip() == "```":
             lines = lines[:-1]
-        candidate = "
-".join(lines).strip()
+        candidate = "\n".join(lines).strip()
     try:
         decoded = json.loads(candidate)
     except (TypeError, ValueError):
