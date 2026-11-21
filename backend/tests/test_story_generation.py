@@ -329,7 +329,7 @@ def test_scene_generation_handler_returns_review_only_canonical_proposal(monkeyp
     })
     assert calls["model"] == "test-model"
     assert calls["key"] == "story-scenes:scene-task-1"
-    assert "REQUESTED SCENE COUNT: 1" in calls["messages"][1]["content"]
+    assert "REQUESTED SCENE COUNT: 1" in calls["messages"][1].content
     assert result["kind"] == "story_scenes_proposal"
     assert result["review_required"] is True
     assert result["canonical_story_modified"] is False
