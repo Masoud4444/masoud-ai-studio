@@ -6,7 +6,8 @@ from .storage import STORAGE_ROOT
 from .backup import BackupError, create_backup, verify_backup
 from .projects import create_project, get_project, list_projects, serialize, set_archived, update_project
 from .schemas import ProjectCreate, ProjectPage, ProjectRead, ProjectUpdate
-from .storage import (detach_project_asset, ingest_upload, list_project_assets,\n                     attach_task_artifact, list_task_artifacts, resolve_task_artifact_file)
+from .storage import (detach_project_asset, ingest_upload, list_project_assets,
+                     attach_task_artifact, list_task_artifacts, resolve_task_artifact_file)
 from .ai_gateway import create_provider, list_providers, delete_provider, update_provider, generate_chat_completion, list_model_capabilities, update_model_capability, test_provider_connection, set_model_pricing, get_usage_summary, list_model_pricing_history
 from .gateway_schemas import ProviderCreate, ProviderRead, ProviderUpdate, ChatCompletionRequest, ChatCompletionRead, ModelCapabilityUpdate, ModelPricingUpdate
 from .task_manager import create_task, get_task, list_tasks, cancel_task, retry_task, approve_task, reject_task_approval, list_task_events
