@@ -331,6 +331,10 @@ function ContinuityReviewPanel({storyId,scenes}:{storyId:string;scenes:Array<{id
   finally{setLoading(false);}
  }
  useEffect(()=>{void load();setFactsAnalyzed(null);setLastDetected(null);setSceneId(scenes[0]?.id??"");setSubjectRef("");},[storyId]);
+ const sceneIdsKey=scenes.map(scene=>scene.id).join("|");
+ useEffect(()=>{
+  if(!scenes.some(scene=>scene.id===sceneId))setSceneId(scenes[0]?.id??"");
+ },[sceneIdsKey,sceneId]);
  useEffect(()=>{
   const options=subjectType==="character"?characters:subjectType==="location"?locations:props;
   if(!options.some(item=>item.id===subjectRef))setSubjectRef(options[0]?.id??"");

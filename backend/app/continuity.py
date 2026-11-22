@@ -131,7 +131,11 @@ def review_issue(sid:str,issue_id:str,p:IssueReview,db:Session=Depends(get_db)):
 
 
 def _timeline_cycle_details(events, relations):
-    """Return deterministic evidence for events inside chronology cycles only."""
+    """Return deterministic evidence for events inside chronology cycles only.
+
+    Iterative Kosaraju traversal avoids recursion-depth failures on long timelines.
+    Relations between distinct cyclic components are deliberately excluded.
+    """
     active = {event.id: event for event in events if event.active}
     edges = [
         (relation.before_event_id, relation.after_event_id)
@@ -143,45 +147,57 @@ def _timeline_cycle_details(events, relations):
     for before, after in edges:
         adjacency[before].append(after)
         reverse[after].append(before)
+    for neighbors in adjacency.values():
+        neighbors.sort()
+    for neighbors in reverse.values():
+        neighbors.sort()
 
+    # First pass: iterative depth-first traversal to produce finish order.
     visited = set()
     order = []
+    for root in sorted(active):
+        if root in visited:
+            continue
+        visited.add(root)
+        stack = [(root, iter(adjacency[root]))]
+        while stack:
+            node, neighbors = stack[-1]
+            following = next(neighbors, None)
+            if following is None:
+                order.append(node)
+                stack.pop()
+            elif following not in visited:
+                visited.add(following)
+                stack.append((following, iter(adjacency[following])))
 
-    def visit(node):
-        visited.add(node)
-        for neighbor in sorted(adjacency[node]):
-            if neighbor not in visited:
-                visit(neighbor)
-        order.append(node)
-
-    for event_id in sorted(active):
-        if event_id not in visited:
-            visit(event_id)
-
+    # Second pass over the reversed graph collects strongly connected components.
     visited.clear()
-    cyclic_ids = set()
-
-    def collect(node, component):
-        visited.add(node)
-        component.append(node)
-        for neighbor in sorted(reverse[node]):
-            if neighbor not in visited:
-                collect(neighbor, component)
-
-    for event_id in reversed(order):
-        if event_id in visited:
+    cyclic_components = []
+    for root in reversed(order):
+        if root in visited:
             continue
         component = []
-        collect(event_id, component)
-        if len(component) > 1 or any(before == event_id and after == event_id for before, after in edges):
-            cyclic_ids.update(component)
+        pending = [root]
+        visited.add(root)
+        while pending:
+            node = pending.pop()
+            component.append(node)
+            for following in reversed(reverse[node]):
+                if following not in visited:
+                    visited.add(following)
+                    pending.append(following)
+        if len(component) > 1 or root in adjacency[root]:
+            cyclic_components.append(set(component))
 
-    if not cyclic_ids:
+    if not cyclic_components:
         return None
+
+    cyclic_ids = set().union(*cyclic_components)
     cycle_events = [active[event_id] for event_id in cyclic_ids]
     cycle_edges = [
-        (before, after) for before, after in edges
-        if before in cyclic_ids and after in cyclic_ids
+        (before, after)
+        for before, after in edges
+        if any(before in component and after in component for component in cyclic_components)
     ]
     return {
         "event_ids": sorted(cyclic_ids),

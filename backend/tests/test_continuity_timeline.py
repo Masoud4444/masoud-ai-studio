@@ -83,3 +83,49 @@ def test_prop_fact_rejects_reference_from_another_story():
 
     assert error.value.status_code == 404
     assert error.value.detail["code"] == "story_prop_not_found"
+
+
+def test_timeline_cycle_details_excludes_bridges_between_distinct_cycles():
+    events = [
+        SimpleNamespace(id=event_id, scene_id=f"scene-{event_id}", title=event_id, active=True)
+        for event_id in ("a", "b", "c", "d")
+    ]
+    relations = [
+        SimpleNamespace(before_event_id="a", after_event_id="b"),
+        SimpleNamespace(before_event_id="b", after_event_id="a"),
+        SimpleNamespace(before_event_id="b", after_event_id="c"),
+        SimpleNamespace(before_event_id="c", after_event_id="d"),
+        SimpleNamespace(before_event_id="d", after_event_id="c"),
+    ]
+
+    details = _timeline_cycle_details(events, relations)
+
+    assert details is not None
+    assert details["event_ids"] == ["a", "b", "c", "d"]
+    assert details["relations"] == [
+        {"before_event_id": "a", "after_event_id": "b"},
+        {"before_event_id": "b", "after_event_id": "a"},
+        {"before_event_id": "c", "after_event_id": "d"},
+        {"before_event_id": "d", "after_event_id": "c"},
+    ]
+
+
+def test_timeline_cycle_details_handles_timelines_beyond_recursion_limit():
+    event_ids = [f"event-{index:04d}" for index in range(1300)]
+    events = [
+        SimpleNamespace(id=event_id, scene_id=None, title=event_id, active=True)
+        for event_id in event_ids
+    ]
+    relations = [
+        SimpleNamespace(before_event_id=event_ids[index], after_event_id=event_ids[index + 1])
+        for index in range(len(event_ids) - 1)
+    ]
+    relations.append(
+        SimpleNamespace(before_event_id=event_ids[-1], after_event_id=event_ids[-2])
+    )
+
+    details = _timeline_cycle_details(events, relations)
+
+    assert details is not None
+    assert details["event_ids"] == event_ids[1:]
+    assert len(details["relations"]) == len(event_ids) - 1
