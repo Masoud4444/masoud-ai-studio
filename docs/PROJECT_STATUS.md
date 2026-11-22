@@ -13,7 +13,7 @@ Last updated: 2026-11-19
 
 ## Implemented backend
 
-- Storyboard & Animatic v0.1: screenplay-evidence-linked shots, ordered shot metadata, reviewable image takes, ComfyUI image adapter, approved-take-only FFmpeg animatic rendering and OpenTimelineIO timeline interchange. Animatic output is stored in project assets and attached to the completed Task Manager record. v1 is silent/picture-only; audio and full editing remain staged.
+- Storyboard & Animatic v0.1: screenplay-evidence-linked shots, ordered shot metadata, reviewable image takes, ComfyUI image/video adapters, approved-take-only FFmpeg animatic rendering and OpenTimelineIO timeline interchange. Animatic output is stored in project assets and attached to the completed Task Manager record. v1 is silent/picture-only; audio and full editing remain staged.
 
 - FastAPI application, SQLAlchemy 2 models, SQLite baseline and Alembic migrations 0001–0020.
 - Project create/list/read/update/archive/restore API, optimistic version checks and duplicate-slug handling.
@@ -361,8 +361,18 @@ Never infer one status from another.
 
 - Added a local FFmpeg renderer registered through the existing Worker Supervisor and central Task Manager; no separate queue, database, storage service or production orchestrator was introduced.
 - Animatic creation is story-scoped and requires one current, approved image take for every storyboard shot. Scene order and shot position determine the sequence. Missing approvals, stale shot versions, changed take approvals, invalid image MIME types and cross-project asset references are rejected.
-- The renderer supports 1280×720 and 1920×1080 at 24/25/30 fps, bounded to 120 shots, 30 minutes and 100 MB. It scales/pads still images consistently, preserves shot durations, supports an allowlist of dissolve/fade/wipe/slide transitions and emits a silent H.264 MP4.
+- The renderer supports approved still-image and generated video takes, 1280×720 and 1920×1080 at 24/25/30 fps, bounded to 120 shots, 30 minutes and 100 MB. It scales/pads picture sources consistently, preserves shot durations, supports an allowlist of dissolve/fade/wipe/slide transitions and emits a silent H.264 MP4.
 - FFmpeg is invoked with an explicit argument vector and no shell, a bounded timeout, generated temporary inputs/filter script, output-size cap and sanitized public errors. The FFmpeg executable is resolved from PATH or MASOUD_STUDIO_FFMPEG_PATH.
 - A companion OpenTimelineIO-compatible .otio document records picture clips, source asset URIs, source hashes, shot/take/scene provenance, timing, transitions and render metadata. Both MP4 and OTIO are saved as project assets and attached to the completed task in the same task-completion transaction.
 - Storyboard UI now queues and refreshes animatic tasks, previews/downloads the MP4 and downloads the OTIO interchange file.
 - This is **Implemented**, not yet **Tested** or **Verified**. Automated tests and full render validation are intentionally deferred to the user's requested test phase. Audio tracks, narration, SFX/music, captions, proxy workflows, interactive timeline editing, transition editor and video-generation adapters remain future increments.
+
+
+## Storyboard image-to-video adapter v0.1 — implementation checkpoint
+
+- Added a versioned, server-side ComfyUI Wan 2.1 image-to-video workflow pack and adapter. It uploads the approved start image through ComfyUI's local upload API, submits the API-format workflow, polls the existing ComfyUI task, retrieves only validated output video locators and accepts MP4/WebM outputs.
+- Video generation is available per shot when a current approved image take and reviewed shot prompt exist. The output is stored as a new unapproved video take; the original image remains unchanged and the human review lifecycle is reused.
+- The adapter reuses ComfyUI URL validation, pinned loopback DNS, disabled proxy/redirect behavior, the central Task Manager, Worker Supervisor and content-addressed project Asset store. Model filenames are server-configured; the browser cannot submit a workflow graph or arbitrary provider URL.
+- The animatic renderer now accepts approved still-image or video takes in the same picture track and preserves the storyboard's scene/shot order, duration and supported transitions.
+- The bundled Wan 2.1 workflow uses 832×480 and bounded 33/49/73-frame outputs at 16/24 fps. Model availability, VRAM and ComfyUI version/custom-node compatibility must be verified on the user's machine.
+- This implementation is **Implemented**, not yet **Tested** or **Verified**. Automated tests and real ComfyUI generation/render validation remain deferred to the user's requested test phase.

@@ -25,7 +25,7 @@ from .animatic_schemas import AnimaticTaskCreate
 
 MAX_SHOTS = 120
 MAX_TOTAL_SECONDS = 1800
-MAX_SOURCE_IMAGE_BYTES = 30 * 1024 * 1024
+MAX_SOURCE_IMAGE_BYTES = 100 * 1024 * 1024
 MAX_RENDER_BYTES = 100 * 1024 * 1024
 RENDER_TIMEOUT_SECONDS = 1800
 
@@ -164,8 +164,8 @@ def create_animatic_task(db: Session, story_id: str, payload: AnimaticTaskCreate
         if take is None or take.shot_id != shot.id or take.status != "approved":
             raise HTTPException(409, detail={"code": "animatic_approved_take_invalid", "shot_id": shot.id})
         asset = db.get(Asset, take.asset_id)
-        if asset is None or asset.mime_type not in {"image/png", "image/jpeg", "image/webp"}:
-            raise HTTPException(422, detail={"code": "animatic_take_must_be_image", "shot_id": shot.id})
+        if asset is None or asset.mime_type not in {"image/png", "image/jpeg", "image/webp", "video/mp4", "video/webm"}:
+            raise HTTPException(422, detail={"code": "animatic_take_media_unsupported", "shot_id": shot.id})
         linked = db.scalar(select(ProjectAsset.id).where(
             ProjectAsset.project_id == story.project_id, ProjectAsset.asset_id == asset.id
         ))
@@ -213,7 +213,7 @@ def _load_approved_inputs(db: Session, snapshot: dict) -> list[tuple[dict, Path]
                 or take.shot_id != shot.id or take.status != "approved" or take.asset_id != item["asset_id"]):
             raise AnimaticTaskError("animatic_approval_stale", "A storyboard shot or approved take changed; review the storyboard and create a new animatic")
         asset, _link, path = resolve_project_asset_file(db, project.id, item["asset_id"])
-        if asset.sha256 != item["asset_sha256"] or asset.mime_type not in {"image/png", "image/jpeg", "image/webp"}:
+        if asset.sha256 != item["asset_sha256"] or asset.mime_type not in {"image/png", "image/jpeg", "image/webp", "video/mp4", "video/webm"}:
             raise AnimaticTaskError("animatic_source_asset_invalid", "An approved storyboard image is no longer valid")
         if asset.size_bytes > MAX_SOURCE_IMAGE_BYTES:
             raise AnimaticTaskError("animatic_source_image_too_large", "An approved storyboard image exceeds the render size limit")
@@ -225,9 +225,10 @@ def _filter_graph(shots: list[dict], fps: int, width: int, height: int) -> tuple
     filters = []
     for index, shot in enumerate(shots):
         filters.append(
-            f"[{index}:v]scale={width}:{height}:force_original_aspect_ratio=decrease,"
+            f"[{index}:v]trim=duration={float(shot['duration_seconds']):.3f},setpts=PTS-STARTPTS,"
+            f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
             f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,"
-            f"setsar=1,fps={fps},format=yuv420p,settb=AVTB,setpts=PTS-STARTPTS[v{index}]"
+            f"setsar=1,fps={fps},format=yuv420p,settb=AVTB[v{index}]"
         )
     current = "v0"
     current_duration = float(shots[0]["duration_seconds"])
@@ -278,8 +279,10 @@ def build_animatic_handler(session_factory: sessionmaker):
             for index, (shot, source_path) in enumerate(inputs):
                 staged = workdir / f"shot-{index:03d}{source_path.suffix.lower() or '.img'}"
                 shutil.copyfile(source_path, staged)
-                input_args.extend(["-loop", "1", "-framerate", str(fps), "-t",
-                                   f"{float(shot['duration_seconds']):.3f}", "-i", str(staged)])
+                if shot["asset_mime_type"].startswith("video/"):
+                input_args.extend(["-stream_loop", "-1", "-i", str(staged)])
+            else:
+                input_args.extend(["-loop", "1", "-framerate", str(fps), "-i", str(staged)])
             graph, output_label, output_duration = _filter_graph(snapshot["shots"], fps, width, height)
             filter_script = workdir / "filters.txt"
             filter_script.write_text(graph, encoding="utf-8")

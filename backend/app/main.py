@@ -24,6 +24,7 @@ from .story_generation import build_story_outline_handler, build_story_scene_gen
 from .storyboard_generation import build_storyboard_prompt_handler
 from .storyboard_media import build_storyboard_image_handler
 from .animatic import build_animatic_handler
+from .storyboard_video import build_storyboard_video_handler
 
 
 @asynccontextmanager
@@ -49,6 +50,7 @@ async def lifespan(app: FastAPI):
         registry.register("storyboard.generate_prompt", build_storyboard_prompt_handler(SessionLocal))
         registry.register("storyboard.generate_image", build_storyboard_image_handler(SessionLocal))
         registry.register("storyboard.create_animatic", build_animatic_handler(SessionLocal))
+        registry.register("storyboard.generate_video", build_storyboard_video_handler(SessionLocal))
         if cloud_executor_configured():
             registry.register_cloud_handler(build_cloud_task_handler(SessionLocal, app.state.worker_id))
         supervisor = WorkerSupervisor(

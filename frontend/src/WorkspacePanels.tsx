@@ -491,6 +491,9 @@ function StoryboardPanel({storyId,storyVersion,projectId,scenes}:{storyId:string
  const [creativeDirection,setCreativeDirection]=useState("");
  const [promptTaskByShot,setPromptTaskByShot]=useState<Record<string,{id:string;status:string;result?:{prompt?:string}}>>({});
  const [imageTaskByShot,setImageTaskByShot]=useState<Record<string,{id:string;status:string;progress_percent?:number;result?:{take_id?:string;asset_id?:string;asset_sha256?:string}}>>({});
+ const [videoTaskByShot,setVideoTaskByShot]=useState<Record<string,{id:string;status:string;progress_percent?:number;result?:{take_id?:string;asset_id?:string;mime_type?:string}}>>({});
+ const [videoFrames,setVideoFrames]=useState("33");
+ const [videoFps,setVideoFps]=useState("16");
  const [imageWidth,setImageWidth]=useState("1024");
  const [imageHeight,setImageHeight]=useState("1024");
  const [imageNegativePrompt,setImageNegativePrompt]=useState("text, watermark, low quality, blurry");
@@ -503,6 +506,7 @@ function StoryboardPanel({storyId,storyVersion,projectId,scenes}:{storyId:string
  const [notice,setNotice]=useState("");
  const scene=scenes.find(item=>item.id===sceneId);
  useEffect(()=>{setAnimaticTask(null);},[storyId]);
+ useEffect(()=>{setVideoTaskByShot({});},[storyId]);
 
  async function loadShots(){
   if(!storyId||!sceneId){setShots([]);return;}
@@ -608,6 +612,27 @@ function StoryboardPanel({storyId,storyVersion,projectId,scenes}:{storyId:string
   }catch(e){setError(e instanceof Error?e.message:"Could not refresh image task");}
   finally{setBusy(false);}
  }
+ async function generateShotVideo(shot:StoryboardShotRecord){
+  if(!shot.prompt?.trim()||!shot.takes.some(take=>take.id===shot.approved_take_id&&take.asset_mime_type?.startsWith("image/")))return;
+  setBusy(true);setError("");setNotice("");
+  try{
+   const task=await api<{id:string;status:string}>(`/api/v1/stories/${storyId}/storyboard/shots/${shot.id}/video-tasks`,{method:"POST",headers:{"Content-Type":"application/json","Idempotency-Key":crypto.randomUUID()},body:JSON.stringify({workflow_id:"wan2.1-i2v-basic-v1",frames:Number(videoFrames),fps:Number(videoFps),negative_prompt:imageNegativePrompt})});
+   setVideoTaskByShot(prev=>({...prev,[shot.id]:{id:task.id,status:task.status}}));
+   setNotice("Image-to-video generation queued from the currently approved image take. The result will be a new unapproved video take.");
+  }catch(e){setError(e instanceof Error?e.message:"Could not queue video generation");}
+  finally{setBusy(false);}
+ }
+ async function refreshShotVideoTask(shot:StoryboardShotRecord){
+  const current=videoTaskByShot[shot.id];if(!current)return;
+  setBusy(true);setError("");
+  try{
+   const task=await api<{id:string;status:string;progress_percent?:number;result?:{take_id?:string;asset_id?:string;mime_type?:string};error_code?:string}>(`/api/v1/tasks/${current.id}`);
+   setVideoTaskByShot(prev=>({...prev,[shot.id]:{id:task.id,status:task.status,progress_percent:task.progress_percent,result:task.result}}));
+   if(task.status==="succeeded"){await loadShots();setNotice("Video generated and added as a new unapproved take. Review it before selecting or approving.");}
+   else if(task.status==="failed")setError("Video generation failed: "+(task.error_code??"unknown error"));
+  }catch(e){setError(e instanceof Error?e.message:"Could not refresh video task");}
+  finally{setBusy(false);}
+ }
  async function createAnimatic(){
   setBusy(true);setError("");setNotice("");
   try{
@@ -670,6 +695,8 @@ function StoryboardPanel({storyId,storyVersion,projectId,scenes}:{storyId:string
    <label className="field-label">Image width<input type="number" min="256" max="2048" step="8" value={imageWidth} onChange={e=>setImageWidth(e.target.value)}/></label>
    <label className="field-label">Image height<input type="number" min="256" max="2048" step="8" value={imageHeight} onChange={e=>setImageHeight(e.target.value)}/></label>
    <label className="field-label">Negative prompt<input value={imageNegativePrompt} onChange={e=>setImageNegativePrompt(e.target.value)} maxLength={6000}/></label>
+  <label className="field-label">Video frames<select value={videoFrames} onChange={e=>setVideoFrames(e.target.value)}><option value="33">33 frames · ~2 sec</option><option value="49">49 frames · ~3 sec</option><option value="73">73 frames · ~4.5 sec</option></select></label>
+  <label className="field-label">Video FPS<select value={videoFps} onChange={e=>setVideoFps(e.target.value)}><option value="16">16 fps</option><option value="24">24 fps</option></select></label>
   </div>
   <form className="scene-script-editor" onSubmit={createShot}>
    <div className="form-title">Plan a shot</div>
@@ -703,9 +730,9 @@ function StoryboardPanel({storyId,storyVersion,projectId,scenes}:{storyId:string
     <p>{shot.source_excerpt}</p>{shot.approved_take_id&&<small>Approved take: {shot.takes.find(t=>t.id===shot.approved_take_id)?.take_number??"selected"}</small>}
     <div className="scene-editor-actions"><button type="button" className="secondary-button" disabled={busy||!promptModel.trim()} onClick={()=>void generateShotPrompt(shot)}>Generate AI prompt</button>{promptTaskByShot[shot.id]&&<><span className="task-status task-queued">{promptTaskByShot[shot.id].status}</span><button type="button" className="secondary-button" disabled={busy} onClick={()=>void refreshPromptTask(shot)}>Check task</button>{promptTaskByShot[shot.id].result?.prompt&&<button type="button" className="primary-button" disabled={busy} onClick={()=>void applyShotPrompt(shot)}>Review & apply prompt</button>}</>}</div>
     {promptTaskByShot[shot.id]?.result?.prompt&&<label className="field-label">Generated prompt proposal<textarea rows={4} readOnly value={promptTaskByShot[shot.id].result?.prompt??""}/></label>}
-    <div className="scene-editor-actions"><button type="button" className="primary-button" disabled={busy||!shot.prompt?.trim()} onClick={()=>void generateShotImage(shot)}>Generate image take</button>{imageTaskByShot[shot.id]&&<><span className="task-status task-queued">{imageTaskByShot[shot.id].status}{typeof imageTaskByShot[shot.id].progress_percent==="number"?` · ${imageTaskByShot[shot.id].progress_percent}%`:""}</span><button type="button" className="secondary-button" disabled={busy} onClick={()=>void refreshShotImageTask(shot)}>Check image task</button></>}</div>
+    <div className="scene-editor-actions"><button type="button" className="primary-button" disabled={busy||!shot.prompt?.trim()} onClick={()=>void generateShotImage(shot)}>Generate image take</button><button type="button" className="secondary-button" disabled={busy||!shot.prompt?.trim()||!shot.approved_take_id} onClick={()=>void generateShotVideo(shot)}>Generate video take</button>{videoTaskByShot[shot.id]&&<><span className="task-status task-queued">{videoTaskByShot[shot.id].status}{typeof videoTaskByShot[shot.id].progress_percent==="number"?" · "+videoTaskByShot[shot.id].progress_percent+"%":""}</span><button type="button" className="secondary-button" disabled={busy} onClick={()=>void refreshShotVideoTask(shot)}>Check video task</button></>}{imageTaskByShot[shot.id]&&<><span className="task-status task-queued">{imageTaskByShot[shot.id].status}{typeof imageTaskByShot[shot.id].progress_percent==="number"?` · ${imageTaskByShot[shot.id].progress_percent}%`:""}</span><button type="button" className="secondary-button" disabled={busy} onClick={()=>void refreshShotImageTask(shot)}>Check image task</button></>}</div>
     <div className="scene-editor-grid"><label className="field-label">Attach existing asset as take<select value={assetByShot[shot.id]??""} onChange={e=>setAssetByShot(prev=>({...prev,[shot.id]:e.target.value}))}><option value="">Choose project asset</option>{assets.map(asset=><option key={asset.id} value={asset.asset_id}>{asset.filename}</option>)}</select></label><div className="form-foot"><button type="button" className="secondary-button" disabled={busy||!assetByShot[shot.id]} onClick={()=>void addTake(shot)}>Add take</button></div></div>
-    {shot.takes.map(take=><div className="asset-row" key={take.id}>{take.asset_mime_type?.startsWith("image/")&&<img className="storyboard-take-preview" src={`/api/v1/projects/${projectId}/assets/${take.asset_id}/file?preview=true`} alt={`Storyboard take ${take.take_number}`}/>}<div className="asset-main"><b>Take {take.take_number}</b><small>{take.status} · {take.asset_sha256.slice(0,12)}…</small></div>{take.status==="generated"&&<button type="button" className="secondary-button" disabled={busy} onClick={()=>void reviewTake(shot,take,"selected")}>Select</button>}{take.status==="selected"&&<button type="button" className="primary-button" disabled={busy} onClick={()=>void reviewTake(shot,take,"approved")}>Approve</button>}<button type="button" className="danger-button" disabled={busy||take.status==="rejected"} onClick={()=>void reviewTake(shot,take,"rejected")}>Reject</button></div>)}
+    {shot.takes.map(take=><div className="asset-row" key={take.id}>{take.asset_mime_type?.startsWith("image/")&&<img className="storyboard-take-preview" src={`/api/v1/projects/${projectId}/assets/${take.asset_id}/file?preview=true`} alt={`Storyboard take ${take.take_number}`}/>}{take.asset_mime_type?.startsWith("video/")&&<video controls preload="metadata" className="storyboard-take-preview" src={`/api/v1/projects/${projectId}/assets/${take.asset_id}/file?preview=true`}/>}<div className="asset-main"><b>Take {take.take_number}</b><small>{take.status} · {take.asset_sha256.slice(0,12)}…</small></div>{take.status==="generated"&&<button type="button" className="secondary-button" disabled={busy} onClick={()=>void reviewTake(shot,take,"selected")}>Select</button>}{take.status==="selected"&&<button type="button" className="primary-button" disabled={busy} onClick={()=>void reviewTake(shot,take,"approved")}>Approve</button>}<button type="button" className="danger-button" disabled={busy||take.status==="rejected"} onClick={()=>void reviewTake(shot,take,"rejected")}>Reject</button></div>)}
    </div></article>)}</div>}
   {editingShot&&<form className="scene-script-editor" onSubmit={saveShot}>
    <div className="form-title">Edit shot · version {editingShot.version}</div>

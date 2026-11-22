@@ -40,6 +40,8 @@ from .storyboard_generation import create_storyboard_prompt_task, apply_storyboa
 from .storyboard_media import create_storyboard_image_task
 from .animatic_schemas import AnimaticTaskCreate
 from .animatic import create_animatic_task
+from .storyboard_video_schemas import StoryboardVideoTaskCreate
+from .storyboard_video import create_storyboard_video_task
 from .research_schemas import (
     ResearchSourceCreate, ResearchEvidenceCreate, ResearchClaimCreate,
     ResearchClaimEvidenceCreate, ResearchClaimUpdate,
@@ -841,6 +843,16 @@ def post_storyboard_image_task(
     db: Session = Depends(get_db),
 ):
     return create_storyboard_image_task(db, story_id, shot_id, payload, idempotency_key)
+
+
+
+@router.post("/stories/{story_id}/storyboard/shots/{shot_id}/video-tasks", status_code=201)
+def post_storyboard_video_task(
+    story_id: str, shot_id: str, payload: StoryboardVideoTaskCreate,
+    idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=8, max_length=200),
+    db: Session = Depends(get_db),
+):
+    return create_storyboard_video_task(db, story_id, shot_id, payload, idempotency_key)
 
 
 @router.post("/stories/{story_id}/storyboard/shots/{shot_id}/prompt-tasks", status_code=201)

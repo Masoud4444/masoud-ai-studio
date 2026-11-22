@@ -95,7 +95,7 @@ Build frontend with npm run build.
 - Authentication and authorization are not implemented. Keep the backend bound to localhost; never expose it to the public internet or an untrusted LAN.
 - Do not commit provider API keys, encryption keys, database files, generated assets or personal data.
 - No provider API keys are configured by default. No billable provider calls are made by the default setup.
-- Worker is disabled by default. When explicitly enabled, only registered local creative handlers (Story outline/scenes, Storyboard prompt/image and approved-take Animatic) are claimable.
+- Worker is disabled by default. When explicitly enabled, only registered local creative handlers (Story outline/scenes, Storyboard prompt/image/video and approved-take Animatic) are claimable.
 - Agent profiles start as drafts. Text-only Agent Runtime requires explicit provider/model/pricing configuration and activation; no tools are executed. Tool Broker, execution sandbox and hard runtime isolation are not complete.
 - Windows credential protection via DPAPI/OS keychain, hard worker process isolation, multi-worker coordination, backup/restore verification and independent security review remain required.
 
@@ -139,3 +139,10 @@ The Animatic renderer reuses the Storyboard, Task Manager, Worker Supervisor and
 5. Refresh the task to see the MP4 preview/download and the .otio timeline export.
 
 The renderer rejects missing, unapproved, stale, cross-project or non-image takes. v1 is picture-only and silent; audio, voice, music, captions and full nonlinear editing are separate planned stages. Output is bounded to 100 MB and 30 minutes, uses a fixed FFmpeg argument list without a shell, and stores both deliverables in the content-addressed project asset store.
+
+
+### Optional local image-to-video generation
+
+The Storyboard also supports image-to-video generation through the versioned ComfyUI Wan 2.1 adapter. It uses the shot's current approved image take as the starting frame and the shot's reviewed prompt as motion guidance. The generated MP4/WebM is stored as a new unapproved Storyboard Take; it never replaces or auto-approves the source image.
+
+The bundled workflow pack expects compatible ComfyUI Wan 2.1 files: the I2V UNET, Wan text encoder, Wan VAE and CLIP Vision model. The default filenames are in the pack; optional overrides are MASOUD_STUDIO_COMFYUI_VIDEO_UNET, MASOUD_STUDIO_COMFYUI_VIDEO_CLIP, MASOUD_STUDIO_COMFYUI_VIDEO_VAE and MASOUD_STUDIO_COMFYUI_VIDEO_CLIP_VISION. This workflow can be computationally demanding and requires a compatible ComfyUI build and available GPU memory. The first increment is bounded to 832×480, 33/49/73 frames and 16/24 fps.

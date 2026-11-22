@@ -289,9 +289,9 @@ def ingest_generated_media_bytes(db: Session, project_id: str, filename: str,
 
     if not isinstance(content, bytes) or not content:
         raise HTTPException(413, detail={"code": "generated_media_empty"})
-    if media_type == "video/mp4":
+    if media_type in {"video/mp4", "video/webm"}:
         maximum = min(MAX_UPLOAD_BYTES, 100 * 1024 * 1024)
-        if len(content) > maximum or detect_mime(content[:32]) != "video/mp4":
+        if len(content) > maximum or detect_mime(content[:32]) != media_type:
             raise HTTPException(415, detail={"code": "generated_video_invalid"})
     elif media_type == "application/json":
         maximum = 5 * 1024 * 1024
