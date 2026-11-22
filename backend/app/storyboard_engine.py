@@ -24,13 +24,13 @@ def _scene(db, story_id, scene_id):
     if scene is None: raise HTTPException(404,detail={"code":"story_scene_not_found"})
     return scene
 
-def _validate_evidence(scene, payload):
-    excerpt=payload.source_excerpt.strip()
-    if payload.source_start is not None or payload.source_end is not None:
-        if payload.source_start is None or payload.source_end is None:
+def _validate_evidence(scene, excerpt, source_start=None, source_end=None):
+    excerpt=excerpt.strip()
+    if source_start is not None or source_end is not None:
+        if source_start is None or source_end is None:
             raise HTTPException(422,detail={"code":"source_range_requires_both_offsets"})
         body=scene.body or ""
-        if payload.source_end > len(body) or body[payload.source_start:payload.source_end] != excerpt:
+        if source_end > len(body) or body[source_start:source_end] != excerpt:
             raise HTTPException(422,detail={"code":"source_excerpt_does_not_match_scene_range"})
         return
     candidates=[scene.body or "",scene.summary or ""]
@@ -59,7 +59,7 @@ def list_shots(db:Session,story_id:str,scene_id:str):
     return {"items":[_shot_data(db,row) for row in rows]}
 
 def create_shot(db:Session,story_id:str,payload:StoryboardShotCreate):
-    _story(db,story_id);scene=_scene(db,story_id,payload.scene_id);_validate_evidence(scene,payload)
+    _story(db,story_id);scene=_scene(db,story_id,payload.scene_id);_validate_evidence(scene,payload.source_excerpt,payload.source_start,payload.source_end)
     position=(db.scalar(select(func.max(StoryboardShot.position)).where(StoryboardShot.story_id==story_id,StoryboardShot.scene_id==payload.scene_id)) or 0)+1
     data=payload.model_dump();refs=data.pop("entity_refs")
     shot=StoryboardShot(id=str(uuid4()),story_id=story_id,position=position,entity_refs_json=_json(refs),**data)
@@ -71,6 +71,10 @@ def update_shot(db:Session,story_id:str,shot_id:str,payload:StoryboardShotUpdate
     if shot is None: raise HTTPException(404,detail={"code":"storyboard_shot_not_found"})
     if shot.version!=payload.expected_version: raise HTTPException(409,detail={"code":"storyboard_shot_version_conflict","current_version":shot.version})
     values=payload.model_dump(exclude_unset=True,exclude={"expected_version"})
+    if any(key in values for key in ("source_excerpt","source_start","source_end")):
+        scene=_scene(db,story_id,shot.scene_id)
+        _validate_evidence(scene,values.get("source_excerpt",shot.source_excerpt),
+            values.get("source_start",shot.source_start),values.get("source_end",shot.source_end))
     if "entity_refs" in values: shot.entity_refs_json=_json(values.pop("entity_refs"))
     for key,value in values.items(): setattr(shot,key,value)
     shot.version+=1;shot.updated_at=_now()
