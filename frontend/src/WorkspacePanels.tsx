@@ -331,7 +331,7 @@ function ContinuityReviewPanel({storyId}:{storyId:string}){
  </section>;
 }
 
-function BackupPanel(){
+export function BackupPanel(){
  const [items,setItems]=useState<BackupRecord[]>([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  async function load(){setLoading(true);setError("");try{setItems(await api<BackupRecord[]>("/api/v1/backups"));}catch(e){setError(e instanceof Error?e.message:"Could not load backups");}finally{setLoading(false);}}
  useEffect(()=>{void load();},[]);
