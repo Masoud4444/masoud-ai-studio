@@ -42,7 +42,7 @@ from .animatic_schemas import AnimaticTaskCreate
 from .animatic import create_animatic_task
 from .storyboard_video_schemas import StoryboardVideoTaskCreate
 from .storyboard_video import create_storyboard_video_task
-from .media_workflow_registry import list_media_workflows
+from .media_workflow_registry import list_media_workflows, check_workflow_compatibility
 from .research_schemas import (
     ResearchSourceCreate, ResearchEvidenceCreate, ResearchClaimCreate,
     ResearchClaimEvidenceCreate, ResearchClaimUpdate,
@@ -303,6 +303,12 @@ def post_task_rejection(task_id: str, reason: str = Query("Human approval reject
 def get_media_workflows():
     """List validated installed media workflows without exposing their graphs."""
     return list_media_workflows()
+
+
+@router.get("/media-workflows/{workflow_id}/compatibility")
+async def get_media_workflow_compatibility(workflow_id: str, kind: str = Query(..., pattern="^(text_to_image|image_to_video)$")):
+    """Check a trusted local workflow against the configured ComfyUI installation."""
+    return await check_workflow_compatibility(workflow_id, kind)
 
 
 @router.get("/production/workflows")
