@@ -27,6 +27,8 @@ class StoryboardShotCreate(BaseModel):
 
     @model_validator(mode="after")
     def valid_source_range(self):
+        if (self.source_start is None) != (self.source_end is None):
+            raise ValueError("source_start and source_end must be supplied together")
         if self.source_start is not None and self.source_end is not None and self.source_end < self.source_start:
             raise ValueError("source_end must be greater than or equal to source_start")
         return self
