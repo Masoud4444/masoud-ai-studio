@@ -487,6 +487,9 @@ function StoryboardPanel({storyId,storyVersion,projectId,scenes}:{storyId:string
  const [lens,setLens]=useState("");
  const [assetByShot,setAssetByShot]=useState<Record<string,string>>({});
  const [editingShot,setEditingShot]=useState<StoryboardShotRecord|null>(null);
+ const [promptModel,setPromptModel]=useState("");
+ const [creativeDirection,setCreativeDirection]=useState("");
+ const [promptTaskByShot,setPromptTaskByShot]=useState<Record<string,{id:string;status:string;result?:{prompt?:string}}>>({});
  const [shotDraft,setShotDraft]=useState({title:"",source_excerpt:"",shot_size:"ms",camera_angle:"eye_level",camera_movement:"static",duration_seconds:"4",lens:"",description:"",composition:"",action:"",dialogue:"",transition:"",prompt:"",continuity_notes:""});
  const [busy,setBusy]=useState(false);
  const [loading,setLoading]=useState(false);
@@ -549,6 +552,35 @@ function StoryboardPanel({storyId,storyVersion,projectId,scenes}:{storyId:string
   }catch(e){setError(e instanceof Error?e.message:"Could not reorder shots");}
   finally{setBusy(false);}
  }
+ async function generateShotPrompt(shot:StoryboardShotRecord){
+  if(!promptModel.trim())return;
+  setBusy(true);setError("");setNotice("");
+  try{
+   const task=await api<{id:string;status:string}>(`/api/v1/stories/${storyId}/storyboard/shots/${shot.id}/prompt-tasks`,{method:"POST",headers:{"Content-Type":"application/json","Idempotency-Key":crypto.randomUUID()},body:JSON.stringify({model:promptModel.trim(),creative_direction:creativeDirection.trim()})});
+   setPromptTaskByShot(prev=>({...prev,[shot.id]:{id:task.id,status:task.status}}));
+   setNotice("AI prompt task queued. It will not change the shot or screenplay until you apply the reviewed result.");
+  }catch(e){setError(e instanceof Error?e.message:"Could not queue prompt generation");}
+  finally{setBusy(false);}
+ }
+ async function refreshPromptTask(shot:StoryboardShotRecord){
+  const current=promptTaskByShot[shot.id];if(!current)return;
+  setBusy(true);setError("");
+  try{
+   const task=await api<{id:string;status:string;result?:{prompt?:string}}>(`/api/v1/tasks/${current.id}`);
+   setPromptTaskByShot(prev=>({...prev,[shot.id]:{id:task.id,status:task.status,result:task.result}}));
+  }catch(e){setError(e instanceof Error?e.message:"Could not refresh prompt task");}
+  finally{setBusy(false);}
+ }
+ async function applyShotPrompt(shot:StoryboardShotRecord){
+  const current=promptTaskByShot[shot.id];if(!current?.result?.prompt)return;
+  setBusy(true);setError("");setNotice("");
+  try{
+   await api(`/api/v1/stories/${storyId}/storyboard/shots/${shot.id}/prompt-tasks/${current.id}/apply`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({expected_version:shot.version})});
+   setPromptTaskByShot(prev=>{const next={...prev};delete next[shot.id];return next;});
+   setNotice("Reviewed AI prompt applied to the shot. The screenplay and Canonical Bible remain unchanged.");await loadShots();
+  }catch(e){setError(e instanceof Error?e.message:"Could not apply generated prompt");}
+  finally{setBusy(false);}
+ }
  async function addTake(shot:StoryboardShotRecord){
   const assetId=assetByShot[shot.id];if(!assetId)return;
   setBusy(true);setError("");setNotice("");
@@ -571,6 +603,10 @@ function StoryboardPanel({storyId,storyVersion,projectId,scenes}:{storyId:string
   <p className="settings-note">Build shots directly from existing scenes. Every shot retains its screenplay excerpt; media takes reference the existing project Asset Library. No AI generation is triggered from this panel.</p>
   {error&&<div className="connection-banner">{error}</div>}{notice&&<div className="notice">{notice}</div>}
   <label className="field-label">Scene<select value={sceneId} onChange={e=>setSceneId(e.target.value)}>{scenes.map(item=><option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
+  <div className="scene-editor-grid">
+   <label className="field-label">AI model for shot prompts<input value={promptModel} onChange={e=>setPromptModel(e.target.value)} placeholder="Enter configured model ID"/></label>
+   <label className="field-label">Creative direction<input value={creativeDirection} onChange={e=>setCreativeDirection(e.target.value)} placeholder="e.g. naturalistic, restrained, anamorphic"/></label>
+  </div>
   <form className="scene-script-editor" onSubmit={createShot}>
    <div className="form-title">Plan a shot</div>
    <label className="field-label">Shot title<input value={title} onChange={e=>setTitle(e.target.value)} maxLength={240} placeholder="e.g. The reveal at the doorway" required/></label>
@@ -592,6 +628,8 @@ function StoryboardPanel({storyId,storyVersion,projectId,scenes}:{storyId:string
     <div className="story-scene-actions"><button type="button" className="secondary-button" disabled={busy||shot.position===1} onClick={()=>void moveShot(shot,-1)}>↑ Move up</button><button type="button" className="secondary-button" disabled={busy||shot.position===shots.length} onClick={()=>void moveShot(shot,1)}>↓ Move down</button><button type="button" className="secondary-button" disabled={busy} onClick={()=>beginEditShot(shot)}>Edit shot</button></div>
     <small>{shot.camera_angle.replaceAll("_"," ")} · {shot.camera_movement.replaceAll("_"," ")}{shot.lens?" · "+shot.lens:""}</small>
     <p>{shot.source_excerpt}</p>{shot.approved_take_id&&<small>Approved take: {shot.takes.find(t=>t.id===shot.approved_take_id)?.take_number??"selected"}</small>}
+    <div className="scene-editor-actions"><button type="button" className="secondary-button" disabled={busy||!promptModel.trim()} onClick={()=>void generateShotPrompt(shot)}>Generate AI prompt</button>{promptTaskByShot[shot.id]&&<><span className="task-status task-queued">{promptTaskByShot[shot.id].status}</span><button type="button" className="secondary-button" disabled={busy} onClick={()=>void refreshPromptTask(shot)}>Check task</button>{promptTaskByShot[shot.id].result?.prompt&&<button type="button" className="primary-button" disabled={busy} onClick={()=>void applyShotPrompt(shot)}>Review & apply prompt</button>}</>}</div>
+    {promptTaskByShot[shot.id]?.result?.prompt&&<label className="field-label">Generated prompt proposal<textarea rows={4} readOnly value={promptTaskByShot[shot.id].result?.prompt??""}/></label>}
     <div className="scene-editor-grid"><label className="field-label">Attach existing asset as take<select value={assetByShot[shot.id]??""} onChange={e=>setAssetByShot(prev=>({...prev,[shot.id]:e.target.value}))}><option value="">Choose project asset</option>{assets.map(asset=><option key={asset.id} value={asset.asset_id}>{asset.filename}</option>)}</select></label><div className="form-foot"><button type="button" className="secondary-button" disabled={busy||!assetByShot[shot.id]} onClick={()=>void addTake(shot)}>Add take</button></div></div>
     {shot.takes.map(take=><div className="asset-row" key={take.id}><div className="asset-main"><b>Take {take.take_number}</b><small>{take.status} · {take.asset_sha256.slice(0,12)}…</small></div>{take.status==="generated"&&<button type="button" className="secondary-button" disabled={busy} onClick={()=>void reviewTake(shot,take,"selected")}>Select</button>}{take.status==="selected"&&<button type="button" className="primary-button" disabled={busy} onClick={()=>void reviewTake(shot,take,"approved")}>Approve</button>}<button type="button" className="danger-button" disabled={busy||take.status==="rejected"} onClick={()=>void reviewTake(shot,take,"rejected")}>Reject</button></div>)}
    </div></article>)}</div>}
