@@ -6,10 +6,12 @@ from sqlalchemy.pool import StaticPool
 
 from backend.app.database import Base, get_db
 from backend.app.main import app
+from backend.app import storage
 
 
 @pytest.fixture()
-def client():
+def client(tmp_path, monkeypatch):
+    monkeypatch.setattr(storage, "STORAGE_ROOT", tmp_path / "storage")
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     testing_session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     Base.metadata.create_all(bind=engine)
@@ -96,3 +98,34 @@ def test_storyboard_rejects_excerpt_not_present_in_canonical_scene(client):
     )
     assert response.status_code == 422
     assert response.json()["detail"]["code"] == "source_excerpt_not_found_in_scene"
+
+
+def test_storyboard_take_must_reference_project_asset_and_be_reviewed(client):
+    project, story, scene = _story_with_scene(client, "Take lifecycle")
+    shot = client.post(
+        f"/api/v1/stories/{story['id']}/storyboard/shots",
+        json=_shot_payload(scene["id"], "Doorway master"),
+    ).json()
+    uploaded = client.post(
+        f"/api/v1/projects/{project['id']}/assets",
+        files={"file": ("frame.png", b"\\x89PNG\\r\\n\\x1a\\nframe-bytes", "image/png")},
+    )
+    assert uploaded.status_code == 201
+    asset_id = uploaded.json()["asset_id"]
+
+    take_url = f"/api/v1/stories/{story['id']}/storyboard/shots/{shot['id']}/takes"
+    created = client.post(take_url, json={"asset_id": asset_id, "engine_key": "manual"})
+    assert created.status_code == 201
+    take = created.json()["takes"][0]
+    assert take["status"] == "generated"
+
+    take_review_url = f"{take_url}/{take['id']}"
+    premature_approval = client.patch(take_review_url, json={"status": "approved"})
+    assert premature_approval.status_code == 409
+
+    selected = client.patch(take_review_url, json={"status": "selected", "review_note": "Best framing"})
+    assert selected.status_code == 200
+    approved = client.patch(take_review_url, json={"status": "approved"})
+    assert approved.status_code == 200
+    assert approved.json()["approved_take_id"] == take["id"]
+    assert approved.json()["takes"][0]["status"] == "approved"
