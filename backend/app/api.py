@@ -34,8 +34,9 @@ from .story_schemas import (StoryCreate, StoryUpdate, StorySceneCreate, StorySce
 from .story_generation import (create_story_outline_task, apply_story_outline_task,
     create_story_scene_generation_task, apply_story_scene_generation_task)
 
-from .storyboard_schemas import StoryboardShotCreate, StoryboardShotUpdate, StoryboardReorder, StoryboardTakeCreate, StoryboardTakeReview
+from .storyboard_schemas import StoryboardShotCreate, StoryboardShotUpdate, StoryboardReorder, StoryboardTakeCreate, StoryboardTakeReview, StoryboardPromptTaskCreate, StoryboardPromptApply
 from .storyboard_engine import list_shots, create_shot, update_shot, reorder_shots, create_take, review_take
+from .storyboard_generation import create_storyboard_prompt_task, apply_storyboard_prompt
 from .research_schemas import (
     ResearchSourceCreate, ResearchEvidenceCreate, ResearchClaimCreate,
     ResearchClaimEvidenceCreate, ResearchClaimUpdate,
@@ -804,6 +805,23 @@ def patch_storyboard_shot(story_id: str, shot_id: str, payload: StoryboardShotUp
 @router.post("/stories/{story_id}/scenes/{scene_id}/storyboard/reorder")
 def post_storyboard_reorder(story_id: str, scene_id: str, payload: StoryboardReorder, db: Session = Depends(get_db)):
     return reorder_shots(db, story_id, scene_id, payload.expected_story_version, payload.shot_ids)
+
+@router.post("/stories/{story_id}/storyboard/shots/{shot_id}/prompt-tasks", status_code=201)
+def post_storyboard_prompt_task(
+    story_id: str, shot_id: str, payload: StoryboardPromptTaskCreate,
+    idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=8, max_length=200),
+    db: Session = Depends(get_db),
+):
+    return create_storyboard_prompt_task(db, story_id, shot_id, payload, idempotency_key)
+
+
+@router.post("/stories/{story_id}/storyboard/shots/{shot_id}/prompt-tasks/{task_id}/apply")
+def post_storyboard_prompt_apply(
+    story_id: str, shot_id: str, task_id: str, payload: StoryboardPromptApply,
+    db: Session = Depends(get_db),
+):
+    return apply_storyboard_prompt(db, story_id, shot_id, task_id, payload)
+
 
 @router.post("/stories/{story_id}/storyboard/shots/{shot_id}/takes", status_code=201)
 def post_storyboard_take(story_id: str, shot_id: str, payload: StoryboardTakeCreate, db: Session = Depends(get_db)):
