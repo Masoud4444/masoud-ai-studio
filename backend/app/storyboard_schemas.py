@@ -1,5 +1,5 @@
 from typing import Literal
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 ShotSize = Literal["ecu", "cu", "mcu", "ms", "mws", "ws", "ews", "ots", "pov", "aerial", "two_shot"]
 CameraAngle = Literal["eye_level", "high", "low", "birds_eye", "worms_eye", "dutch", "overhead"]

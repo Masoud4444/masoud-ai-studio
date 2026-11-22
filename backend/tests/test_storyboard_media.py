@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from backend.app.storyboard_schemas import StoryboardImageTaskCreate
 from backend.app.storyboard_media import (
     WORKFLOW_DIR, build_workflow_graph, load_workflow_pack, _validate_image_locator,
 )
@@ -50,3 +51,16 @@ def test_workflow_pack_is_not_mutated_by_graph_building():
         negative_prompt="", width=1024, height=1024, steps=24, cfg=7, seed=9,
     )
     assert json.dumps(pack["workflow"], sort_keys=True) == original
+
+
+@pytest.mark.parametrize("width,height", [(256, 256), (1280, 720), (2048, 1024)])
+def test_storyboard_image_dimensions_accept_multiples_of_eight(width, height):
+    task = StoryboardImageTaskCreate(width=width, height=height)
+    assert task.width == width
+    assert task.height == height
+
+
+@pytest.mark.parametrize("field,value", [("width", 1025), ("height", 721)])
+def test_storyboard_image_dimensions_reject_non_multiples_of_eight(field, value):
+    with pytest.raises(ValueError, match="divisible by 8"):
+        StoryboardImageTaskCreate(**{field: value})

@@ -471,7 +471,7 @@ export function SettingsPanel(){
 
 
 type StoryboardTakeRecord={id:string;take_number:number;asset_id:string;asset_sha256:string;asset_mime_type?:string|null;status:string;engine_key:string;prompt_snapshot:string|null;review_note:string|null};
-type StoryboardShotRecord={id:string;scene_id:string;position:number;title:string;description:string;shot_size:string;camera_angle:string;camera_movement:string;lens:string|null;composition:string|null;action:string|null;dialogue:string|null;duration_seconds:number;source_excerpt:string;source_start:number|null;source_end:number|null;prompt:string|null;continuity_notes:string|null;approved_take_id:string|null;version:number;takes:StoryboardTakeRecord[]};
+type StoryboardShotRecord={id:string;scene_id:string;position:number;title:string;description:string;shot_size:string;camera_angle:string;camera_movement:string;lens:string|null;composition:string|null;action:string|null;dialogue:string|null;duration_seconds:number;transition:string|null;source_excerpt:string;source_start:number|null;source_end:number|null;prompt:string|null;continuity_notes:string|null;approved_take_id:string|null;version:number;takes:StoryboardTakeRecord[]};
 type StoryboardSceneOption={id:string;title:string;body?:string|null;summary?:string|null};
 
 function StoryboardPanel({storyId,storyVersion,projectId,scenes}:{storyId:string;storyVersion:number;projectId:string;scenes:StoryboardSceneOption[]}){
