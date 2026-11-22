@@ -185,9 +185,30 @@ def main() -> int:
         return 5
 
     if "--smoke-test" in sys.argv:
-        server.should_exit = True
-        thread.join(timeout=20)
-        return 0 if not thread.is_alive() else 6
+        try:
+            with urllib.request.urlopen("http://127.0.0.1:8000/api/v1/settings/runtime", timeout=5) as response:
+                runtime = __import__("json").loads(response.read().decode("utf-8"))
+            if runtime.get("database", {}).get("status") != "ok":
+                logging.error("Smoke test failed: database diagnostics are not healthy: %r", runtime.get("database"))
+                return_code = 7
+            else:
+                with urllib.request.urlopen("http://127.0.0.1:8000/", timeout=5) as response:
+                    page = response.read(2_000_000).decode("utf-8", errors="replace")
+                    if response.status != 200 or "<html" not in page.lower():
+                        logging.error("Smoke test failed: packaged frontend did not return an HTML document.")
+                        return_code = 8
+                    else:
+                        return_code = 0
+        except Exception:
+            logging.exception("Packaged application smoke diagnostics failed.")
+            return_code = 9
+        finally:
+            server.should_exit = True
+            thread.join(timeout=20)
+        if thread.is_alive():
+            logging.error("Smoke test failed: local server did not shut down cleanly.")
+            return 6
+        return return_code
 
     def open_studio(_icon=None, _item=None):
         webbrowser.open("http://127.0.0.1:8000", new=2)

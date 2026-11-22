@@ -54,8 +54,18 @@ jobs:
         shell: pwsh
         run: |
           $app = Resolve-Path "dist/MasoudAIStudio/MasoudAIStudio.exe"
-          $process = Start-Process -FilePath $app -ArgumentList "--smoke-test" -Wait -PassThru
-          if ($process.ExitCode -ne 0) { throw "Packaged application smoke test failed with exit code $($process.ExitCode)" }
+          $process = Start-Process -FilePath $app -ArgumentList "--smoke-test" -PassThru -NoNewWindow
+          if (-not $process.WaitForExit(120000)) {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            $log = Join-Path $env:LOCALAPPDATA "Masoud AI Studio/logs/studio.log"
+            if (Test-Path $log) { Get-Content $log -Tail 100 }
+            throw "Packaged application smoke test exceeded the 120-second limit."
+          }
+          if ($process.ExitCode -ne 0) {
+            $log = Join-Path $env:LOCALAPPDATA "Masoud AI Studio/logs/studio.log"
+            if (Test-Path $log) { Get-Content $log -Tail 100 }
+            throw "Packaged application smoke test failed with exit code $($process.ExitCode)."
+          }
       - name: Build offline backup restore utility
         run: pyinstaller --noconfirm --clean --onefile --console --name MasoudStudioRestore --paths . --distpath dist/MasoudAIStudio --workpath build/restore-tool desktop/restore_backup.py
       - name: Build offline data migration utility
