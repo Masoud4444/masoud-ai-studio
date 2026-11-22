@@ -24,6 +24,21 @@ def _scene(db, story_id, scene_id):
     if scene is None: raise HTTPException(404,detail={"code":"story_scene_not_found"})
     return scene
 
+def _validate_evidence(scene, payload):
+    excerpt=payload.source_excerpt.strip()
+    if payload.source_start is not None or payload.source_end is not None:
+        if payload.source_start is None or payload.source_end is None:
+            raise HTTPException(422,detail={"code":"source_range_requires_both_offsets"})
+        body=scene.body or ""
+        if payload.source_end > len(body) or body[payload.source_start:payload.source_end] != excerpt:
+            raise HTTPException(422,detail={"code":"source_excerpt_does_not_match_scene_range"})
+        return
+    candidates=[scene.body or "",scene.summary or ""]
+    try: candidates.extend(json.loads(scene.beats_json or "[]"))
+    except (TypeError,ValueError): pass
+    if not any(excerpt in candidate for candidate in candidates if isinstance(candidate,str)):
+        raise HTTPException(422,detail={"code":"source_excerpt_not_found_in_scene","message":"The evidence excerpt must exactly match the scene body, summary or a beat."})
+
 def _shot_data(db, shot):
     takes=db.scalars(select(StoryboardTake).where(StoryboardTake.shot_id==shot.id).order_by(StoryboardTake.take_number)).all()
     return {"id":shot.id,"story_id":shot.story_id,"scene_id":shot.scene_id,"position":shot.position,
@@ -44,7 +59,7 @@ def list_shots(db:Session,story_id:str,scene_id:str):
     return {"items":[_shot_data(db,row) for row in rows]}
 
 def create_shot(db:Session,story_id:str,payload:StoryboardShotCreate):
-    _story(db,story_id);_scene(db,story_id,payload.scene_id)
+    _story(db,story_id);scene=_scene(db,story_id,payload.scene_id);_validate_evidence(scene,payload)
     position=(db.scalar(select(func.max(StoryboardShot.position)).where(StoryboardShot.story_id==story_id,StoryboardShot.scene_id==payload.scene_id)) or 0)+1
     data=payload.model_dump();refs=data.pop("entity_refs")
     shot=StoryboardShot(id=str(uuid4()),story_id=story_id,position=position,entity_refs_json=_json(refs),**data)
@@ -96,10 +111,11 @@ def review_take(db:Session,story_id:str,shot_id:str,take_id:str,status:str,revie
     if take is None: raise HTTPException(404,detail={"code":"storyboard_take_not_found"})
     if status=="approved":
         if take.status not in ("selected","approved"): raise HTTPException(409,detail={"code":"take_must_be_selected_before_approval"})
+        db.query(StoryboardTake).filter(StoryboardTake.shot_id==shot_id,StoryboardTake.id!=take_id,StoryboardTake.status=="approved").update({"status":"generated"},synchronize_session=False)
         shot.approved_take_id=take.id;take.status="approved"
     elif status=="selected":
-        if shot.approved_take_id: shot.approved_take_id=None
-        db.query(StoryboardTake).filter(StoryboardTake.shot_id==shot_id,StoryboardTake.id!=take_id,StoryboardTake.status=="selected").update({"status":"generated"},synchronize_session=False)
+        shot.approved_take_id=None
+        db.query(StoryboardTake).filter(StoryboardTake.shot_id==shot_id,StoryboardTake.id!=take_id,StoryboardTake.status.in_([ "selected", "approved" ])).update({"status":"generated"},synchronize_session=False)
         take.status="selected"
     else:
         if shot.approved_take_id==take.id: shot.approved_take_id=None
