@@ -33,6 +33,9 @@ from .story_schemas import (StoryCreate, StoryUpdate, StorySceneCreate, StorySce
     StoryOutlineTaskCreate, StoryOutlineApply, StorySceneGenerationTaskCreate, StorySceneGenerationApply)
 from .story_generation import (create_story_outline_task, apply_story_outline_task,
     create_story_scene_generation_task, apply_story_scene_generation_task)
+
+from .storyboard_schemas import StoryboardShotCreate, StoryboardShotUpdate, StoryboardReorder, StoryboardTakeCreate, StoryboardTakeReview
+from .storyboard_engine import list_shots, create_shot, update_shot, reorder_shots, create_take, review_take
 from .research_schemas import (
     ResearchSourceCreate, ResearchEvidenceCreate, ResearchClaimCreate,
     ResearchClaimEvidenceCreate, ResearchClaimUpdate,
@@ -785,3 +788,27 @@ def delete_story_scene(story_id: str, scene_id: str, db: Session = Depends(get_d
 @router.post("/stories/{story_id}/scenes/reorder")
 def post_story_scene_reorder(story_id: str, payload: StorySceneReorder, db: Session = Depends(get_db)):
     return reorder_scenes(db, story_id, payload.expected_story_version, payload.scene_ids)
+
+@router.get("/stories/{story_id}/scenes/{scene_id}/storyboard")
+def get_storyboard(story_id: str, scene_id: str, db: Session = Depends(get_db)):
+    return list_shots(db, story_id, scene_id)
+
+@router.post("/stories/{story_id}/storyboard/shots", status_code=201)
+def post_storyboard_shot(story_id: str, payload: StoryboardShotCreate, db: Session = Depends(get_db)):
+    return create_shot(db, story_id, payload)
+
+@router.patch("/stories/{story_id}/storyboard/shots/{shot_id}")
+def patch_storyboard_shot(story_id: str, shot_id: str, payload: StoryboardShotUpdate, db: Session = Depends(get_db)):
+    return update_shot(db, story_id, shot_id, payload)
+
+@router.post("/stories/{story_id}/scenes/{scene_id}/storyboard/reorder")
+def post_storyboard_reorder(story_id: str, scene_id: str, payload: StoryboardReorder, db: Session = Depends(get_db)):
+    return reorder_shots(db, story_id, scene_id, payload.expected_story_version, payload.shot_ids)
+
+@router.post("/stories/{story_id}/storyboard/shots/{shot_id}/takes", status_code=201)
+def post_storyboard_take(story_id: str, shot_id: str, payload: StoryboardTakeCreate, db: Session = Depends(get_db)):
+    return create_take(db, story_id, shot_id, payload)
+
+@router.patch("/stories/{story_id}/storyboard/shots/{shot_id}/takes/{take_id}")
+def patch_storyboard_take(story_id: str, shot_id: str, take_id: str, payload: StoryboardTakeReview, db: Session = Depends(get_db)):
+    return review_take(db, story_id, shot_id, take_id, payload.status, payload.review_note)
