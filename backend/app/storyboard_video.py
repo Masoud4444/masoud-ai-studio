@@ -246,6 +246,52 @@ def prepare_storyboard_video_task(db: Session, story_id: str, shot_id: str,
     }
 
 
+def prepare_storyboard_video_task(db: Session, story_id: str, shot_id: str,
+                                   payload: StoryboardVideoTaskCreate) -> dict:
+    """Validate video-generation prerequisites and freeze the approved source snapshot."""
+    story = db.get(Story, story_id)
+    if story is None:
+        raise HTTPException(404, detail={"code": "story_not_found"})
+    project = db.get(Project, story.project_id)
+    if project is None:
+        raise HTTPException(404, detail={"code": "project_not_found"})
+    if project.status != "active" or story.status in {"archived", "locked"}:
+        raise HTTPException(409, detail={"code": "story_not_active"})
+    shot = db.scalar(select(StoryboardShot).where(
+        StoryboardShot.id == shot_id, StoryboardShot.story_id == story_id
+    ))
+    if shot is None:
+        raise HTTPException(404, detail={"code": "storyboard_shot_not_found"})
+    if not (shot.prompt or "").strip():
+        raise HTTPException(409, detail={"code": "storyboard_prompt_required"})
+    if not shot.approved_take_id:
+        raise HTTPException(409, detail={"code": "video_generation_requires_approved_start_image"})
+    take = db.get(StoryboardTake, shot.approved_take_id)
+    if take is None or take.shot_id != shot.id or take.status != "approved":
+        raise HTTPException(409, detail={"code": "storyboard_approved_take_invalid"})
+    asset = db.get(Asset, take.asset_id)
+    if asset is None or asset.mime_type not in {"image/png", "image/jpeg", "image/webp"}:
+        raise HTTPException(422, detail={"code": "video_generation_requires_image_take"})
+    linked = db.scalar(select(ProjectAsset.id).where(
+        ProjectAsset.project_id == story.project_id, ProjectAsset.asset_id == asset.id
+    ))
+    if linked is None:
+        raise HTTPException(409, detail={"code": "video_start_image_project_scope_invalid"})
+    try:
+        pack = load_video_workflow_pack(payload.workflow_id)
+    except ValueError as exc:
+        raise HTTPException(422, detail={"code": "video_workflow_pack_invalid", "message": str(exc)}) from None
+    seed = payload.seed if payload.seed is not None else int.from_bytes(os.urandom(8), "big")
+    return {
+        "story_id": story.id, "project_id": story.project_id, "shot_id": shot.id,
+        "shot_version": shot.version, "shot_title": shot.title, "prompt": shot.prompt,
+        "negative_prompt": payload.negative_prompt, "workflow_id": payload.workflow_id,
+        "workflow_version": pack.get("version", "1.0.0"), "start_take_id": take.id,
+        "start_asset_id": asset.id, "start_asset_sha256": asset.sha256,
+        "frames": payload.frames, "fps": payload.fps, "seed": seed,
+    }
+
+
 def create_storyboard_video_task(db: Session, story_id: str, shot_id: str,
                                  payload: StoryboardVideoTaskCreate, idempotency_key: str,
                                  validated_snapshot: dict | None = None) -> dict:

@@ -37,11 +37,11 @@ from .story_generation import (create_story_outline_task, apply_story_outline_ta
 from .storyboard_schemas import StoryboardShotCreate, StoryboardShotUpdate, StoryboardReorder, StoryboardTakeCreate, StoryboardTakeReview, StoryboardPromptTaskCreate, StoryboardPromptApply, StoryboardImageTaskCreate
 from .storyboard_engine import list_shots, create_shot, update_shot, reorder_shots, create_take, review_take
 from .storyboard_generation import create_storyboard_prompt_task, apply_storyboard_prompt
-from .storyboard_media import create_storyboard_image_task, prepare_storyboard_image_task
+from .storyboard_media import create_storyboard_image_task, prepare_storyboard_image_task, prepare_storyboard_image_task
 from .animatic_schemas import AnimaticTaskCreate
 from .animatic import create_animatic_task
 from .storyboard_video_schemas import StoryboardVideoTaskCreate
-from .storyboard_video import create_storyboard_video_task, prepare_storyboard_video_task
+from .storyboard_video import create_storyboard_video_task, prepare_storyboard_video_task, prepare_storyboard_video_task
 from .media_workflow_registry import list_media_workflows, check_workflow_compatibility
 from .research_schemas import (
     ResearchSourceCreate, ResearchEvidenceCreate, ResearchClaimCreate,
