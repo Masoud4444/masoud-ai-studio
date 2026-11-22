@@ -124,17 +124,58 @@ def review_issue(sid:str,issue_id:str,p:IssueReview,db:Session=Depends(get_db)):
 
 
 def _timeline_cycle_details(events, relations):
-    """Return deterministic evidence for active chronology cycles, or None."""
+    """Return deterministic evidence for events inside chronology cycles only."""
     active = {event.id: event for event in events if event.active}
     edges = [
         (relation.before_event_id, relation.after_event_id)
         for relation in relations
         if relation.before_event_id in active and relation.after_event_id in active
     ]
-    _, cyclic_ids = _topological_layers(sorted(active), edges)
+    adjacency = {event_id: [] for event_id in active}
+    reverse = {event_id: [] for event_id in active}
+    for before, after in edges:
+        adjacency[before].append(after)
+        reverse[after].append(before)
+
+    visited = set()
+    order = []
+
+    def visit(node):
+        visited.add(node)
+        for neighbor in sorted(adjacency[node]):
+            if neighbor not in visited:
+                visit(neighbor)
+        order.append(node)
+
+    for event_id in sorted(active):
+        if event_id not in visited:
+            visit(event_id)
+
+    visited.clear()
+    cyclic_ids = set()
+
+    def collect(node, component):
+        visited.add(node)
+        component.append(node)
+        for neighbor in sorted(reverse[node]):
+            if neighbor not in visited:
+                collect(neighbor, component)
+
+    for event_id in reversed(order):
+        if event_id in visited:
+            continue
+        component = []
+        collect(event_id, component)
+        if len(component) > 1 or any(before == event_id and after == event_id for before, after in edges):
+            cyclic_ids.update(component)
+
     if not cyclic_ids:
         return None
     cycle_events = [active[event_id] for event_id in cyclic_ids]
+    cycle_edges = [
+        (before, after) for before, after in edges
+        if before in cyclic_ids and after in cyclic_ids
+    ]
     return {
         "event_ids": sorted(cyclic_ids),
         "scene_ids": sorted({event.scene_id for event in cycle_events if event.scene_id}),
@@ -144,8 +185,7 @@ def _timeline_cycle_details(events, relations):
         ],
         "relations": [
             {"before_event_id": before, "after_event_id": after}
-            for before, after in sorted(edges)
-            if before in cyclic_ids and after in cyclic_ids
+            for before, after in sorted(cycle_edges)
         ],
     }
 
