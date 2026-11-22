@@ -79,7 +79,12 @@ async def check_workflow_compatibility(workflow_id: str, kind: str) -> dict:
                     return {"workflow_id": workflow_id, "kind": kind, "compatible": False,
                             "engine_available": True, "error": "comfyui_object_info_unavailable",
                             "missing_nodes": [], "missing_models": [], "unsupported_inputs": []}
-                object_info = await response.json(content_type=None)
+                raw_info = await response.content.read(32 * 1024 * 1024 + 1)
+                if len(raw_info) > 32 * 1024 * 1024:
+                    return {"workflow_id": workflow_id, "kind": kind, "compatible": False,
+                            "engine_available": True, "error": "comfyui_object_info_too_large",
+                            "missing_nodes": [], "missing_models": [], "unsupported_inputs": []}
+                object_info = __import__("json").loads(raw_info)
     except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
         return {"workflow_id": workflow_id, "kind": kind, "compatible": False,
                 "engine_available": False, "error": "comfyui_connection_failed",
