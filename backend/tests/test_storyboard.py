@@ -36,14 +36,14 @@ def test_storyboard_source_range_cannot_be_reversed():
 def test_storyboard_evidence_must_match_exact_scene_text():
     payload = StoryboardShotCreate.model_validate(_shot_payload())
     scene = SimpleNamespace(body="Mira opens the door. A light flickers.", summary=None, beats_json="[]")
-    _validate_evidence(scene, payload)
+    _validate_evidence(scene, payload.source_excerpt, payload.source_start, payload.source_end)
 
 
 def test_storyboard_rejects_invented_or_untraceable_evidence():
     payload = StoryboardShotCreate.model_validate(_shot_payload(source_excerpt="Mira flies into space."))
     scene = SimpleNamespace(body="Mira opens the door.", summary=None, beats_json="[]")
     with pytest.raises(HTTPException) as exc:
-        _validate_evidence(scene, payload)
+        _validate_evidence(scene, payload.source_excerpt, payload.source_start, payload.source_end)
     assert exc.value.status_code == 422
     assert exc.value.detail["code"] == "source_excerpt_not_found_in_scene"
 
