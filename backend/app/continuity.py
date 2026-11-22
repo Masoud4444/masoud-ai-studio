@@ -12,6 +12,7 @@ from .database import Base, get_db
 from .models import Story, StoryScene
 from .character_world import Character, Location, SceneCharacter, SceneLocation
 from .props import StoryProp
+from .timeline import TimelineEvent, TimelineRelation, _topological_layers
 
 def _now(): return datetime.now(timezone.utc)
 def _json(v): return json.dumps(v,ensure_ascii=False,sort_keys=True,separators=(",",":"))
@@ -120,6 +121,34 @@ def review_issue(sid:str,issue_id:str,p:IssueReview,db:Session=Depends(get_db)):
     _story(db,sid);x=db.get(ContinuityIssue,issue_id)
     if not x or x.story_id!=sid: raise HTTPException(404,detail={"code":"continuity_issue_not_found"})
     x.status=p.status;x.reviewer_note=p.reviewer_note;x.reviewed_at=_now();db.commit();db.refresh(x);return _issue_out(x)
+
+
+def _timeline_cycle_details(events, relations):
+    """Return deterministic evidence for active chronology cycles, or None."""
+    active = {event.id: event for event in events if event.active}
+    edges = [
+        (relation.before_event_id, relation.after_event_id)
+        for relation in relations
+        if relation.before_event_id in active and relation.after_event_id in active
+    ]
+    _, cyclic_ids = _topological_layers(sorted(active), edges)
+    if not cyclic_ids:
+        return None
+    cycle_events = [active[event_id] for event_id in cyclic_ids]
+    return {
+        "event_ids": sorted(cyclic_ids),
+        "scene_ids": sorted({event.scene_id for event in cycle_events if event.scene_id}),
+        "events": [
+            {"id": event.id, "scene_id": event.scene_id, "title": event.title}
+            for event in sorted(cycle_events, key=lambda item: item.id)
+        ],
+        "relations": [
+            {"before_event_id": before, "after_event_id": after}
+            for before, after in sorted(edges)
+            if before in cyclic_ids and after in cyclic_ids
+        ],
+    }
+
 @router.post("/analyze")
 def analyze_continuity(sid:str,db:Session=Depends(get_db)):
     _story(db,sid)
@@ -158,6 +187,13 @@ def analyze_continuity(sid:str,db:Session=Depends(get_db)):
         if f.subject_type=="location" and (f.scene_id,f.subject_ref) not in location_links:
             details={"fact_id":f.id,"scene_id":f.scene_id,"scene_title":scene_by_id[f.scene_id].title,"location_id":f.subject_ref,"location":f.subject_label}
             add("location_not_linked_to_scene","low","Location missing scene link",f"{f.subject_label} has a continuity fact in {scene_by_id[f.scene_id].title} but is not linked to that scene.",details)
+    timeline_events=db.scalars(select(TimelineEvent).where(TimelineEvent.story_id==sid,TimelineEvent.active.is_(True))).all()
+    timeline_relations=db.scalars(select(TimelineRelation).where(TimelineRelation.story_id==sid)).all()
+    cycle_details=_timeline_cycle_details(timeline_events,timeline_relations)
+    if cycle_details:
+        add("timeline_chronology_cycle","high","Contradictory story chronology",
+            "The explicit chronology contains a cycle: at least one event is required to happen before itself.",
+            cycle_details)
     now=_now();open_ids=[];current_fingerprints={item[0] for item in detected}
     for fp,code,severity,title,description,details in detected:
         issue=db.scalar(select(ContinuityIssue).where(ContinuityIssue.story_id==sid,ContinuityIssue.fingerprint==fp))
