@@ -252,3 +252,26 @@ def ingest_generated_bytes(db: Session, project_id: str, filename: str, content:
             db.commit()
             db.refresh(link)
     return asset, link
+
+
+def resolve_project_asset_file(db: Session, project_id: str, asset_id: str):
+    """Resolve an asset only when it is linked to the requested project."""
+    from .models import Asset, ProjectAsset
+    if db.get(Project, project_id) is None:
+        raise HTTPException(404, detail={"code": "project_not_found"})
+    row = db.execute(
+        select(Asset, ProjectAsset).join(ProjectAsset, ProjectAsset.asset_id == Asset.id)
+        .where(ProjectAsset.project_id == project_id, ProjectAsset.asset_id == asset_id)
+    ).first()
+    if row is None:
+        raise HTTPException(404, detail={"code": "project_asset_not_found"})
+    asset, link = row
+    path = blob_path(asset.sha256)
+    if not path.is_file() or path.is_symlink():
+        raise HTTPException(404, detail={"code": "asset_file_missing"})
+    try:
+        if path.stat().st_size != asset.size_bytes:
+            raise HTTPException(409, detail={"code": "asset_size_mismatch"})
+    except OSError:
+        raise HTTPException(404, detail={"code": "asset_file_missing"})
+    return asset, link, path

@@ -41,16 +41,21 @@ def _validate_evidence(scene, excerpt, source_start=None, source_end=None):
 
 def _shot_data(db, shot):
     takes=db.scalars(select(StoryboardTake).where(StoryboardTake.shot_id==shot.id).order_by(StoryboardTake.take_number)).all()
+    take_items=[]
+    for take in takes:
+        asset=db.get(Asset,take.asset_id)
+        take_items.append({"id":take.id,"take_number":take.take_number,"asset_id":take.asset_id,
+          "asset_sha256":take.asset_sha256,"asset_mime_type":asset.mime_type if asset else None,
+          "status":take.status,"engine_key":take.engine_key,"engine_job_id":take.engine_job_id,
+          "prompt_snapshot":take.prompt_snapshot,"generation_metadata":_decode(take.generation_metadata_json,{}),
+          "review_note":take.review_note,"created_at":take.created_at})
     return {"id":shot.id,"story_id":shot.story_id,"scene_id":shot.scene_id,"position":shot.position,
       "title":shot.title,"description":shot.description,"shot_size":shot.shot_size,"camera_angle":shot.camera_angle,
       "camera_movement":shot.camera_movement,"lens":shot.lens,"composition":shot.composition,"action":shot.action,
       "dialogue":shot.dialogue,"duration_seconds":float(shot.duration_seconds),"transition":shot.transition,"prompt":shot.prompt,
       "source_excerpt":shot.source_excerpt,"source_start":shot.source_start,"source_end":shot.source_end,
       "continuity_notes":shot.continuity_notes,"entity_refs":_decode(shot.entity_refs_json,[]),
-      "approved_take_id":shot.approved_take_id,"version":shot.version,
-      "takes":[{"id":t.id,"take_number":t.take_number,"asset_id":t.asset_id,"asset_sha256":t.asset_sha256,
-        "status":t.status,"engine_key":t.engine_key,"engine_job_id":t.engine_job_id,"prompt_snapshot":t.prompt_snapshot,
-        "generation_metadata":_decode(t.generation_metadata_json,{}),"review_note":t.review_note,"created_at":t.created_at} for t in takes],
+      "approved_take_id":shot.approved_take_id,"version":shot.version,"takes":take_items,
       "created_at":shot.created_at,"updated_at":shot.updated_at}
 
 def list_shots(db:Session,story_id:str,scene_id:str):

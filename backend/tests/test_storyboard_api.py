@@ -208,3 +208,58 @@ def test_storyboard_ai_prompt_apply_rejects_stale_shot_version(client):
     )
     assert response.status_code == 409
     assert response.json()["detail"]["code"] == "storyboard_shot_version_conflict"
+
+
+def test_storyboard_image_generation_task_is_review_first_and_version_bound(client):
+    _, story, scene = _story_with_scene(client, "Storyboard image task")
+    base = f"/api/v1/stories/{story['id']}"
+    shot = client.post(f"{base}/storyboard/shots", json=_shot_payload(scene["id"], "Doorway image")).json()
+    patched = client.patch(
+        f"{base}/storyboard/shots/{shot['id']}",
+        json={"expected_version": 1, "prompt": "Cinematic medium shot, warm practical light."},
+    )
+    assert patched.status_code == 200
+    queued = client.post(
+        f"{base}/storyboard/shots/{shot['id']}/image-tasks",
+        headers={"Idempotency-Key": "storyboard-image-0001"},
+        json={"workflow_id": "checkpoint-basic-v1", "width": 1280, "height": 720, "seed": 77},
+    )
+    assert queued.status_code == 201
+    task = queued.json()
+    assert task["task_type"] == "storyboard.generate_image"
+    assert task["status"] == "queued"
+    assert task["payload"]["snapshot"]["shot_version"] == 2
+    assert task["payload"]["snapshot"]["prompt"] == "Cinematic medium shot, warm practical light."
+    assert task["payload"]["snapshot"]["seed"] == 77
+    assert task["payload"]["snapshot"]["width"] == 1280
+
+
+def test_storyboard_image_generation_requires_existing_prompt_and_valid_workflow(client):
+    _, story, scene = _story_with_scene(client, "Storyboard image validation")
+    base = f"/api/v1/stories/{story['id']}"
+    shot = client.post(f"{base}/storyboard/shots", json=_shot_payload(scene["id"], "No prompt yet")).json()
+    response = client.post(
+        f"{base}/storyboard/shots/{shot['id']}/image-tasks",
+        headers={"Idempotency-Key": "storyboard-image-0002"},
+        json={"workflow_id": "checkpoint-basic-v1"},
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "storyboard_prompt_required"
+
+
+def test_generated_image_bytes_are_project_scoped_and_previewable(client):
+    project, _, _ = _story_with_scene(client, "Generated asset storage")
+    from backend.app.storage import ingest_generated_bytes
+    png = b"\\x89PNG\\r\\n\\x1a\\n" + b"storyforge-test"
+    with client.testing_session() as db:
+        asset, _ = ingest_generated_bytes(db, project["id"], "generated.png", png)
+        asset_id = asset.id
+    response = client.get(
+        f"/api/v1/projects/{project['id']}/assets/{asset_id}/file?preview=true"
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("image/png")
+    assert response.content == png
+    assert client.get(
+        f"/api/v1/projects/00000000-0000-0000-0000-000000000000/assets/{asset_id}/file"
+    ).status_code == 404

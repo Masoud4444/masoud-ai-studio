@@ -470,7 +470,7 @@ export function SettingsPanel(){
 }
 
 
-type StoryboardTakeRecord={id:string;take_number:number;asset_id:string;asset_sha256:string;status:string;engine_key:string;prompt_snapshot:string|null;review_note:string|null};
+type StoryboardTakeRecord={id:string;take_number:number;asset_id:string;asset_sha256:string;asset_mime_type?:string|null;status:string;engine_key:string;prompt_snapshot:string|null;review_note:string|null};
 type StoryboardShotRecord={id:string;scene_id:string;position:number;title:string;description:string;shot_size:string;camera_angle:string;camera_movement:string;lens:string|null;composition:string|null;action:string|null;dialogue:string|null;duration_seconds:number;source_excerpt:string;source_start:number|null;source_end:number|null;prompt:string|null;continuity_notes:string|null;approved_take_id:string|null;version:number;takes:StoryboardTakeRecord[]};
 type StoryboardSceneOption={id:string;title:string;body?:string|null;summary?:string|null};
 
@@ -490,6 +490,10 @@ function StoryboardPanel({storyId,storyVersion,projectId,scenes}:{storyId:string
  const [promptModel,setPromptModel]=useState("");
  const [creativeDirection,setCreativeDirection]=useState("");
  const [promptTaskByShot,setPromptTaskByShot]=useState<Record<string,{id:string;status:string;result?:{prompt?:string}}>>({});
+ const [imageTaskByShot,setImageTaskByShot]=useState<Record<string,{id:string;status:string;progress_percent?:number;result?:{take_id?:string;asset_id?:string;asset_sha256?:string}}>>({});
+ const [imageWidth,setImageWidth]=useState("1024");
+ const [imageHeight,setImageHeight]=useState("1024");
+ const [imageNegativePrompt,setImageNegativePrompt]=useState("text, watermark, low quality, blurry");
  const [shotDraft,setShotDraft]=useState({title:"",source_excerpt:"",shot_size:"ms",camera_angle:"eye_level",camera_movement:"static",duration_seconds:"4",lens:"",description:"",composition:"",action:"",dialogue:"",transition:"",prompt:"",continuity_notes:""});
  const [busy,setBusy]=useState(false);
  const [loading,setLoading]=useState(false);
@@ -581,6 +585,26 @@ function StoryboardPanel({storyId,storyVersion,projectId,scenes}:{storyId:string
   }catch(e){setError(e instanceof Error?e.message:"Could not apply generated prompt");}
   finally{setBusy(false);}
  }
+ async function generateShotImage(shot:StoryboardShotRecord){
+  if(!shot.prompt?.trim())return;
+  setBusy(true);setError("");setNotice("");
+  try{
+   const task=await api<{id:string;status:string}>(`/api/v1/stories/${storyId}/storyboard/shots/${shot.id}/image-tasks`,{method:"POST",headers:{"Content-Type":"application/json","Idempotency-Key":crypto.randomUUID()},body:JSON.stringify({workflow_id:"checkpoint-basic-v1",width:Number(imageWidth),height:Number(imageHeight),negative_prompt:imageNegativePrompt})});
+   setImageTaskByShot(prev=>({...prev,[shot.id]:{id:task.id,status:task.status}}));
+   setNotice("Image generation queued through the local ComfyUI adapter. The result will be a new reviewable take.");
+  }catch(e){setError(e instanceof Error?e.message:"Could not queue image generation");}
+  finally{setBusy(false);}
+ }
+ async function refreshShotImageTask(shot:StoryboardShotRecord){
+  const current=imageTaskByShot[shot.id];if(!current)return;
+  setBusy(true);setError("");
+  try{
+   const task=await api<{id:string;status:string;progress_percent?:number;result?:{take_id?:string;asset_id?:string;asset_sha256?:string}}>(`/api/v1/tasks/${current.id}`);
+   setImageTaskByShot(prev=>({...prev,[shot.id]:{id:task.id,status:task.status,progress_percent:task.progress_percent,result:task.result}}));
+   if(task.status==="succeeded"){await loadShots();setNotice("Image generated and added as a new unapproved take. Review it before selecting or approving.");}
+  }catch(e){setError(e instanceof Error?e.message:"Could not refresh image task");}
+  finally{setBusy(false);}
+ }
  async function addTake(shot:StoryboardShotRecord){
   const assetId=assetByShot[shot.id];if(!assetId)return;
   setBusy(true);setError("");setNotice("");
@@ -606,6 +630,9 @@ function StoryboardPanel({storyId,storyVersion,projectId,scenes}:{storyId:string
   <div className="scene-editor-grid">
    <label className="field-label">AI model for shot prompts<input value={promptModel} onChange={e=>setPromptModel(e.target.value)} placeholder="Enter configured model ID"/></label>
    <label className="field-label">Creative direction<input value={creativeDirection} onChange={e=>setCreativeDirection(e.target.value)} placeholder="e.g. naturalistic, restrained, anamorphic"/></label>
+   <label className="field-label">Image width<input type="number" min="256" max="2048" step="8" value={imageWidth} onChange={e=>setImageWidth(e.target.value)}/></label>
+   <label className="field-label">Image height<input type="number" min="256" max="2048" step="8" value={imageHeight} onChange={e=>setImageHeight(e.target.value)}/></label>
+   <label className="field-label">Negative prompt<input value={imageNegativePrompt} onChange={e=>setImageNegativePrompt(e.target.value)} maxLength={6000}/></label>
   </div>
   <form className="scene-script-editor" onSubmit={createShot}>
    <div className="form-title">Plan a shot</div>
@@ -630,8 +657,9 @@ function StoryboardPanel({storyId,storyVersion,projectId,scenes}:{storyId:string
     <p>{shot.source_excerpt}</p>{shot.approved_take_id&&<small>Approved take: {shot.takes.find(t=>t.id===shot.approved_take_id)?.take_number??"selected"}</small>}
     <div className="scene-editor-actions"><button type="button" className="secondary-button" disabled={busy||!promptModel.trim()} onClick={()=>void generateShotPrompt(shot)}>Generate AI prompt</button>{promptTaskByShot[shot.id]&&<><span className="task-status task-queued">{promptTaskByShot[shot.id].status}</span><button type="button" className="secondary-button" disabled={busy} onClick={()=>void refreshPromptTask(shot)}>Check task</button>{promptTaskByShot[shot.id].result?.prompt&&<button type="button" className="primary-button" disabled={busy} onClick={()=>void applyShotPrompt(shot)}>Review & apply prompt</button>}</>}</div>
     {promptTaskByShot[shot.id]?.result?.prompt&&<label className="field-label">Generated prompt proposal<textarea rows={4} readOnly value={promptTaskByShot[shot.id].result?.prompt??""}/></label>}
+    <div className="scene-editor-actions"><button type="button" className="primary-button" disabled={busy||!shot.prompt?.trim()} onClick={()=>void generateShotImage(shot)}>Generate image take</button>{imageTaskByShot[shot.id]&&<><span className="task-status task-queued">{imageTaskByShot[shot.id].status}{typeof imageTaskByShot[shot.id].progress_percent==="number"?` · ${imageTaskByShot[shot.id].progress_percent}%`:""}</span><button type="button" className="secondary-button" disabled={busy} onClick={()=>void refreshShotImageTask(shot)}>Check image task</button></>}</div>
     <div className="scene-editor-grid"><label className="field-label">Attach existing asset as take<select value={assetByShot[shot.id]??""} onChange={e=>setAssetByShot(prev=>({...prev,[shot.id]:e.target.value}))}><option value="">Choose project asset</option>{assets.map(asset=><option key={asset.id} value={asset.asset_id}>{asset.filename}</option>)}</select></label><div className="form-foot"><button type="button" className="secondary-button" disabled={busy||!assetByShot[shot.id]} onClick={()=>void addTake(shot)}>Add take</button></div></div>
-    {shot.takes.map(take=><div className="asset-row" key={take.id}><div className="asset-main"><b>Take {take.take_number}</b><small>{take.status} · {take.asset_sha256.slice(0,12)}…</small></div>{take.status==="generated"&&<button type="button" className="secondary-button" disabled={busy} onClick={()=>void reviewTake(shot,take,"selected")}>Select</button>}{take.status==="selected"&&<button type="button" className="primary-button" disabled={busy} onClick={()=>void reviewTake(shot,take,"approved")}>Approve</button>}<button type="button" className="danger-button" disabled={busy||take.status==="rejected"} onClick={()=>void reviewTake(shot,take,"rejected")}>Reject</button></div>)}
+    {shot.takes.map(take=><div className="asset-row" key={take.id}>{take.asset_mime_type?.startsWith("image/")&&<img className="storyboard-take-preview" src={`/api/v1/projects/${projectId}/assets/${take.asset_id}/file?preview=true`} alt={`Storyboard take ${take.take_number}`}/>}<div className="asset-main"><b>Take {take.take_number}</b><small>{take.status} · {take.asset_sha256.slice(0,12)}…</small></div>{take.status==="generated"&&<button type="button" className="secondary-button" disabled={busy} onClick={()=>void reviewTake(shot,take,"selected")}>Select</button>}{take.status==="selected"&&<button type="button" className="primary-button" disabled={busy} onClick={()=>void reviewTake(shot,take,"approved")}>Approve</button>}<button type="button" className="danger-button" disabled={busy||take.status==="rejected"} onClick={()=>void reviewTake(shot,take,"rejected")}>Reject</button></div>)}
    </div></article>)}</div>}
   {editingShot&&<form className="scene-script-editor" onSubmit={saveShot}>
    <div className="form-title">Edit shot · version {editingShot.version}</div>

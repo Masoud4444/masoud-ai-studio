@@ -7,7 +7,7 @@ from .backup import BackupError, create_backup, verify_backup
 from .projects import create_project, get_project, list_projects, serialize, set_archived, update_project
 from .schemas import ProjectCreate, ProjectPage, ProjectRead, ProjectUpdate
 from .storage import (detach_project_asset, ingest_upload, list_project_assets,
-                     attach_task_artifact, list_task_artifacts, resolve_task_artifact_file)
+                     attach_task_artifact, list_task_artifacts, resolve_task_artifact_file, resolve_project_asset_file)
 from .ai_gateway import create_provider, list_providers, delete_provider, update_provider, generate_chat_completion, list_model_capabilities, update_model_capability, test_provider_connection, set_model_pricing, get_usage_summary, list_model_pricing_history
 from .gateway_schemas import ProviderCreate, ProviderRead, ProviderUpdate, ChatCompletionRequest, ChatCompletionRead, ModelCapabilityUpdate, ModelPricingUpdate
 from .task_manager import create_task, get_task, list_tasks, cancel_task, retry_task, approve_task, reject_task_approval, list_task_events
@@ -81,6 +81,22 @@ async def upload_project_asset(project_id: str, file: UploadFile = File(...), db
 @router.get("/projects/{project_id}/assets")
 def get_project_assets(project_id: str, db: Session = Depends(get_db)):
     return list_project_assets(db, project_id)
+
+@router.get("/projects/{project_id}/assets/{asset_id}/file")
+def get_project_asset_file(project_id: str, asset_id: str, preview: bool = Query(False), db: Session = Depends(get_db)):
+    asset, link, path = resolve_project_asset_file(db, project_id, asset_id)
+    previewable = asset.mime_type in {
+        "image/png", "image/jpeg", "image/gif", "image/webp",
+        "audio/mpeg", "audio/wav", "audio/ogg", "audio/flac",
+        "video/mp4", "video/webm",
+    }
+    disposition = "inline" if preview and previewable else "attachment"
+    return FileResponse(
+        path, media_type=asset.mime_type, filename=link.original_filename,
+        content_disposition_type=disposition,
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+    )
+
 
 @router.delete("/projects/{project_id}/assets/{link_id}", status_code=204)
 def delete_project_asset(project_id: str, link_id: str, db: Session = Depends(get_db)):

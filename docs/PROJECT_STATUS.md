@@ -343,3 +343,13 @@ Never infer one status from another.
 - Approved scenes are appended, not substituted for existing work. Story logline/synopsis are updated and a new immutable revision is saved.
 - Application is one-time: a conditional task-result update claims the proposal, and the applied marker plus story revision are committed in the same database transaction, preventing duplicate scene insertion on repeated requests. The proposal is also bound to the exact story version used when generation started; stale proposals are rejected.
 - A 500-scene cap prevents oversized generated outlines from overwhelming a project.
+
+
+## Storyboard and first media-engine adapter (2026-11-22)
+
+- Storyboard shot editing/reordering and review-first AI prompt generation are implemented on the development branch.
+- Added a local ComfyUI image-generation adapter using the existing worker/task lifecycle, versioned server-owned workflow pack, project Asset storage, and generated StoryboardTake records.
+- Added a project-scoped asset preview endpoint and image previews for Storyboard takes.
+- The ComfyUI adapter is optional and disabled until the local worker and ComfyUI/checkpoint settings are configured. No remote URL or arbitrary workflow JSON is accepted from the client.
+- Targeted tests cover workflow mapping, output locator safety, task creation, prompt/version requirements, and project-scoped generated asset access. CI evidence is pending for the current branch head.
+- This is the first real image-engine integration, not completion of video/audio generation, Animatic rendering, editing, QA, publishing, or desktop/Android clients.

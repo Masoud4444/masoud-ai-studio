@@ -109,3 +109,19 @@ Build frontend with npm run build.
 - AI Gateway: docs/AI_GATEWAY.md
 - Agent Manager: docs/AGENT_MANAGER.md
 - Research Vault: docs/RESEARCH_VAULT.md
+
+
+## Local ComfyUI storyboard image generation (optional)
+
+Storyboard image generation is an optional local adapter. It reuses the central Task Manager, Worker Supervisor, project-scoped content-addressed Asset storage, and the existing human-reviewed Storyboard Take lifecycle. No second queue or asset database is introduced.
+
+1. Install and start ComfyUI separately on the same machine, bound to loopback (default `http://127.0.0.1:8188`).
+2. Place a compatible checkpoint in ComfyUI's model directory.
+3. Configure these environment values for the backend process:
+   - `MASOUD_STUDIO_WORKER_ENABLED=true`
+   - `MASOUD_STUDIO_COMFYUI_URL=http://127.0.0.1:8188`
+   - `MASOUD_STUDIO_COMFYUI_CHECKPOINT=your-checkpoint-filename.safetensors`
+4. Restart the backend. The runtime diagnostics endpoint should report the worker as running and list `storyboard.generate_image` among registered handlers.
+5. In Storyboard, create or generate a shot prompt, then choose **Generate image take**. The generated image is stored in the project's asset library as a new unapproved take.
+
+The first adapter version intentionally accepts loopback ComfyUI only. It pins DNS resolution to loopback, disables proxy inheritance and redirects, bounds polling and output size, validates returned image bytes and output locators, and never accepts an arbitrary provider URL or workflow graph from the browser. The versioned workflow pack uses ComfyUI core nodes and requires a compatible checkpoint. Video generation, remote engines, live previews, and custom-node workflow packs remain separate future adapters.
