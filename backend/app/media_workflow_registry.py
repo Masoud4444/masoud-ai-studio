@@ -9,43 +9,20 @@ from .ai_gateway import _PinnedResolver, _resolve_provider_addresses
 from fastapi import HTTPException
 
 
-def _effective_model_value(kind: str, class_type: str, field: str, default: object) -> object:
-    """Return the model filename the worker will actually pass to ComfyUI."""
-    setting = None
-    if kind == "text_to_image" and class_type == "CheckpointLoaderSimple" and field == "ckpt_name":
-        setting = "MASOUD_STUDIO_COMFYUI_CHECKPOINT"
-    elif kind == "image_to_video":
-        setting = {
-            ("UNETLoader", "unet_name"): "MASOUD_STUDIO_COMFYUI_VIDEO_UNET",
-            ("CLIPLoader", "clip_name"): "MASOUD_STUDIO_COMFYUI_VIDEO_CLIP",
-            ("VAELoader", "vae_name"): "MASOUD_STUDIO_COMFYUI_VIDEO_VAE",
-            ("CLIPVisionLoader", "clip_name"): "MASOUD_STUDIO_COMFYUI_VIDEO_CLIP_VISION",
-        }.get((class_type, field))
-    if setting is None:
-        return default
-    configured = __import__("os").getenv(setting, "").strip()
-    # Image generation requires an explicit checkpoint; video settings may
-    # safely fall back to the versioned workflow pack defaults.
-    if kind == "text_to_image":
-        return configured or None
-    return configured or default
-
-
 def _entry(pack: dict, workflow_id: str, kind: str) -> dict:
     graph = pack.get("workflow") or {}
+    model_fields = {"ckpt_name", "unet_name", "clip_name", "vae_name"}
     models, nodes = set(), set()
     for node in graph.values():
         if not isinstance(node, dict):
             continue
-        class_type = node.get("class_type")
-        if isinstance(class_type, str):
-            nodes.add(class_type)
+        if isinstance(node.get("class_type"), str):
+            nodes.add(node["class_type"])
         inputs = node.get("inputs")
         if isinstance(inputs, dict):
             for key, value in inputs.items():
-                effective = _effective_model_value(kind, str(class_type or ""), key, value)
-                if key in {"ckpt_name", "unet_name", "clip_name", "vae_name"} and isinstance(effective, str) and effective:
-                    models.add(effective)
+                if key in model_fields and isinstance(value, str) and value:
+                    models.add(value)
     return {
         "workflow_id": workflow_id, "version": str(pack.get("version", "1.0.0")),
         "engine": str(pack.get("engine", "comfyui")), "kind": kind,
@@ -138,16 +115,15 @@ async def check_workflow_compatibility(workflow_id: str, kind: str) -> dict:
             if isinstance(fields, dict):
                 choices_by_field.update(fields)
         node_inputs = node.get("inputs") or {}
-        for field, default_value in node_inputs.items():
-            if isinstance(default_value, list) and len(default_value) == 2 and isinstance(default_value[0], str):
-                continue
-            value = _effective_model_value(kind, str(class_type or ""), field, default_value)
-            if field in model_fields and value is None:
-                missing_models.add("MASOUD_STUDIO_COMFYUI_CHECKPOINT (not configured)")
+        for field, value in node_inputs.items():
+            if isinstance(value, list) and len(value) == 2 and isinstance(value[0], str):
                 continue
             field_schema = choices_by_field.get(field)
             if not isinstance(field_schema, list) or not field_schema:
-                unsupported_inputs.add(f"{class_type}.{field}")
+                if field in model_fields:
+                    missing_models.add(str(value))
+                else:
+                    unsupported_inputs.add(f"{class_type}.{field}")
                 continue
             choices = field_schema[0]
             if isinstance(choices, list) and value not in choices:
@@ -155,8 +131,6 @@ async def check_workflow_compatibility(workflow_id: str, kind: str) -> dict:
                     missing_models.add(str(value))
                 else:
                     unsupported_inputs.add(f"{class_type}.{field}={value}")
-            elif field in model_fields and not isinstance(choices, list):
-                unsupported_inputs.add(f"{class_type}.{field} (model inventory unavailable)")
 
     system = stats.get("system") if isinstance(stats, dict) else {}
     devices = []

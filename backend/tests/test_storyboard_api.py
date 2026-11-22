@@ -210,7 +210,13 @@ def test_storyboard_ai_prompt_apply_rejects_stale_shot_version(client):
     assert response.json()["detail"]["code"] == "storyboard_shot_version_conflict"
 
 
-def test_storyboard_image_generation_task_is_review_first_and_version_bound(client):
+def test_storyboard_image_generation_task_is_review_first_and_version_bound(client, monkeypatch):
+    from backend.app import api as api_module
+
+    async def compatible_workflow(_workflow_id, _kind):
+        return {"compatible": True}
+
+    monkeypatch.setattr(api_module, "check_workflow_compatibility", compatible_workflow)
     _, story, scene = _story_with_scene(client, "Storyboard image task")
     base = f"/api/v1/stories/{story['id']}"
     shot = client.post(f"{base}/storyboard/shots", json=_shot_payload(scene["id"], "Doorway image")).json()

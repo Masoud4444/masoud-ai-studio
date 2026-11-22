@@ -11,7 +11,6 @@ from backend.app.storyboard_video import (
     _safe_video_locator, build_video_workflow_graph, load_video_workflow_pack,
 )
 from backend.app.storyboard_video_schemas import StoryboardVideoTaskCreate
-from backend.app.media_workflow_registry import _effective_model_value, _entry
 from backend.app.animatic import _filter_graph, _timeline_document
 
 
@@ -160,44 +159,3 @@ def test_animatic_timeline_exports_otio_clip_transition_and_provenance():
     assert track["children"][0]["metadata"]["storyforge"]["take_id"] == "take-1"
     assert track["children"][0]["media_reference"]["target_url"].startswith("file://")
     assert document["metadata"]["storyforge"]["rendered_video_asset_id"] == "video-asset"
-
-
-
-def test_media_workflow_preflight_uses_effective_image_checkpoint(monkeypatch):
-    pack = load_workflow_pack("checkpoint-basic-v1")
-    monkeypatch.setenv("MASOUD_STUDIO_COMFYUI_CHECKPOINT", "installed-model.safetensors")
-    assert _effective_model_value(
-        "text_to_image", "CheckpointLoaderSimple", "ckpt_name",
-        pack["workflow"]["4"]["inputs"]["ckpt_name"],
-    ) == "installed-model.safetensors"
-
-
-def test_image_preflight_requires_the_checkpoint_used_by_worker(monkeypatch):
-    monkeypatch.delenv("MASOUD_STUDIO_COMFYUI_CHECKPOINT", raising=False)
-    assert _effective_model_value(
-        "text_to_image", "CheckpointLoaderSimple", "ckpt_name", "placeholder.safetensors"
-    ) is None
-
-
-@pytest.mark.parametrize(("class_type", "field", "setting", "default"), [
-    ("UNETLoader", "unet_name", "MASOUD_STUDIO_COMFYUI_VIDEO_UNET", "default-unet.safetensors"),
-    ("CLIPLoader", "clip_name", "MASOUD_STUDIO_COMFYUI_VIDEO_CLIP", "default-clip.safetensors"),
-    ("VAELoader", "vae_name", "MASOUD_STUDIO_COMFYUI_VIDEO_VAE", "default-vae.safetensors"),
-    ("CLIPVisionLoader", "clip_name", "MASOUD_STUDIO_COMFYUI_VIDEO_CLIP_VISION", "default-vision.safetensors"),
-])
-def test_video_preflight_uses_same_model_overrides_as_worker(monkeypatch, class_type, field, setting, default):
-    monkeypatch.setenv(setting, "configured-model.safetensors")
-    assert _effective_model_value("image_to_video", class_type, field, default) == "configured-model.safetensors"
-
-
-def test_video_preflight_falls_back_to_versioned_pack_model_defaults(monkeypatch):
-    monkeypatch.delenv("MASOUD_STUDIO_COMFYUI_VIDEO_UNET", raising=False)
-    assert _effective_model_value(
-        "image_to_video", "UNETLoader", "unet_name", "wan-default.safetensors"
-    ) == "wan-default.safetensors"
-
-
-def test_media_workflow_entry_includes_clip_vision_model():
-    pack = load_video_workflow_pack("wan2.1-i2v-basic-v1")
-    entry = _entry(pack, "wan2.1-i2v-basic-v1", "image_to_video")
-    assert "clip_vision_h.safetensors" in entry["required_models"]

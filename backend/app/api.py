@@ -37,7 +37,7 @@ from .story_generation import (create_story_outline_task, apply_story_outline_ta
 from .storyboard_schemas import StoryboardShotCreate, StoryboardShotUpdate, StoryboardReorder, StoryboardTakeCreate, StoryboardTakeReview, StoryboardPromptTaskCreate, StoryboardPromptApply, StoryboardImageTaskCreate
 from .storyboard_engine import list_shots, create_shot, update_shot, reorder_shots, create_take, review_take
 from .storyboard_generation import create_storyboard_prompt_task, apply_storyboard_prompt
-from .storyboard_media import create_storyboard_image_task
+from .storyboard_media import create_storyboard_image_task, prepare_storyboard_image_task
 from .animatic_schemas import AnimaticTaskCreate
 from .animatic import create_animatic_task
 from .storyboard_video_schemas import StoryboardVideoTaskCreate
@@ -855,10 +855,13 @@ async def post_storyboard_image_task(
     idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=8, max_length=200),
     db: Session = Depends(get_db),
 ): 
+    validated_snapshot = prepare_storyboard_image_task(db, story_id, shot_id, payload)
     check = await check_workflow_compatibility(payload.workflow_id, "text_to_image")
     if not check.get("compatible"):
         raise HTTPException(409, detail={"code": "media_workflow_incompatible", "compatibility": check})
-    return create_storyboard_image_task(db, story_id, shot_id, payload, idempotency_key)
+    return create_storyboard_image_task(
+        db, story_id, shot_id, payload, idempotency_key, validated_snapshot=validated_snapshot
+    )
 
 
 

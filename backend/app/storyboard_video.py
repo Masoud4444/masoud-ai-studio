@@ -24,7 +24,7 @@ from .storyboard_video_schemas import StoryboardVideoTaskCreate
 VIDEO_WORKFLOW_DIR = Path(__file__).resolve().parents[1] / "workflows" / "comfyui" / "video"
 MAX_START_IMAGE_BYTES = 30 * 1024 * 1024
 MAX_VIDEO_OUTPUT_BYTES = 100 * 1024 * 1024
-_VIDEO_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,79}$")
+_VIDEO_ID = re.compile(r"^[a-z0-9][a-z0-9.-]{0,78}[a-z0-9]$")
 
 
 class StoryboardVideoError(RuntimeError):
