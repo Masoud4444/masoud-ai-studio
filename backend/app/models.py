@@ -414,7 +414,7 @@ class StoryboardShot(Base):
     source_end: Mapped[int | None] = mapped_column(Integer, nullable=True)
     continuity_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     entity_refs_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
-    approved_take_id: Mapped[str | None] = mapped_column(ForeignKey("storyboard_takes.id", ondelete="RESTRICT"), nullable=True)
+    approved_take_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
