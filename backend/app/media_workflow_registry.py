@@ -6,6 +6,7 @@ import json
 from .storyboard_media import WORKFLOW_DIR, ComfyUIClient, load_workflow_pack
 from .storyboard_video import VIDEO_WORKFLOW_DIR, load_video_workflow_pack
 from .ai_gateway import _PinnedResolver, _resolve_provider_addresses
+from fastapi import HTTPException
 
 
 def _entry(pack: dict, workflow_id: str, kind: str) -> dict:
@@ -86,7 +87,7 @@ async def check_workflow_compatibility(workflow_id: str, kind: str) -> dict:
                             "engine_available": True, "error": "comfyui_object_info_too_large",
                             "missing_nodes": [], "missing_models": [], "unsupported_inputs": []}
                 object_info = json.loads(raw_info)
-    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
+    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, OSError, HTTPException):
         return {"workflow_id": workflow_id, "kind": kind, "compatible": False,
                 "engine_available": False, "error": "comfyui_connection_failed",
                 "missing_nodes": [], "missing_models": [], "unsupported_inputs": []}
