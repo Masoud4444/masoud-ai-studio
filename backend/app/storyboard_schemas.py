@@ -77,3 +77,14 @@ class StoryboardTakeCreate(BaseModel):
 class StoryboardTakeReview(BaseModel):
     status: Literal["selected", "approved", "rejected"]
     review_note: str | None = Field(default=None, max_length=2000)
+
+class StoryboardPromptTaskCreate(BaseModel):
+    model: str = Field(min_length=1, max_length=160)
+    provider_id: str | None = Field(default=None, min_length=1, max_length=120)
+    creative_direction: str = Field(default="", max_length=6000)
+    temperature: float = Field(default=0.5, ge=0, le=2)
+    max_tokens: int = Field(default=1600, ge=128, le=6000)
+
+
+class StoryboardPromptApply(BaseModel):
+    expected_version: int = Field(ge=1)
