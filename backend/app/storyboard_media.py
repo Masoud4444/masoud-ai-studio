@@ -151,9 +151,8 @@ class ComfyUIClient:
         raise TimeoutError("ComfyUI generation timed out")
 
 
-def prepare_storyboard_image_task(db: Session, story_id: str, shot_id: str,
-                                   payload: StoryboardImageTaskCreate) -> dict:
-    """Validate the request and freeze the exact shot/workflow snapshot before engine preflight."""
+def create_storyboard_image_task(db: Session, story_id: str, shot_id: str,
+                                 payload: StoryboardImageTaskCreate, idempotency_key: str) -> dict:
     story = db.get(Story, story_id)
     if story is None:
         raise HTTPException(404, detail={"code": "story_not_found"})
@@ -173,7 +172,7 @@ def prepare_storyboard_image_task(db: Session, story_id: str, shot_id: str,
         pack = load_workflow_pack(payload.workflow_id)
     except ValueError as exc:
         raise HTTPException(422, detail={"code": "workflow_pack_invalid", "message": str(exc)}) from None
-    return {
+    snapshot = {
         "story_id": story_id, "project_id": story.project_id, "shot_id": shot.id,
         "shot_version": shot.version, "scene_id": scene.id, "workflow_id": payload.workflow_id,
         "workflow_version": pack.get("version", "1.0.0"), "prompt": prompt,
@@ -181,18 +180,13 @@ def prepare_storyboard_image_task(db: Session, story_id: str, shot_id: str,
         "steps": payload.steps, "cfg": payload.cfg, "seed": payload.seed,
         "shot_title": shot.title, "source_excerpt": shot.source_excerpt,
     }
-
-
-def create_storyboard_image_task(db: Session, story_id: str, shot_id: str,
-                                 payload: StoryboardImageTaskCreate, idempotency_key: str,
-                                 validated_snapshot: dict | None = None) -> dict:
-    snapshot = validated_snapshot or prepare_storyboard_image_task(db, story_id, shot_id, payload)
     return create_task(
         db, task_type="storyboard.generate_image", payload={"snapshot": snapshot},
-        idempotency_key=idempotency_key, project_id=snapshot["project_id"],
+        idempotency_key=idempotency_key, project_id=story.project_id,
         execution_mode="local", estimated_duration_seconds=180,
         max_attempts=2,
     )
+
 
 def build_storyboard_image_handler(session_factory: sessionmaker):
     def handle(payload: dict) -> dict:

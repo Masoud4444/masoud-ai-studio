@@ -269,3 +269,21 @@ def test_generated_image_bytes_are_project_scoped_and_previewable(client):
     assert client.get(
         f"/api/v1/projects/00000000-0000-0000-0000-000000000000/assets/{asset_id}/file"
     ).status_code == 404
+
+
+
+def test_storyboard_video_generation_validates_approval_before_engine_preflight(client):
+    _, story, scene = _story_with_scene(client, "Video preflight ordering")
+    base = f"/api/v1/stories/{story['id']}"
+    shot = client.post(f"{base}/storyboard/shots", json=_shot_payload(scene["id"], "Video shot")).json()
+    client.patch(
+        f"{base}/storyboard/shots/{shot['id']}",
+        json={"expected_version": 1, "prompt": "A slow camera move through the doorway."},
+    )
+    response = client.post(
+        f"{base}/storyboard/shots/{shot['id']}/video-tasks",
+        headers={"Idempotency-Key": "storyboard-video-0001"},
+        json={"workflow_id": "wan2.1-i2v-basic-v1"},
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "video_generation_requires_approved_start_image"

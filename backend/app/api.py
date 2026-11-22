@@ -41,7 +41,7 @@ from .storyboard_media import create_storyboard_image_task, prepare_storyboard_i
 from .animatic_schemas import AnimaticTaskCreate
 from .animatic import create_animatic_task
 from .storyboard_video_schemas import StoryboardVideoTaskCreate
-from .storyboard_video import create_storyboard_video_task
+from .storyboard_video import create_storyboard_video_task, prepare_storyboard_video_task
 from .media_workflow_registry import list_media_workflows, check_workflow_compatibility
 from .research_schemas import (
     ResearchSourceCreate, ResearchEvidenceCreate, ResearchClaimCreate,
@@ -871,10 +871,13 @@ async def post_storyboard_video_task(
     idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=8, max_length=200),
     db: Session = Depends(get_db),
 ): 
+    validated_snapshot = prepare_storyboard_video_task(db, story_id, shot_id, payload)
     check = await check_workflow_compatibility(payload.workflow_id, "image_to_video")
     if not check.get("compatible"):
         raise HTTPException(409, detail={"code": "media_workflow_incompatible", "compatibility": check})
-    return create_storyboard_video_task(db, story_id, shot_id, payload, idempotency_key)
+    return create_storyboard_video_task(
+        db, story_id, shot_id, payload, idempotency_key, validated_snapshot=validated_snapshot
+    )
 
 
 @router.post("/stories/{story_id}/storyboard/shots/{shot_id}/prompt-tasks", status_code=201)

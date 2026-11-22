@@ -200,16 +200,17 @@ class ComfyUIVideoClient(ComfyUIClient):
         raise StoryboardVideoError("comfyui_video_timeout", "ComfyUI video generation exceeded the time limit")
 
 
-def create_storyboard_video_task(db: Session, story_id: str, shot_id: str,
-                                 payload: StoryboardVideoTaskCreate, idempotency_key: str) -> dict:
+def prepare_storyboard_video_task(db: Session, story_id: str, shot_id: str,
+                                   payload: StoryboardVideoTaskCreate) -> dict:
+    """Validate video-generation prerequisites and freeze the approved source snapshot."""
     story = db.get(Story, story_id)
     if story is None:
         raise HTTPException(404, detail={"code": "story_not_found"})
     project = db.get(Project, story.project_id)
     if project is None:
         raise HTTPException(404, detail={"code": "project_not_found"})
-    if project.status != "active":
-        raise HTTPException(409, detail={"code": "project_archived"})
+    if project.status != "active" or story.status in {"archived", "locked"}:
+        raise HTTPException(409, detail={"code": "story_not_active"})
     shot = db.scalar(select(StoryboardShot).where(
         StoryboardShot.id == shot_id, StoryboardShot.story_id == story_id
     ))
@@ -235,7 +236,7 @@ def create_storyboard_video_task(db: Session, story_id: str, shot_id: str,
     except ValueError as exc:
         raise HTTPException(422, detail={"code": "video_workflow_pack_invalid", "message": str(exc)}) from None
     seed = payload.seed if payload.seed is not None else int.from_bytes(os.urandom(8), "big")
-    snapshot = {
+    return {
         "story_id": story.id, "project_id": story.project_id, "shot_id": shot.id,
         "shot_version": shot.version, "shot_title": shot.title, "prompt": shot.prompt,
         "negative_prompt": payload.negative_prompt, "workflow_id": payload.workflow_id,
@@ -243,12 +244,17 @@ def create_storyboard_video_task(db: Session, story_id: str, shot_id: str,
         "start_asset_id": asset.id, "start_asset_sha256": asset.sha256,
         "frames": payload.frames, "fps": payload.fps, "seed": seed,
     }
+
+
+def create_storyboard_video_task(db: Session, story_id: str, shot_id: str,
+                                 payload: StoryboardVideoTaskCreate, idempotency_key: str,
+                                 validated_snapshot: dict | None = None) -> dict:
+    snapshot = validated_snapshot or prepare_storyboard_video_task(db, story_id, shot_id, payload)
     return create_task(
         db, task_type="storyboard.generate_video", payload={"snapshot": snapshot},
-        idempotency_key=idempotency_key, project_id=story.project_id,
+        idempotency_key=idempotency_key, project_id=snapshot["project_id"],
         execution_mode="local", estimated_duration_seconds=600, max_attempts=1,
     )
-
 
 def build_storyboard_video_handler(session_factory: sessionmaker):
     def handle(payload: dict) -> dict:

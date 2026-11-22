@@ -2,6 +2,7 @@
 import aiohttp
 import asyncio
 import json
+import os
 
 from .storyboard_media import WORKFLOW_DIR, ComfyUIClient, load_workflow_pack
 from .storyboard_video import VIDEO_WORKFLOW_DIR, load_video_workflow_pack
