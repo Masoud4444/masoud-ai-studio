@@ -58,13 +58,9 @@ def upgrade():
     )
     op.create_index("ix_storyboard_takes_shot_id", "storyboard_takes", ["shot_id"])
     op.create_index("ix_storyboard_takes_asset_id", "storyboard_takes", ["asset_id"])
-    with op.batch_alter_table("storyboard_shots") as batch:
-        batch.create_foreign_key("fk_storyboard_approved_take", "storyboard_takes", ["approved_take_id"], ["id"], ondelete="RESTRICT")
 
 
 def downgrade():
-    with op.batch_alter_table("storyboard_shots") as batch:
-        batch.drop_constraint("fk_storyboard_approved_take", type_="foreignkey")
     op.drop_index("ix_storyboard_takes_asset_id", table_name="storyboard_takes")
     op.drop_index("ix_storyboard_takes_shot_id", table_name="storyboard_takes")
     op.drop_table("storyboard_takes")
