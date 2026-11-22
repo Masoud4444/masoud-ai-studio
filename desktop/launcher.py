@@ -135,15 +135,35 @@ def _tray_image():
     return image
 
 
+def _configure_bootstrap_logging() -> Path:
+    """Create a diagnostic log before any fallible desktop initialization."""
+    base = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "Masoud AI Studio" / "logs"
+    base.mkdir(parents=True, exist_ok=True)
+    log_file = base / "studio.log"
+    logging.basicConfig(
+        handlers=[RotatingFileHandler(log_file, maxBytes=2_000_000, backupCount=3, encoding="utf-8")],
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        force=True,
+    )
+    return log_file
+
+
 def main() -> int:
     if os.name != "nt":
         raise RuntimeError("The packaged desktop launcher currently supports Windows only.")
-    app_data = _configure_environment()
+    _configure_bootstrap_logging()
+    try:
+        app_data = _configure_environment()
+    except Exception:
+        logging.exception("Desktop environment initialization failed before application startup.")
+        return 1
     log_file = app_data / "logs" / "studio.log"
     logging.basicConfig(
         handlers=[RotatingFileHandler(log_file, maxBytes=2_000_000, backupCount=3, encoding="utf-8")],
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        force=True,
     )
     root = _resource_root()
     os.chdir(root)
