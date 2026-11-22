@@ -121,11 +121,11 @@ def test_timeline_cycle_details_handles_timelines_beyond_recursion_limit():
         for index in range(len(event_ids) - 1)
     ]
     relations.append(
-        SimpleNamespace(before_event_id=event_ids[-1], after_event_id=event_ids[-2])
+        SimpleNamespace(before_event_id=event_ids[-1], after_event_id=event_ids[0])
     )
 
     details = _timeline_cycle_details(events, relations)
 
     assert details is not None
-    assert details["event_ids"] == event_ids[1:]
-    assert len(details["relations"]) == len(event_ids) - 1
+    assert details["event_ids"] == event_ids
+    assert len(details["relations"]) == len(event_ids)
