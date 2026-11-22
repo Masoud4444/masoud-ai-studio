@@ -280,9 +280,9 @@ def build_animatic_handler(session_factory: sessionmaker):
                 staged = workdir / f"shot-{index:03d}{source_path.suffix.lower() or '.img'}"
                 shutil.copyfile(source_path, staged)
                 if shot["asset_mime_type"].startswith("video/"):
-                input_args.extend(["-stream_loop", "-1", "-i", str(staged)])
-            else:
-                input_args.extend(["-loop", "1", "-framerate", str(fps), "-i", str(staged)])
+                    input_args.extend(["-stream_loop", "-1", "-i", str(staged)])
+                else:
+                    input_args.extend(["-loop", "1", "-framerate", str(fps), "-i", str(staged)])
             graph, output_label, output_duration = _filter_graph(snapshot["shots"], fps, width, height)
             filter_script = workdir / "filters.txt"
             filter_script.write_text(graph, encoding="utf-8")
