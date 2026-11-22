@@ -850,21 +850,27 @@ def post_storyboard_reorder(story_id: str, scene_id: str, payload: StoryboardReo
     return reorder_shots(db, story_id, scene_id, payload.expected_story_version, payload.shot_ids)
 
 @router.post("/stories/{story_id}/storyboard/shots/{shot_id}/image-tasks", status_code=201)
-def post_storyboard_image_task(
+async def post_storyboard_image_task(
     story_id: str, shot_id: str, payload: StoryboardImageTaskCreate,
     idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=8, max_length=200),
     db: Session = Depends(get_db),
-):
+): 
+    check = await check_workflow_compatibility(payload.workflow_id, "text_to_image")
+    if not check.get("compatible"):
+        raise HTTPException(409, detail={"code": "media_workflow_incompatible", "compatibility": check})
     return create_storyboard_image_task(db, story_id, shot_id, payload, idempotency_key)
 
 
 
 @router.post("/stories/{story_id}/storyboard/shots/{shot_id}/video-tasks", status_code=201)
-def post_storyboard_video_task(
+async def post_storyboard_video_task(
     story_id: str, shot_id: str, payload: StoryboardVideoTaskCreate,
     idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=8, max_length=200),
     db: Session = Depends(get_db),
-):
+): 
+    check = await check_workflow_compatibility(payload.workflow_id, "image_to_video")
+    if not check.get("compatible"):
+        raise HTTPException(409, detail={"code": "media_workflow_incompatible", "compatibility": check})
     return create_storyboard_video_task(db, story_id, shot_id, payload, idempotency_key)
 
 

@@ -1,6 +1,7 @@
 """Registry and live compatibility checks for installed ComfyUI workflow packs."""
 import aiohttp
 import asyncio
+import json
 
 from .storyboard_media import WORKFLOW_DIR, ComfyUIClient, load_workflow_pack
 from .storyboard_video import VIDEO_WORKFLOW_DIR, load_video_workflow_pack
@@ -62,11 +63,11 @@ async def check_workflow_compatibility(workflow_id: str, kind: str) -> dict:
                 "engine_available": False, "error": "workflow_pack_invalid",
                 "missing_nodes": [], "missing_models": [], "unsupported_inputs": []}
 
-    client = ComfyUIClient()
-    pinned = await _resolve_provider_addresses(client.host, client.port, allow_local=True)
-    connector = aiohttp.TCPConnector(resolver=_PinnedResolver(pinned), use_dns_cache=False)
-    timeout = aiohttp.ClientTimeout(total=20, connect=5, sock_read=12)
     try:
+        client = ComfyUIClient()
+        pinned = await _resolve_provider_addresses(client.host, client.port, allow_local=True)
+        connector = aiohttp.TCPConnector(resolver=_PinnedResolver(pinned), use_dns_cache=False)
+        timeout = aiohttp.ClientTimeout(total=20, connect=5, sock_read=12)
         async with aiohttp.ClientSession(connector=connector, timeout=timeout, trust_env=False) as session:
             async with session.get(client.base_url + "/system_stats", allow_redirects=False) as response:
                 if response.status != 200:
@@ -84,7 +85,7 @@ async def check_workflow_compatibility(workflow_id: str, kind: str) -> dict:
                     return {"workflow_id": workflow_id, "kind": kind, "compatible": False,
                             "engine_available": True, "error": "comfyui_object_info_too_large",
                             "missing_nodes": [], "missing_models": [], "unsupported_inputs": []}
-                object_info = __import__("json").loads(raw_info)
+                object_info = json.loads(raw_info)
     except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
         return {"workflow_id": workflow_id, "kind": kind, "compatible": False,
                 "engine_available": False, "error": "comfyui_connection_failed",
