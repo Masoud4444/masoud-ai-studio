@@ -34,9 +34,10 @@ from .story_schemas import (StoryCreate, StoryUpdate, StorySceneCreate, StorySce
 from .story_generation import (create_story_outline_task, apply_story_outline_task,
     create_story_scene_generation_task, apply_story_scene_generation_task)
 
-from .storyboard_schemas import StoryboardShotCreate, StoryboardShotUpdate, StoryboardReorder, StoryboardTakeCreate, StoryboardTakeReview, StoryboardPromptTaskCreate, StoryboardPromptApply
+from .storyboard_schemas import StoryboardShotCreate, StoryboardShotUpdate, StoryboardReorder, StoryboardTakeCreate, StoryboardTakeReview, StoryboardPromptTaskCreate, StoryboardPromptApply, StoryboardImageTaskCreate
 from .storyboard_engine import list_shots, create_shot, update_shot, reorder_shots, create_take, review_take
 from .storyboard_generation import create_storyboard_prompt_task, apply_storyboard_prompt
+from .storyboard_media import create_storyboard_image_task
 from .research_schemas import (
     ResearchSourceCreate, ResearchEvidenceCreate, ResearchClaimCreate,
     ResearchClaimEvidenceCreate, ResearchClaimUpdate,
@@ -805,6 +806,15 @@ def patch_storyboard_shot(story_id: str, shot_id: str, payload: StoryboardShotUp
 @router.post("/stories/{story_id}/scenes/{scene_id}/storyboard/reorder")
 def post_storyboard_reorder(story_id: str, scene_id: str, payload: StoryboardReorder, db: Session = Depends(get_db)):
     return reorder_shots(db, story_id, scene_id, payload.expected_story_version, payload.shot_ids)
+
+@router.post("/stories/{story_id}/storyboard/shots/{shot_id}/image-tasks", status_code=201)
+def post_storyboard_image_task(
+    story_id: str, shot_id: str, payload: StoryboardImageTaskCreate,
+    idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=8, max_length=200),
+    db: Session = Depends(get_db),
+):
+    return create_storyboard_image_task(db, story_id, shot_id, payload, idempotency_key)
+
 
 @router.post("/stories/{story_id}/storyboard/shots/{shot_id}/prompt-tasks", status_code=201)
 def post_storyboard_prompt_task(

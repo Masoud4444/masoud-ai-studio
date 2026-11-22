@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "checkpoint-basic-v1",
+  "version": "1.0.0",
+  "engine": "comfyui",
+  "description": "Checkpoint-based text-to-image workflow using ComfyUI core nodes.",
+  "output_node_ids": ["9"],
+  "workflow": {
+    "3": {"class_type": "KSampler", "inputs": {"seed": 1, "steps": 24, "cfg": 7, "sampler_name": "euler", "scheduler": "normal", "denoise": 1, "model": ["4", 0], "positive": ["6", 0], "negative": ["7", 0], "latent_image": ["5", 0]}},
+    "4": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "checkpoint.safetensors"}},
+    "5": {"class_type": "EmptyLatentImage", "inputs": {"width": 1024, "height": 1024, "batch_size": 1}},
+    "6": {"class_type": "CLIPTextEncode", "inputs": {"text": "cinematic still", "clip": ["4", 1]}},
+    "7": {"class_type": "CLIPTextEncode", "inputs": {"text": "low quality, blurry, watermark, text", "clip": ["4", 1]}},
+    "8": {"class_type": "VAEDecode", "inputs": {"samples": ["3", 0], "vae": ["4", 2]}},
+    "9": {"class_type": "SaveImage", "inputs": {"filename_prefix": "storyforge", "images": ["8", 0]}}
+  },
+  "mapping": {
+    "seed": ["3", "inputs", "seed"],
+    "steps": ["3", "inputs", "steps"],
+    "cfg": ["3", "inputs", "cfg"],
+    "checkpoint": ["4", "inputs", "ckpt_name"],
+    "width": ["5", "inputs", "width"],
+    "height": ["5", "inputs", "height"],
+    "positive_prompt": ["6", "inputs", "text"],
+    "negative_prompt": ["7", "inputs", "text"]
+  }
+}

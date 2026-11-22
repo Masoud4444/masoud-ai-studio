@@ -88,3 +88,20 @@ class StoryboardPromptTaskCreate(BaseModel):
 
 class StoryboardPromptApply(BaseModel):
     expected_version: int = Field(ge=1)
+
+
+class StoryboardImageTaskCreate(BaseModel):
+    workflow_id: str = Field(default="checkpoint-basic-v1", min_length=1, max_length=80)
+    negative_prompt: str = Field(default="", max_length=6000)
+    width: int = Field(default=1024, ge=256, le=2048)
+    height: int = Field(default=1024, ge=256, le=2048)
+    steps: int = Field(default=24, ge=1, le=80)
+    cfg: float = Field(default=7.0, ge=1, le=30)
+    seed: int | None = Field(default=None, ge=0, le=18446744073709551615)
+
+    @field_validator("width", "height")
+    @classmethod
+    def dimensions_multiple_of_eight(cls, value):
+        if value % 8:
+            raise ValueError("Image dimensions must be divisible by 8")
+        return value

@@ -187,3 +187,68 @@ def resolve_task_artifact_file(db: Session, task_id: str, artifact_id: str):
     except OSError:
         raise HTTPException(404, detail={"code": "artifact_file_missing"})
     return asset, link, path
+
+
+def ingest_generated_bytes(db: Session, project_id: str, filename: str, content: bytes):
+    """Atomically ingest bounded, verified image bytes produced by a trusted local engine."""
+    import hashlib
+    import os
+    import tempfile
+    from .models import Asset, ProjectAsset
+    if not isinstance(content, bytes) or not content or len(content) > min(MAX_UPLOAD_BYTES, 30 * 1024 * 1024):
+        raise HTTPException(413, detail={"code": "generated_asset_size_invalid"})
+    project = db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(404, detail={"code": "project_not_found"})
+    if project.status != "active":
+        raise HTTPException(409, detail={"code": "project_archived"})
+    mime = detect_mime(content[:32])
+    if mime not in {"image/png", "image/jpeg", "image/webp"}:
+        raise HTTPException(415, detail={"code": "generated_asset_type_unsupported"})
+    digest = hashlib.sha256(content).hexdigest()
+    asset = db.scalar(select(Asset).where(Asset.sha256 == digest))
+    if asset is None:
+        STORAGE_ROOT.mkdir(parents=True, exist_ok=True)
+        destination = blob_path(digest)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        fd, temporary_name = tempfile.mkstemp(prefix="generated-", suffix=".part", dir=STORAGE_ROOT)
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(fd, "wb") as output:
+                output.write(content)
+                output.flush()
+                os.fsync(output.fileno())
+            if not destination.exists():
+                os.replace(temporary, destination)
+            asset = Asset(sha256=digest, size_bytes=len(content), mime_type=mime,
+                          storage_key=f"blobs/{digest[:2]}/{digest}")
+            db.add(asset)
+            db.flush()
+        finally:
+            temporary.unlink(missing_ok=True)
+    link = db.scalar(select(ProjectAsset).where(
+        ProjectAsset.project_id == project_id, ProjectAsset.asset_id == asset.id
+    ))
+    if link is None:
+        link = ProjectAsset(project_id=project_id, asset_id=asset.id,
+                            original_filename=safe_filename(filename))
+        db.add(link)
+    try:
+        db.commit()
+        db.refresh(asset)
+        db.refresh(link)
+    except IntegrityError:
+        db.rollback()
+        asset = db.scalar(select(Asset).where(Asset.sha256 == digest))
+        if asset is None:
+            raise HTTPException(409, detail={"code": "generated_asset_conflict"})
+        link = db.scalar(select(ProjectAsset).where(
+            ProjectAsset.project_id == project_id, ProjectAsset.asset_id == asset.id
+        ))
+        if link is None:
+            link = ProjectAsset(project_id=project_id, asset_id=asset.id,
+                                original_filename=safe_filename(filename))
+            db.add(link)
+            db.commit()
+            db.refresh(link)
+    return asset, link

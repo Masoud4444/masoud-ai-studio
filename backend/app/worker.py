@@ -129,7 +129,9 @@ class WorkerSupervisor:
             payload = task.get("payload") or {}
             handler_payload = dict(payload)
             handler_payload["_studio_task"] = {"id": task["id"], "task_type": task["task_type"],
-                                                "execution_mode": task.get("execution_mode", "local")}
+                                                "execution_mode": task.get("execution_mode", "local"),
+                                                "worker_id": self.worker_id,
+                                                "remote_job_id": task.get("remote_job_id") }
             result = handler(handler_payload)
         except Exception as exc:
             heartbeat_stop.set()
