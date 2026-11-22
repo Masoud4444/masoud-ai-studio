@@ -52,7 +52,7 @@ def test_storyboard_offset_range_must_match_exact_excerpt():
     payload = StoryboardShotCreate.model_validate(_shot_payload(source_start=0, source_end=5))
     scene = SimpleNamespace(body="Mira opens the door.", summary=None, beats_json="[]")
     with pytest.raises(HTTPException) as exc:
-        _validate_evidence(scene, payload)
+        _validate_evidence(scene, payload.source_excerpt, payload.source_start, payload.source_end)
     assert exc.value.status_code == 422
     assert exc.value.detail["code"] == "source_excerpt_does_not_match_scene_range"
 
