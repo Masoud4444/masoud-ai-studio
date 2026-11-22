@@ -108,7 +108,7 @@ def test_storyboard_take_must_reference_project_asset_and_be_reviewed(client):
     ).json()
     uploaded = client.post(
         f"/api/v1/projects/{project['id']}/assets",
-        files={"file": ("frame.png", b"\\x89PNG\\r\\n\\x1a\\nframe-bytes", "image/png")},
+        files={"file": ("frame.png", b"\x89PNG\r\n\x1a\nframe-bytes", "image/png")},
     )
     assert uploaded.status_code == 201
     asset_id = uploaded.json()["asset_id"]
