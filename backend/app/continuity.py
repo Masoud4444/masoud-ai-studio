@@ -79,6 +79,14 @@ def _story(db,sid):
     return story
 def _fact_out(x):
     return {"id":x.id,"scene_id":x.scene_id,"subject_type":x.subject_type,"subject_ref":x.subject_ref,"subject_label":x.subject_label,"attribute":x.attribute,"value":x.value,"transition_note":x.transition_note,"evidence_note":x.evidence_note,"active":x.active,"version":x.version,"created_at":x.created_at}
+def _prop_subject_label(db, sid, subject_ref, subject_label):
+    if not subject_ref:
+        return subject_label.strip()
+    item = db.get(StoryProp, subject_ref)
+    if not item or item.story_id != sid:
+        raise HTTPException(404, detail={"code": "story_prop_not_found"})
+    return item.name
+
 def _issue_out(x):
     return {"id":x.id,"code":x.code,"severity":x.severity,"status":x.status,"title":x.title,"description":x.description,"details":json.loads(x.details_json),"occurrences":x.occurrences,"first_seen":x.first_seen,"last_seen":x.last_seen,"reviewer_note":x.reviewer_note}
 @router.get("/facts")
@@ -99,8 +107,7 @@ def create_fact(sid:str,p:FactIn,db:Session=Depends(get_db)):
         if not item or item.story_id!=sid: raise HTTPException(404,detail={"code":"location_not_found"})
         label=item.name
     else:
-        if p.subject_ref: raise HTTPException(422,detail={"code":"prop_reference_not_supported"})
-        label=p.subject_label.strip()
+        label=_prop_subject_label(db,sid,p.subject_ref,p.subject_label)
     x=ContinuityFact(story_id=sid,scene_id=p.scene_id,subject_type=p.subject_type,subject_ref=p.subject_ref,subject_label=label,attribute=p.attribute.strip().casefold(),value=p.value.strip(),transition_note=p.transition_note,evidence_note=p.evidence_note)
     db.add(x);db.commit();db.refresh(x);return _fact_out(x)
 @router.patch("/facts/{fact_id}")

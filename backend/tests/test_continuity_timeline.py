@@ -57,3 +57,29 @@ def test_timeline_cycle_details_excludes_events_downstream_of_cycle():
     assert details["event_ids"] == ["event-a", "event-b"]
     assert details["scene_ids"] == ["scene-a", "scene-b"]
     assert len(details["relations"]) == 2
+
+
+def test_prop_fact_uses_canonical_registry_name():
+    from backend.app.continuity import _prop_subject_label
+
+    class FakeDB:
+        def get(self, model, item_id):
+            return SimpleNamespace(id=item_id, story_id="story-1", name="The Silver Key")
+
+    assert _prop_subject_label(FakeDB(), "story-1", "prop-1", "untrusted label") == "The Silver Key"
+
+
+def test_prop_fact_rejects_reference_from_another_story():
+    import pytest
+    from fastapi import HTTPException
+    from backend.app.continuity import _prop_subject_label
+
+    class FakeDB:
+        def get(self, model, item_id):
+            return SimpleNamespace(id=item_id, story_id="story-2", name="Foreign prop")
+
+    with pytest.raises(HTTPException) as error:
+        _prop_subject_label(FakeDB(), "story-1", "prop-2", "Foreign prop")
+
+    assert error.value.status_code == 404
+    assert error.value.detail["code"] == "story_prop_not_found"
