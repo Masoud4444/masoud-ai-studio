@@ -376,3 +376,12 @@ Never infer one status from another.
 - The animatic renderer now accepts approved still-image or video takes in the same picture track and preserves the storyboard's scene/shot order, duration and supported transitions.
 - The bundled Wan 2.1 workflow uses 832×480 and bounded 33/49/73-frame outputs at 16/24 fps. Model availability, VRAM and ComfyUI version/custom-node compatibility must be verified on the user's machine.
 - This implementation is **Implemented**, not yet **Tested** or **Verified**. Automated tests and real ComfyUI generation/render validation remain deferred to the user's requested test phase.
+
+
+## Open-source adoption and production references
+
+- Added `docs/OPEN_SOURCE_CATALOG.md` as the maintained reference catalog for production-studio projects, media engines and interchange standards.
+- The catalog separates product/design references from code/dependency adoption, records license caveats, and defines a repeatable security, compatibility and provenance gate.
+- Priority patterns: workflow manifests and model requirements (OpenField/ComfyUI), take review and approval (StoryBored/Spool), OTIO interchange (OpenTimelineIO), strict preview/apply agent editing (OpenKatana/Drama Studio), deterministic media QA, and local transcription.
+- No third-party application shell, queue, database, storage layer, model weights or GPL source code has been imported by this documentation increment.
+- Automated verification is deferred to the dedicated test stage; this increment does not claim new test results.

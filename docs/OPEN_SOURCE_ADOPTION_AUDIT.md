@@ -100,3 +100,8 @@ Each step must be a vertical slice with API contract, migration safety, UI, focu
 - External repository metadata, recursive source trees, key architecture/contract documents, and representative storyboard/animatic/grounding files inspected.
 - This commit adds the adoption decision and integration guardrails only. No application behavior or database schema is changed.
 - The first functional integration should be the additive Storyboard foundation described in step 1; it must be implemented against the current code and tested before claiming completion.
+
+
+## Follow-up catalog
+
+The broader maintained reference matrix is now in [OPEN_SOURCE_CATALOG.md](OPEN_SOURCE_CATALOG.md). It adds current AI-video workstation and timeline references (Drama Studio, OpenField, OpenKatana and ComfyUI-Spool), records their licensing boundaries, and prioritizes adapter-level adoption. The original audit remains the architectural decision record for the Storyboard foundation.

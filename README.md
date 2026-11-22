@@ -99,6 +99,10 @@ Build frontend with npm run build.
 - Agent profiles start as drafts. Text-only Agent Runtime requires explicit provider/model/pricing configuration and activation; no tools are executed. Tool Broker, execution sandbox and hard runtime isolation are not complete.
 - Windows credential protection via DPAPI/OS keychain, hard worker process isolation, multi-worker coordination, backup/restore verification and independent security review remain required.
 
+## Open-source reference catalog
+
+- `docs/OPEN_SOURCE_CATALOG.md` records reviewed GitHub references, license signals, adoption priorities and the mandatory dependency-adoption gate. It distinguishes design inspiration, external-engine integration and source-code reuse.
+
 ## Project documentation
 
 - Local Windows installation: docs/INSTALLATION.md
