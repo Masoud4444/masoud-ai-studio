@@ -42,6 +42,7 @@ from .animatic_schemas import AnimaticTaskCreate
 from .animatic import create_animatic_task
 from .storyboard_video_schemas import StoryboardVideoTaskCreate
 from .storyboard_video import create_storyboard_video_task
+from .media_workflow_registry import list_media_workflows
 from .research_schemas import (
     ResearchSourceCreate, ResearchEvidenceCreate, ResearchClaimCreate,
     ResearchClaimEvidenceCreate, ResearchClaimUpdate,
@@ -296,6 +297,12 @@ def post_task_approval(task_id: str, db: Session = Depends(get_db)):
 def post_task_rejection(task_id: str, reason: str = Query("Human approval rejected", max_length=500),
                         db: Session = Depends(get_db)):
     return reject_task_approval(db, task_id, reason)
+
+
+@router.get("/media-workflows")
+def get_media_workflows():
+    """List validated installed media workflows without exposing their graphs."""
+    return list_media_workflows()
 
 
 @router.get("/production/workflows")
