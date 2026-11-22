@@ -38,6 +38,8 @@ from .storyboard_schemas import StoryboardShotCreate, StoryboardShotUpdate, Stor
 from .storyboard_engine import list_shots, create_shot, update_shot, reorder_shots, create_take, review_take
 from .storyboard_generation import create_storyboard_prompt_task, apply_storyboard_prompt
 from .storyboard_media import create_storyboard_image_task
+from .animatic_schemas import AnimaticTaskCreate
+from .animatic import create_animatic_task
 from .research_schemas import (
     ResearchSourceCreate, ResearchEvidenceCreate, ResearchClaimCreate,
     ResearchClaimEvidenceCreate, ResearchClaimUpdate,
@@ -810,6 +812,15 @@ def post_story_scene_reorder(story_id: str, payload: StorySceneReorder, db: Sess
 @router.get("/stories/{story_id}/scenes/{scene_id}/storyboard")
 def get_storyboard(story_id: str, scene_id: str, db: Session = Depends(get_db)):
     return list_shots(db, story_id, scene_id)
+
+@router.post("/stories/{story_id}/animatic-tasks", status_code=201)
+def post_storyboard_animatic_task(
+    story_id: str, payload: AnimaticTaskCreate,
+    idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    db: Session = Depends(get_db),
+):
+    return create_animatic_task(db, story_id, payload, idempotency_key)
+
 
 @router.post("/stories/{story_id}/storyboard/shots", status_code=201)
 def post_storyboard_shot(story_id: str, payload: StoryboardShotCreate, db: Session = Depends(get_db)):

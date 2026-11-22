@@ -300,6 +300,31 @@ def complete_task(db: Session, task_id: str, worker_id: str, result: dict) -> di
     if task.status != "running" or task.locked_by != worker_id or not _lease_is_valid(task):
         raise HTTPException(status_code=409, detail={"code": "task_lease_not_owned"})
     before = task.status
+    # Attach declared output assets atomically with task completion. Each asset
+    # must already belong to the task's project; arbitrary cross-project links
+    # are never accepted.
+    artifacts = result.get("artifacts", []) if isinstance(result, dict) else []
+    if artifacts:
+        if not task.project_id or not isinstance(artifacts, list) or len(artifacts) > 10:
+            raise HTTPException(status_code=409, detail={"code": "task_artifact_scope_invalid"})
+        from .models import ProjectAsset, TaskArtifact
+        for item in artifacts:
+            if not isinstance(item, dict) or not isinstance(item.get("asset_id"), str):
+                raise HTTPException(status_code=422, detail={"code": "task_artifact_invalid"})
+            asset_id = item["asset_id"]
+            filename = item.get("filename", "artifact.bin")
+            if not isinstance(filename, str) or len(filename) > 255:
+                raise HTTPException(status_code=422, detail={"code": "task_artifact_invalid"})
+            linked = db.scalar(select(ProjectAsset.id).where(
+                ProjectAsset.project_id == task.project_id, ProjectAsset.asset_id == asset_id
+            ))
+            if linked is None:
+                raise HTTPException(status_code=409, detail={"code": "task_artifact_project_scope_invalid"})
+            existing = db.scalar(select(TaskArtifact.id).where(
+                TaskArtifact.task_id == task.id, TaskArtifact.asset_id == asset_id
+            ))
+            if existing is None:
+                db.add(TaskArtifact(task_id=task.id, asset_id=asset_id, original_filename=filename[:255]))
     task.status = "succeeded"
     task.result_json = json.dumps(result, ensure_ascii=False, separators=(",", ":"))
     task.finished_at = _now()

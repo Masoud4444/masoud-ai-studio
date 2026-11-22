@@ -250,7 +250,7 @@ def test_storyboard_image_generation_requires_existing_prompt_and_valid_workflow
 def test_generated_image_bytes_are_project_scoped_and_previewable(client):
     project, _, _ = _story_with_scene(client, "Generated asset storage")
     from backend.app.storage import ingest_generated_bytes
-    png = b"\\x89PNG\\r\\n\\x1a\\n" + b"storyforge-test"
+    png = b"\x89PNG\r\n\x1a\n" + b"storyforge-test"
     with client.testing_session() as db:
         asset, _ = ingest_generated_bytes(db, project["id"], "generated.png", png)
         asset_id = asset.id

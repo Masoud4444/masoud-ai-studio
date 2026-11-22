@@ -494,12 +494,15 @@ function StoryboardPanel({storyId,storyVersion,projectId,scenes}:{storyId:string
  const [imageWidth,setImageWidth]=useState("1024");
  const [imageHeight,setImageHeight]=useState("1024");
  const [imageNegativePrompt,setImageNegativePrompt]=useState("text, watermark, low quality, blurry");
+ const [animaticTask,setAnimaticTask]=useState<{id:string;status:string;progress_percent?:number;result?:{video_asset_id?:string;timeline_asset_id?:string;duration_seconds?:number;resolution?:string;fps?:number;shot_count?:number}}|null>(null);
+ const [animaticResolution,setAnimaticResolution]=useState<"1280x720"|"1920x1080">("1280x720");
  const [shotDraft,setShotDraft]=useState({title:"",source_excerpt:"",shot_size:"ms",camera_angle:"eye_level",camera_movement:"static",duration_seconds:"4",lens:"",description:"",composition:"",action:"",dialogue:"",transition:"",prompt:"",continuity_notes:""});
  const [busy,setBusy]=useState(false);
  const [loading,setLoading]=useState(false);
  const [error,setError]=useState("");
  const [notice,setNotice]=useState("");
  const scene=scenes.find(item=>item.id===sceneId);
+ useEffect(()=>{setAnimaticTask(null);},[storyId]);
 
  async function loadShots(){
   if(!storyId||!sceneId){setShots([]);return;}
@@ -605,6 +608,27 @@ function StoryboardPanel({storyId,storyVersion,projectId,scenes}:{storyId:string
   }catch(e){setError(e instanceof Error?e.message:"Could not refresh image task");}
   finally{setBusy(false);}
  }
+ async function createAnimatic(){
+  setBusy(true);setError("");setNotice("");
+  try{
+   const [width,height]=animaticResolution.split("x").map(Number);
+   const task=await api<{id:string;status:string}>("/api/v1/stories/"+storyId+"/animatic-tasks",{method:"POST",headers:{"Content-Type":"application/json","Idempotency-Key":crypto.randomUUID()},body:JSON.stringify({width,height,fps:24})});
+   setAnimaticTask({id:task.id,status:task.status});
+   setNotice("Animatic queued from approved storyboard takes across all scenes. Unapproved takes are excluded.");
+  }catch(e){setError(e instanceof Error?e.message:"Could not queue animatic");}
+  finally{setBusy(false);}
+ }
+ async function refreshAnimaticTask(){
+  if(!animaticTask)return;
+  setBusy(true);setError("");
+  try{
+   const task=await api<{id:string;status:string;progress_percent?:number;result?:{video_asset_id?:string;timeline_asset_id?:string;duration_seconds?:number;resolution?:string;fps?:number;shot_count?:number}}>(`/api/v1/tasks/${animaticTask.id}`);
+   setAnimaticTask({id:task.id,status:task.status,progress_percent:task.progress_percent,result:task.result});
+   if(task.status==="succeeded")setNotice("Animatic rendered and saved to the project Asset Library with an OpenTimelineIO timeline.");
+   else if(task.status==="failed")setError("Animatic task failed: "+(task as any).error_code);
+  }catch(e){setError(e instanceof Error?e.message:"Could not refresh animatic task");}
+  finally{setBusy(false);}
+ }
  async function addTake(shot:StoryboardShotRecord){
   const assetId=assetByShot[shot.id];if(!assetId)return;
   setBusy(true);setError("");setNotice("");
@@ -624,6 +648,19 @@ function StoryboardPanel({storyId,storyVersion,projectId,scenes}:{storyId:string
  }
  return <section className="scene-script-editor">
   <div className="panel-list-heading"><b>Storyboard & shot planning</b><span>{shots.length} shots · {shots.reduce((sum,item)=>sum+item.duration_seconds,0).toFixed(1)} sec</span></div>
+  <div className="scene-script-editor">
+   <div className="form-title">Animatic renderer</div>
+   <p className="settings-note">Build a silent picture animatic from the approved takes in every scene. Shot order, durations and supported transitions are preserved. Unapproved or stale takes are never rendered.</p>
+   <div className="scene-editor-actions">
+    <label className="field-label">Output resolution<select value={animaticResolution} onChange={e=>setAnimaticResolution(e.target.value as "1280x720"|"1920x1080")}><option value="1280x720">HD · 1280 × 720</option><option value="1920x1080">Full HD · 1920 × 1080</option></select></label>
+    <button type="button" className="primary-button" disabled={busy||!storyId||scenes.length===0} onClick={()=>void createAnimatic()}>Build approved animatic</button>
+    {animaticTask&&<><span className="task-status task-queued">{animaticTask.status}{typeof animaticTask.progress_percent==="number"? " · "+animaticTask.progress_percent+"%":""}</span><button type="button" className="secondary-button" disabled={busy} onClick={()=>void refreshAnimaticTask()}>Check render</button></>}
+   </div>
+   {animaticTask?.result?.video_asset_id&&<div className="scene-script-editor">
+    <video controls preload="metadata" className="storyboard-take-preview" src={`/api/v1/projects/${projectId}/assets/${animaticTask.result.video_asset_id}/file?preview=true`}/>
+    <div className="scene-editor-actions"><span>{animaticTask.result.resolution} · {animaticTask.result.fps} fps · {animaticTask.result.shot_count} shots · {animaticTask.result.duration_seconds?.toFixed(1)} sec</span><a className="secondary-button" href={`/api/v1/projects/${projectId}/assets/${animaticTask.result.video_asset_id}/file`}>Download MP4</a>{animaticTask.result.timeline_asset_id&&<a className="secondary-button" href={`/api/v1/projects/${projectId}/assets/${animaticTask.result.timeline_asset_id}/file`}>OpenTimelineIO (.otio)</a>}</div>
+   </div>}
+  </div>
   <p className="settings-note">Build shots directly from existing scenes. Every shot retains its screenplay excerpt; media takes reference the existing project Asset Library. No AI generation is triggered from this panel.</p>
   {error&&<div className="connection-banner">{error}</div>}{notice&&<div className="notice">{notice}</div>}
   <label className="field-label">Scene<select value={sceneId} onChange={e=>setSceneId(e.target.value)}>{scenes.map(item=><option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
@@ -649,7 +686,16 @@ function StoryboardPanel({storyId,storyVersion,projectId,scenes}:{storyId:string
    <label className="field-label">Lens note<input value={lens} onChange={e=>setLens(e.target.value)} maxLength={120} placeholder="e.g. 35mm anamorphic"/></label>
    <div className="form-foot"><span>Evidence-linked · review-first · no automatic canon edits</span><button className="primary-button" disabled={busy||!sceneId||!title.trim()||!excerpt.trim()}>Add shot</button></div>
   </form>
-  {loading?<div className="empty-state compact-empty">Loading storyboard…</div>:shots.length===0?<div className="empty-state compact-empty">No shots in this scene yet. Add the first shot above.</div>:<div className="story-scenes">{shots.map(shot=><article className="story-scene" key={shot.id}>
+  <div className="scene-script-editor">
+   <div className="form-title">Editing timeline · {scene?.title??"Scene"}</div>
+   {shots.length===0?<small className="research-muted">Add storyboard shots to create the picture track.</small>:<div style={{display:"flex",gap:6,overflowX:"auto",alignItems:"stretch",paddingBottom:6}}>
+    {shots.map(shot=><div key={shot.id} className="story-scene" style={{flexGrow:Math.max(1,shot.duration_seconds),flexBasis:0,minWidth:116,margin:0}}>
+     <b>{String(shot.position).padStart(2,"0")} · {shot.title}</b><small>{shot.duration_seconds.toFixed(1)} sec · {shot.transition||"Cut"}</small><small>{shot.approved_take_id?"Approved take":"Awaiting approval"}</small>
+    </div>)}
+   </div>}
+   <p className="settings-note">This picture track follows the current scene order. Reorder shots with the controls below; adjust clip duration and outgoing transition in Edit shot. The full story timeline is exported as OpenTimelineIO.</p>
+  </div>
+ {loading?<div className="empty-state compact-empty">Loading storyboard…</div>:shots.length===0?<div className="empty-state compact-empty">No shots in this scene yet. Add the first shot above.</div>:<div className="story-scenes">{shots.map(shot=><article className="story-scene" key={shot.id}>
    <div className="story-scene-number">{String(shot.position).padStart(2,"0")}</div><div className="story-scene-main">
     <div className="execution-job-head"><b>{shot.title}</b><span className="task-status task-queued">{shot.shot_size.toUpperCase()} · {shot.duration_seconds}s</span></div>
     <div className="story-scene-actions"><button type="button" className="secondary-button" disabled={busy||shot.position===1} onClick={()=>void moveShot(shot,-1)}>↑ Move up</button><button type="button" className="secondary-button" disabled={busy||shot.position===shots.length} onClick={()=>void moveShot(shot,1)}>↓ Move down</button><button type="button" className="secondary-button" disabled={busy} onClick={()=>beginEditShot(shot)}>Edit shot</button></div>

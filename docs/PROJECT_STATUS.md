@@ -13,7 +13,9 @@ Last updated: 2026-11-19
 
 ## Implemented backend
 
-- FastAPI application, SQLAlchemy 2 models, SQLite baseline and Alembic migrations 0001–0017.
+- Storyboard & Animatic v0.1: screenplay-evidence-linked shots, ordered shot metadata, reviewable image takes, ComfyUI image adapter, approved-take-only FFmpeg animatic rendering and OpenTimelineIO timeline interchange. Animatic output is stored in project assets and attached to the completed Task Manager record. v1 is silent/picture-only; audio and full editing remain staged.
+
+- FastAPI application, SQLAlchemy 2 models, SQLite baseline and Alembic migrations 0001–0020.
 - Project create/list/read/update/archive/restore API, optimistic version checks and duplicate-slug handling.
 - Content-addressed asset storage using SHA-256, streamed uploads, size limits, temporary staging, atomic placement, MIME sniffing, filename sanitization, project listing and detach.
 - AI Gateway provider registry, priority selection, OpenAI-compatible non-streaming completion, encrypted credentials and idempotent response storage (AES-256-GCM), SSRF-aware URL checks, DNS pinning, TLS verification, disabled redirects/proxies, sanitized errors, usage ledger and manually configured pricing history.
@@ -353,3 +355,14 @@ Never infer one status from another.
 - The ComfyUI adapter is optional and disabled until the local worker and ComfyUI/checkpoint settings are configured. No remote URL or arbitrary workflow JSON is accepted from the client.
 - Targeted tests cover workflow mapping, output locator safety, task creation, prompt/version requirements, and project-scoped generated asset access. CI evidence is pending for the current branch head.
 - This is the first real image-engine integration, not completion of video/audio generation, Animatic rendering, editing, QA, publishing, or desktop/Android clients.
+
+
+## Storyboard Animatic v0.1 — implementation checkpoint
+
+- Added a local FFmpeg renderer registered through the existing Worker Supervisor and central Task Manager; no separate queue, database, storage service or production orchestrator was introduced.
+- Animatic creation is story-scoped and requires one current, approved image take for every storyboard shot. Scene order and shot position determine the sequence. Missing approvals, stale shot versions, changed take approvals, invalid image MIME types and cross-project asset references are rejected.
+- The renderer supports 1280×720 and 1920×1080 at 24/25/30 fps, bounded to 120 shots, 30 minutes and 100 MB. It scales/pads still images consistently, preserves shot durations, supports an allowlist of dissolve/fade/wipe/slide transitions and emits a silent H.264 MP4.
+- FFmpeg is invoked with an explicit argument vector and no shell, a bounded timeout, generated temporary inputs/filter script, output-size cap and sanitized public errors. The FFmpeg executable is resolved from PATH or MASOUD_STUDIO_FFMPEG_PATH.
+- A companion OpenTimelineIO-compatible .otio document records picture clips, source asset URIs, source hashes, shot/take/scene provenance, timing, transitions and render metadata. Both MP4 and OTIO are saved as project assets and attached to the completed task in the same task-completion transaction.
+- Storyboard UI now queues and refreshes animatic tasks, previews/downloads the MP4 and downloads the OTIO interchange file.
+- This is **Implemented**, not yet **Tested** or **Verified**. Automated tests and full render validation are intentionally deferred to the user's requested test phase. Audio tracks, narration, SFX/music, captions, proxy workflows, interactive timeline editing, transition editor and video-generation adapters remain future increments.

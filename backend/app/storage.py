@@ -275,3 +275,92 @@ def resolve_project_asset_file(db: Session, project_id: str, asset_id: str):
     except OSError:
         raise HTTPException(404, detail={"code": "asset_file_missing"})
     return asset, link, path
+
+
+
+def ingest_generated_media_bytes(db: Session, project_id: str, filename: str,
+                                 content: bytes, media_type: str = "video/mp4"):
+    """Persist bounded renderer output or a validated OTIO interchange document."""
+    import hashlib
+    import json
+    import os
+    import tempfile
+    from .models import Asset, ProjectAsset
+
+    if not isinstance(content, bytes) or not content:
+        raise HTTPException(413, detail={"code": "generated_media_empty"})
+    if media_type == "video/mp4":
+        maximum = min(MAX_UPLOAD_BYTES, 100 * 1024 * 1024)
+        if len(content) > maximum or detect_mime(content[:32]) != "video/mp4":
+            raise HTTPException(415, detail={"code": "generated_video_invalid"})
+    elif media_type == "application/json":
+        maximum = 5 * 1024 * 1024
+        if len(content) > maximum:
+            raise HTTPException(413, detail={"code": "generated_timeline_too_large"})
+        try:
+            parsed = json.loads(content.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError):
+            raise HTTPException(415, detail={"code": "generated_timeline_invalid"}) from None
+        if not isinstance(parsed, dict) or parsed.get("OTIO_SCHEMA") != "Timeline.1":
+            raise HTTPException(415, detail={"code": "generated_timeline_invalid"})
+    else:
+        raise HTTPException(415, detail={"code": "generated_media_type_unsupported"})
+
+    project = db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(404, detail={"code": "project_not_found"})
+    if project.status != "active":
+        raise HTTPException(409, detail={"code": "project_archived"})
+
+    digest = hashlib.sha256(content).hexdigest()
+    try:
+        asset = db.scalar(select(Asset).where(Asset.sha256 == digest))
+        if asset is None:
+            STORAGE_ROOT.mkdir(parents=True, exist_ok=True)
+            destination = blob_path(digest)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            fd, temporary_name = tempfile.mkstemp(prefix="rendered-", suffix=".part", dir=STORAGE_ROOT)
+            temporary = Path(temporary_name)
+            try:
+                with os.fdopen(fd, "wb") as output:
+                    output.write(content)
+                    output.flush()
+                    os.fsync(output.fileno())
+                if not destination.exists():
+                    os.replace(temporary, destination)
+            finally:
+                temporary.unlink(missing_ok=True)
+            asset = Asset(sha256=digest, size_bytes=len(content), mime_type=media_type,
+                          storage_key=f"blobs/{digest[:2]}/{digest}")
+            db.add(asset)
+            db.flush()
+
+        link = db.scalar(select(ProjectAsset).where(
+            ProjectAsset.project_id == project_id, ProjectAsset.asset_id == asset.id
+        ))
+        if link is None:
+            link = ProjectAsset(project_id=project_id, asset_id=asset.id,
+                                original_filename=safe_filename(filename))
+            db.add(link)
+        db.commit()
+        db.refresh(asset)
+        db.refresh(link)
+        return asset, link
+    except IntegrityError:
+        db.rollback()
+        asset = db.scalar(select(Asset).where(Asset.sha256 == digest))
+        if asset is None:
+            raise HTTPException(409, detail={"code": "generated_media_conflict"}) from None
+        link = db.scalar(select(ProjectAsset).where(
+            ProjectAsset.project_id == project_id, ProjectAsset.asset_id == asset.id
+        ))
+        if link is None:
+            link = ProjectAsset(project_id=project_id, asset_id=asset.id,
+                                original_filename=safe_filename(filename))
+            db.add(link)
+            db.commit()
+            db.refresh(link)
+        return asset, link
+    except Exception:
+        db.rollback()
+        raise

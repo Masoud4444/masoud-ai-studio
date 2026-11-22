@@ -22,7 +22,7 @@ A public-code, private-by-design, local-first AI creative production studio for 
 ## Current implementation
 
 ### Backend
-- FastAPI, SQLAlchemy 2, SQLite and Alembic migrations through 0017.
+- FastAPI, SQLAlchemy 2, SQLite and Alembic migrations through 0020.
 - Project lifecycle API with optimistic version checks.
 - Content-addressed local storage and project asset linking.
 - AI Provider registry, encrypted credentials, SSRF-aware URL validation and OpenAI-compatible non-streaming gateway.
@@ -42,6 +42,7 @@ A public-code, private-by-design, local-first AI creative production studio for 
 - Overview, Projects, Production, AI Agents and Assets workspaces.
 - Research Vault workspace with source/evidence/claim management, search and document extraction.
 - Story Engine workspace for story dossiers, scenes and revision history.
+- Storyboard workspace for screenplay-linked shots, reviewed image takes and FFmpeg-based animatic rendering with OpenTimelineIO interchange.
 - Characters & Worlds workspace for character/location/world data and continuity review; registered props can be created, edited and linked into continuity facts.
 - Timeline workspace for in-world events, explicit chronology constraints and cycle analysis.
 - Video & Audio, Compliance and some Settings capabilities remain staged; no incomplete module is represented as production-ready.
@@ -94,7 +95,7 @@ Build frontend with npm run build.
 - Authentication and authorization are not implemented. Keep the backend bound to localhost; never expose it to the public internet or an untrusted LAN.
 - Do not commit provider API keys, encryption keys, database files, generated assets or personal data.
 - No provider API keys are configured by default. No billable provider calls are made by the default setup.
-- Worker is disabled by default. Creative task handlers are not registered.
+- Worker is disabled by default. When explicitly enabled, only registered local creative handlers (Story outline/scenes, Storyboard prompt/image and approved-take Animatic) are claimable.
 - Agent profiles start as drafts. Text-only Agent Runtime requires explicit provider/model/pricing configuration and activation; no tools are executed. Tool Broker, execution sandbox and hard runtime isolation are not complete.
 - Windows credential protection via DPAPI/OS keychain, hard worker process isolation, multi-worker coordination, backup/restore verification and independent security review remain required.
 
@@ -125,3 +126,16 @@ Storyboard image generation is an optional local adapter. It reuses the central 
 5. In Storyboard, create or generate a shot prompt, then choose **Generate image take**. The generated image is stored in the project's asset library as a new unapproved take.
 
 The first adapter version intentionally accepts loopback ComfyUI only. It pins DNS resolution to loopback, disables proxy inheritance and redirects, bounds polling and output size, validates returned image bytes and output locators, and never accepts an arbitrary provider URL or workflow graph from the browser. The versioned workflow pack uses ComfyUI core nodes and requires a compatible checkpoint. Video generation, remote engines, live previews, and custom-node workflow packs remain separate future adapters.
+
+
+## Approved-take Animatic renderer (optional local engine)
+
+The Animatic renderer reuses the Storyboard, Task Manager, Worker Supervisor and project Asset Library. It renders a silent MP4 from the approved image take for every shot, in scene/shot order, preserving shot durations and supported dissolve/fade/wipe transitions. It also saves an OpenTimelineIO (.otio) interchange document as a second project asset and attaches both outputs to the task.
+
+1. Install FFmpeg on the same machine and make ffmpeg available on PATH, or set MASOUD_STUDIO_FFMPEG_PATH to its executable.
+2. Set MASOUD_STUDIO_WORKER_ENABLED=true for the backend process and restart it.
+3. Approve one image take for every storyboard shot in the story.
+4. In Storyboard, choose the output resolution and select **Build approved animatic**.
+5. Refresh the task to see the MP4 preview/download and the .otio timeline export.
+
+The renderer rejects missing, unapproved, stale, cross-project or non-image takes. v1 is picture-only and silent; audio, voice, music, captions and full nonlinear editing are separate planned stages. Output is bounded to 100 MB and 30 minutes, uses a fixed FFmpeg argument list without a shell, and stores both deliverables in the content-addressed project asset store.
