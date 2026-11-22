@@ -10,7 +10,7 @@ from backend.app.storyboard_engine import _validate_evidence
 
 def _shot_payload(**overrides):
     values = {
-        "scene_id": "scene-00000000-0000-0000-000000000001",
+        "scene_id": "00000000-0000-0000-0000-000000000001",
         "title": "Doorway reveal",
         "source_excerpt": "Mira opens the door.",
     }
