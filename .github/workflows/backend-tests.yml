@@ -12,6 +12,8 @@ on:
   pull_request:
     paths:
       - "backend/migrations/**"
+      - "backend/app/storyboard*.py"
+      - "backend/tests/test_storyboard.py"
       - "requirements.txt"
       - "alembic.ini"
       - "pyproject.toml"
